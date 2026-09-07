@@ -71,8 +71,8 @@ class Settings(BaseSettings):
     # ── 缓存
     agent_cache_db: Path = REPO_ROOT / "data" / "provider-cache.db"
 
-    # ── 模型（见 §9.5 / §9.7）
-    default_model_id: str = "openai:gpt-5.6-terra"
+    # ── 模型（见 §9.5 / §9.7）。开发期用国内模型，上线切 OpenAI 只改环境变量
+    default_model_id: str = "deepseek:deepseek-v4-pro"
     model_role_planner: str | None = None
     model_role_balanced: str | None = None
     model_role_fast: str | None = None

@@ -68,9 +68,14 @@ def test_health_never_leaks_secrets(client: TestClient) -> None:
 
 
 @pytest.mark.usefixtures("clean_env")
-def test_defaults_prefer_openai() -> None:
-    settings = IsolatedSettings()
-    assert settings.default_model_id.startswith("openai:")
+def test_default_model_id_is_well_formed() -> None:
+    """默认模型必须是 `provider:model` 形式且 provider 在已知集合内。
+
+    不断言具体型号：开发期用国内模型、上线切 OpenAI，型号会变（§9.7）。
+    """
+    provider, _, model = IsolatedSettings().default_model_id.partition(":")
+    assert provider in {"openai", "deepseek", "zhipu", "moonshot", "anthropic", "google"}
+    assert model
 
 
 @pytest.mark.usefixtures("clean_env")
