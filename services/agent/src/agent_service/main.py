@@ -19,6 +19,7 @@ from agent_service.api import research as research_api
 from agent_service.config import Settings, get_settings
 from agent_service.models.registry import ModelRegistry, bootstrap_sdk, tracing_status
 from agent_service.observability.logging import configure_logging, get_logger
+from agent_service.providers.runtime import ProviderRuntime
 
 log = get_logger(__name__)
 
@@ -80,6 +81,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     tracing_enabled = bootstrap_sdk(settings)
     app.state.registry = ModelRegistry(settings)
 
+    runtime = ProviderRuntime(settings.cache_db_path)
+    await runtime.open()
+    app.state.provider_runtime = runtime
+
     configured = [p.provider for p in _llm_provider_status(settings) if p.configured]
     log.info(
         "agent_service.startup",
@@ -96,6 +101,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     yield
 
+    await app.state.provider_runtime.aclose()
     await app.state.registry.aclose()
     log.info("agent_service.shutdown")
 
