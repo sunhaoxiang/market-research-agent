@@ -169,7 +169,26 @@ def extract_json_object(text: str) -> str:
 
 def parse_output[T: BaseModel](text: str, output_model: type[T]) -> T:
     """把模型输出解析成目标类型。失败时抛出的异常信息会被回喂给模型。"""
+    if not text.strip():
+        raise EmptyOutputError
     return output_model.model_validate_json(extract_json_object(text))
+
+
+class EmptyOutputError(ValueError):
+    """模型返回空文本。
+
+    实测于 deepseek-v4-pro：它是推理模型，`reasoning_content` 与正式输出
+    **共享同一个 max_tokens 预算**。预算被推理耗尽时接口仍返回 200，但
+    `content` 为空字符串。单独成一类是因为重试对它无效——同样的
+    max_tokens 会得到同样的结果，必须改配置。
+    """
+
+    def __init__(self) -> None:
+        super().__init__(
+            "模型返回了空文本。若为推理模型（如 deepseek-v4-pro），"
+            "通常是 max_tokens 被 reasoning token 耗尽——加大 max_output_tokens，"
+            "重试无效"
+        )
 
 
 def format_validation_feedback(error: Exception) -> str:
@@ -332,6 +351,10 @@ async def run_structured[T: BaseModel](
         last_raw = str(result.final_output or "")
         try:
             parsed = strategy.parse(last_raw)
+        except EmptyOutputError:
+            # 不重试：原因是 token 预算而非模型理解偏差，同样的配置只会得到
+            # 同样的空输出，重试纯属浪费成本与时间
+            raise
         except (ValidationError, ValueError) as error:
             last_error = error
             feedback = format_validation_feedback(error)

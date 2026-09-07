@@ -244,6 +244,10 @@
   3. **新增 `[DP §9.8]` 缓存约束**：缓存命中价仅为未命中的 3%，比分时折扣重要得多。要求 system prompt 字节级稳定（严禁插入当前时间 / session_id），易变内容放消息末尾——这条容易在写 prompt 时无意破坏，需在 review 时专门检查。
 - 实测核实的两点（影响设计）：
   - OpenAI 全系与 Kimi K3 支持 `json_schema` + `strict`，DeepSeek/GLM 仅 `json_object` → 结构化输出做三路径（P1-4b），schema 保持扁平。
+  - **DeepSeek 实测结论（2026-09-07，真实 key）**：`response_format=json_schema` 被 **HTTP 400** 拒绝（`"This response_format type is unavailable now"`），只支持 `json_object` → 目录里保守标注 `json_mode` 得到证实。三个样例问题走 json_mode 路径**全部一次通过、零重试**，6360 字符的内嵌 schema 模型能正确消化。附带三点：
+    1. **缓存策略验证有效**：首个问题 `cached_tokens=0`，后两个均为 1664/1725 ≈ **96% 命中**。§9.8 要求的「schema 后缀追加在末尾、前缀字节级稳定」确实拿到了 3% 的缓存价。
+    2. **planner 延迟是真实风险**：单次 17–60s，与输出 token 量（1.1k–4k）正相关，因为 v4-pro 是推理模型。60s 会吃掉 `TOTAL_TIMEOUT_S=420` 的 14%，P1-9 需评估 planner 换 flash 或限制推理长度。
+    3. **推理模型的空输出陷阱**：`reasoning_content` 与正式输出共享 `max_tokens`，预算耗尽时接口返回 200 但 `content` 为空。已加 `EmptyOutputError` 并**不重试**（同样配置只会得到同样结果）。
   - **SDK 的 `output_type` 与 `json_mode` 互斥**（读 `chatcmpl_converter.convert_response_format()` 得知）：只要设了 `output_type`，SDK 就无条件发送 `response_format={"type":"json_schema"}`，`is_strict_json_schema()` 只能切换其中的 `strict` 标志，无法降级为 `json_object`。因此 `json_mode` / `prompt_only` 两条路径必须**不设 `output_type`**，改由我们自己内嵌 schema、解析文本、带错误重试。这是 P1-4b 的核心约束，也是它不能简单委托给 SDK 的原因。
   - SDK tracing 依赖 `OPENAI_API_KEY` 上传，且**独立于业务模型**：有 OpenAI key 后，用国内模型的 run 也能上传 trace。
 - 当前 OpenAI 阵容（2026-09 核实）：`gpt-6-astra` $10/$50（1.05M ctx）、`gpt-5.6-sol` $4/$20、`terra` $2/$12、`luna` $0.20/$1.20。

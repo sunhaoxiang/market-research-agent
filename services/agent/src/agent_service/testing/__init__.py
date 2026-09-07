@@ -10,5 +10,18 @@ from agent_service.testing.fake_model import (
     message,
     tool_call,
 )
+from agent_service.testing.settings import (
+    IsolatedExecutionLimits,
+    IsolatedProviderCredentials,
+    IsolatedSettings,
+)
 
-__all__ = ["FakeModel", "FakeTurn", "message", "tool_call"]
+__all__ = [
+    "FakeModel",
+    "FakeTurn",
+    "IsolatedExecutionLimits",
+    "IsolatedProviderCredentials",
+    "IsolatedSettings",
+    "message",
+    "tool_call",
+]

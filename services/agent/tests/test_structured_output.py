@@ -17,6 +17,7 @@ from agent_service.models.capabilities import (
 )
 from agent_service.models.catalog import get_entry
 from agent_service.models.structured_output import (
+    EmptyOutputError,
     StructuredOutputError,
     apply_strategy,
     build_strategy,
@@ -309,6 +310,22 @@ async def test_gives_up_after_max_retries(json_mode_agent: Agent[None]) -> None:
 
     assert excinfo.value.attempts == 3
     assert excinfo.value.model_name == "Sample"
+
+
+async def test_empty_output_fails_fast_without_retrying(
+    json_mode_agent: Agent[None],
+) -> None:
+    """实测于 deepseek-v4-pro：推理 token 耗尽 max_tokens 时接口返回 200 但
+    content 为空。重试对它无效——同样的配置只会得到同样的结果，所以必须
+    立刻失败并指向真正的原因，而不是白烧两次调用。"""
+    model = FakeModel(["", '{"symbol": "X", "price": 1.0, "tags": []}'])
+    json_mode_agent.model = model
+    strategy = build_strategy(Sample, _caps(StructuredOutputMode.JSON_MODE))
+
+    with pytest.raises(EmptyOutputError, match="max_tokens"):
+        await run_structured(json_mode_agent, "查 X", strategy=strategy)
+
+    assert model.call_count == 1  # 没有浪费重试
 
 
 async def test_native_schema_path_skips_manual_parsing(

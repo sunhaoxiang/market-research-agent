@@ -8,9 +8,7 @@ from __future__ import annotations
 import pytest
 from agents import OpenAIChatCompletionsModel, OpenAIResponsesModel
 from agents.extensions.models.litellm_model import LitellmModel
-from pydantic_settings import SettingsConfigDict
 
-from agent_service.config import Settings
 from agent_service.models.capabilities import ProviderId
 from agent_service.models.registry import (
     ModelRegistry,
@@ -18,12 +16,7 @@ from agent_service.models.registry import (
     bootstrap_sdk,
 )
 from agent_service.schemas.common import ModelRole
-
-
-class IsolatedSettings(Settings):
-    """不读 .env 文件，避免本机凭证影响断言。"""
-
-    model_config = SettingsConfigDict(env_file=None, extra="ignore", case_sensitive=False)
+from agent_service.testing import IsolatedSettings
 
 
 @pytest.fixture

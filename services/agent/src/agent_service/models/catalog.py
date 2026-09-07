@@ -73,9 +73,11 @@ CATALOG: tuple[ModelEntry, ...] = (
         verified_at=_VERIFIED,
         notes=(
             "开发期 PLANNER / BALANCED / WRITING 的默认模型。"
-            "structured_output 保守标为 json_mode：官方声明支持 structured output，"
-            "但尚未实测 strict json_schema 的可靠性（P1-4b 验证后可升级）。"
-            "保守的代价只是少用一点模型能力，激进的代价是研究中途冒出解析失败。"
+            "json_mode 已实测确认：发送 response_format=json_schema 会被 400 拒绝，"
+            'message 为 "This response_format type is unavailable now"，只支持 json_object。'
+            "另需注意它是推理模型，reasoning_content 与正式输出共享 max_tokens 预算，"
+            "预算不足时接口返回 200 但 content 为空（见 EmptyOutputError）。"
+            "planner 场景实测单次 17-60s，输出 1.1k-4k token，延迟与输出量正相关。"
         ),
         capabilities=ModelCapabilities(
             tool_calling=True,

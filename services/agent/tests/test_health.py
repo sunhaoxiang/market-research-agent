@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import pytest
 from fastapi.testclient import TestClient
-from pydantic_settings import SettingsConfigDict
 
-from agent_service.config import ProviderCredentials, Settings, get_settings
+from agent_service.config import get_settings
 from agent_service.main import create_app
+from agent_service.testing import IsolatedProviderCredentials, IsolatedSettings
 
 _PROVIDER_ENV_VARS = (
     "OPENAI_API_KEY",
@@ -18,12 +18,6 @@ _PROVIDER_ENV_VARS = (
     "GOOGLE_API_KEY",
     "DEFAULT_MODEL_ID",
 )
-
-
-class IsolatedSettings(Settings):
-    """不读取 .env 文件的 Settings，用于测试默认值不受本地环境影响。"""
-
-    model_config = SettingsConfigDict(env_file=None, extra="ignore", case_sensitive=False)
 
 
 @pytest.fixture
@@ -90,7 +84,7 @@ def test_execution_limits_are_internally_consistent() -> None:
 def test_secrets_are_not_exposed_in_repr(monkeypatch: pytest.MonkeyPatch) -> None:
     """SecretStr 保证日志与异常里不会意外打印出 key。"""
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test-should-not-appear")
-    creds = ProviderCredentials()
+    creds = IsolatedProviderCredentials()
 
     assert creds.openai_api_key is not None
     assert creds.openai_api_key.get_secret_value() == "sk-test-should-not-appear"
