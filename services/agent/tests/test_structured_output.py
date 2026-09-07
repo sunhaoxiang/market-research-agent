@@ -18,7 +18,6 @@ from agent_service.models.capabilities import (
 )
 from agent_service.models.catalog import get_entry
 from agent_service.models.structured_output import (
-    EmptyOutputError,
     StructuredOutputError,
     apply_strategy,
     build_strategy,
@@ -316,20 +315,48 @@ async def test_gives_up_after_max_retries(json_mode_agent: Agent[None]) -> None:
     assert excinfo.value.model_name == "Sample"
 
 
-async def test_empty_output_fails_fast_without_retrying(
-    json_mode_agent: Agent[None],
-) -> None:
-    """实测于 deepseek-v4-pro：推理 token 耗尽 max_tokens 时接口返回 200 但
-    content 为空。重试对它无效——同样的配置只会得到同样的结果，所以必须
-    立刻失败并指向真正的原因，而不是白烧两次调用。"""
+async def test_empty_output_is_retried(json_mode_agent: Agent[None]) -> None:
+    """DeepSeek 会偶发返回 200 + 空 content（实测 v4-flash 5 次里 1 次，
+    且同一请求直接重发就正常）。规划失败会带走整个会话（§7.2），
+    为一次偶发空响应放弃会话不值得。"""
     model = _scripted("", '{"symbol": "X", "price": 1.0, "tags": []}')
     json_mode_agent.model = model
     strategy = build_strategy(Sample, _caps(StructuredOutputMode.JSON_MODE))
 
-    with pytest.raises(EmptyOutputError, match="max_tokens"):
-        await run_structured(json_mode_agent, "查 X", strategy=strategy)
+    outcome = await run_structured(json_mode_agent, "查 X", strategy=strategy)
 
-    assert len(model.calls) == 1  # 没有浪费重试；第二步脚本刻意留着不被消费
+    assert outcome.output.symbol == "X"
+    assert outcome.attempts == 2
+
+
+async def test_empty_output_retry_resends_the_original_input(
+    json_mode_agent: Agent[None],
+) -> None:
+    """空输出重试不回喂历史。
+
+    两个原因：空输出没有可纠正的信息，回喂等于让模型揣摩「上次为什么没说话」；
+    以及重发原请求能保持 prompt 前缀不变，这次重试仍命中缓存（§9.8）。
+    """
+    model = _scripted("", '{"symbol": "X", "price": 1.0, "tags": []}')
+    json_mode_agent.model = model
+    strategy = build_strategy(Sample, _caps(StructuredOutputMode.JSON_MODE))
+
+    await run_structured(json_mode_agent, "查 X", strategy=strategy)
+
+    assert model.calls[1].input == model.calls[0].input
+
+
+async def test_persistent_empty_output_eventually_fails(
+    json_mode_agent: Agent[None],
+) -> None:
+    """一直空则说明不是偶发，重试用尽后要报出根因而不是含糊的解析失败。"""
+    json_mode_agent.model = _scripted("", "", "")
+    strategy = build_strategy(Sample, _caps(StructuredOutputMode.JSON_MODE))
+
+    with pytest.raises(StructuredOutputError) as excinfo:
+        await run_structured(json_mode_agent, "查 X", strategy=strategy, max_retries=2)
+
+    assert "content 为空" in excinfo.value.last_error
 
 
 async def test_native_schema_path_skips_manual_parsing(

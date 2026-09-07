@@ -238,6 +238,7 @@ market-research-agent/
 │       │   ├── orchestrator/
 │       │   │   ├── state.py          # ResearchState
 │       │   │   ├── planner.py        # LLM → ResearchPlan
+│       │   │   ├── plan_validation.py # 计划语义校验（上限/依赖/无环）+ 分层
 │       │   │   ├── executor.py       # fan-out 执行
 │       │   │   └── pipeline.py       # 全流程串联
 │       │   ├── agents/
@@ -1383,17 +1384,17 @@ OPENAI_AGENTS_DISABLE_TRACING=false
 
 ### 18.1 分层
 
-| 层                   | 工具                   | 覆盖                                                               | 是否调 LLM |
-| -------------------- | ---------------------- | ------------------------------------------------------------------ | ---------- |
-| Python 单元          | pytest                 | schema 校验、指标计算、URL 归一化、SSRF 判定、事件序列化、降级逻辑 | 否         |
-| Provider 契约        | pytest + **respx**     | 每个 provider：正常/404/429/超时/畸形响应/缓存命中                 | 否         |
-| Tool 集成            | pytest（录制 fixture） | 真实响应快照 → 断言结构化解析与 provenance                         | 否         |
+| 层                   | 工具                       | 覆盖                                                               | 是否调 LLM |
+| -------------------- | -------------------------- | ------------------------------------------------------------------ | ---------- |
+| Python 单元          | pytest                     | schema 校验、指标计算、URL 归一化、SSRF 判定、事件序列化、降级逻辑 | 否         |
+| Provider 契约        | pytest + **respx**         | 每个 provider：正常/404/429/超时/畸形响应/缓存命中                 | 否         |
+| Tool 集成            | pytest（录制 fixture）     | 真实响应快照 → 断言结构化解析与 provenance                         | 否         |
 | **Workflow（关键）** | pytest + **ScriptedModel** | 全流程：planning→fan-out→fact check→report。含失败/超时/冲突场景   | **否**     |
-| Live smoke           | pytest `-m live`       | 少量真实 API + 真实 LLM 调用，本地手动/每周 CI                     | 是         |
-| 前端单元             | Vitest                 | 事件 reducer、SSE 解析、引用解析、格式化                           | 否         |
-| 前端组件             | Vitest + RTL           | Activity Panel 状态渲染、Citation 交互                             | 否         |
-| DB                   | Vitest + 内存 SQLite   | migration、queries、事务、事件批写                                 | 否         |
-| E2E                  | Playwright [P6]        | 打桩 Python 服务，跑完整 UI 流程                                   | 否         |
+| Live smoke           | pytest `-m live`           | 少量真实 API + 真实 LLM 调用，本地手动/每周 CI                     | 是         |
+| 前端单元             | Vitest                     | 事件 reducer、SSE 解析、引用解析、格式化                           | 否         |
+| 前端组件             | Vitest + RTL               | Activity Panel 状态渲染、Citation 交互                             | 否         |
+| DB                   | Vitest + 内存 SQLite       | migration、queries、事务、事件批写                                 | 否         |
+| E2E                  | Playwright [P6]            | 打桩 Python 服务，跑完整 UI 流程                                   | 否         |
 
 ### 18.2 `ScriptedModel` — 测试策略的核心
 

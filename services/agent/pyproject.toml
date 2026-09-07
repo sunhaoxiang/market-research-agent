@@ -76,8 +76,6 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101", "PLR2004", "ARG"]  # 测试里允许 assert 与魔数
-# FakeModel 实现 SDK 的 Model 协议，签名由上游固定：位置参数个数与未用参数都不可改
-"src/agent_service/testing/fake_model.py" = ["ARG002", "PLR0917"]
 
 [tool.ruff.lint.flake8-tidy-imports]
 ban-relative-imports = "parents"

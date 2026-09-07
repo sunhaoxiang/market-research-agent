@@ -83,10 +83,10 @@
 | P1-4b | **结构化输出三路径**：`native_schema`（主）/ `json_mode` / `prompt_only` + Pydantic 二次校验 + 带错误信息重试 2 次 `[DP §9.4, R3]`；schema 扁平化约束                                                  | P1-4, P1-1        | ✅   | 三条路径各有单测；故意返回坏 JSON 能被修正                                                                |
 | P1-5  | `GET /v1/models` + Next `GET /api/models`：过滤无 key 的 provider 并给出禁用原因                                                                                                                       | P1-4              | ✅   | 只配 1 个 key 时其余显示禁用                                                                              |
 | P1-6  | 事件总线 `observability/event_bus.py`：`asyncio.Queue` + seq 分配 + heartbeat 任务                                                                                                                     | P1-1              | ✅   | 并发发事件时 seq 严格递增                                                                                 |
-| P1-7  | SDK 事件翻译层：`RunItemStreamEvent`/`AgentUpdatedStreamEvent` → 本协议事件 `[DP §12.1]`                                                                                                               | P1-6              | ✅   | 用 ScriptedModel 验证翻译正确                                                                                 |
-| P1-8  | ~~自建 `FakeModel`~~ → **改用 SDK 自带 `agents.testing.ScriptedModel`**（自建版只实现 `get_response`，`run_streamed` 走 `stream_response`，P1-7 一跑就暴露）`[DP §18.2]`                                                                                                                        | P1-4              | ✅   | 能驱动一次完整 run                                                                                        |
-| P1-9  | Research Manager Agent（planner）+ prompt + plan 代码校验（任务数上限/agent 合法/无环）                                                                                                                | P1-4, P1-1        | ⬜   | 真实模型能对 3 个样例问题产出合法 plan                                                                    |
-| P1-10 | Orchestrator 骨架：`state.py` / `executor.py`（分层 fan-out + 超时 + 失败降级）/ `pipeline.py`；接入执行上限 `[DP §7.2]`                                                                               | P1-9, P1-6        | ⬜   | ScriptedModel 下走完 planning→执行→完成                                                                       |
+| P1-7  | SDK 事件翻译层：`RunItemStreamEvent`/`AgentUpdatedStreamEvent` → 本协议事件 `[DP §12.1]`                                                                                                               | P1-6              | ✅   | 用 ScriptedModel 验证翻译正确                                                                             |
+| P1-8  | ~~自建 `FakeModel`~~ → **改用 SDK 自带 `agents.testing.ScriptedModel`**（自建版只实现 `get_response`，`run_streamed` 走 `stream_response`，P1-7 一跑就暴露）`[DP §18.2]`                               | P1-4              | ✅   | 能驱动一次完整 run                                                                                        |
+| P1-9  | Research Manager Agent（planner）+ prompt + plan 代码校验（任务数上限/agent 合法/无环）                                                                                                                | P1-4, P1-1        | ✅   | v4-pro 对 3 个样例问题 3/3 产出合法 plan，零修复                                                          |
+| P1-10 | Orchestrator 骨架：`state.py` / `executor.py`（分层 fan-out + 超时 + 失败降级）/ `pipeline.py`；接入执行上限 `[DP §7.2]`                                                                               | P1-9, P1-6        | ⬜   | ScriptedModel 下走完 planning→执行→完成                                                                   |
 | P1-11 | `POST /v1/research/stream` SSE 端点 + Next `POST /api/research`（消费/落库/转发，客户端断开仍落库）+ `lib/sse.ts` 解析器                                                                               | P1-10, P0-7       | ⬜   | 浏览器实时收到事件；断开后 DB 完整                                                                        |
 | P1-12 | 前端最小闭环：提问框 + 模型选择器 + Activity Panel 骨架（计划树 + 状态点亮）+ 事件 reducer + store                                                                                                     | P1-11, P1-5, P1-2 | ⬜   | 提问后能看到计划与逐节点点亮                                                                              |
 | P1-13 | **可观察性埋点**（`[DP §20.1]`）：`agent_runs` / `tool_calls` 写入 + prompt hash / token / 成本记录；SDK tracing 开关验证                                                                              | P1-11             | ⬜   | 一次研究后两张表数据完整，成本可核算；`/debug` 与 eval 的数据基础就绪                                     |
@@ -173,7 +173,7 @@
 | P5-5 | Fact Checker Agent（干净上下文，只看 claims + sources，可复检索）+ 校验事件流                              | P5-4              | ⬜   | 能识别注入的错误声明                        |
 | P5-6 | Gap Check + 最多 1 轮补充研究（`PLAN_UPDATED`）                                                            | P5-5              | ⬜   | 缺关键数据时能补一轮                        |
 | P5-7 | Report Writer v2：动态 `report_sections`、Executive Summary、Bull/Bear Case、Risks、数据限制章节、免责声明 | P5-6, P2-8        | ⬜   | 不同问题类型报告结构不同                    |
-| P5-8 | 全流程 workflow 测试（ScriptedModel）：正常 / 工具失败 / 超时 / 冲突 / 引用缺失 / schema 解析失败 6 条路径     | P5-7, P1-8        | ⬜   | 全部确定性通过                              |
+| P5-8 | 全流程 workflow 测试（ScriptedModel）：正常 / 工具失败 / 超时 / 冲突 / 引用缺失 / schema 解析失败 6 条路径 | P5-7, P1-8        | ⬜   | 全部确定性通过                              |
 | P5-9 | 多模型冒烟：6 个 provider 各跑一次完整研究，结果写入 catalog `verified` 字段 + `[DP §9.4]` 降级验证        | P5-8, P1-4        | ⬜   | 已配 key 的 provider 全部跑通或明确标注限制 |
 
 ### P5.5 — MVP 验收 ⬜
@@ -246,8 +246,8 @@
   - OpenAI 全系与 Kimi K3 支持 `json_schema` + `strict`，DeepSeek/GLM 仅 `json_object` → 结构化输出做三路径（P1-4b），schema 保持扁平。
   - **DeepSeek 实测结论（2026-09-07，真实 key）**：`response_format=json_schema` 被 **HTTP 400** 拒绝（`"This response_format type is unavailable now"`），只支持 `json_object` → 目录里保守标注 `json_mode` 得到证实。三个样例问题走 json_mode 路径**全部一次通过、零重试**，6360 字符的内嵌 schema 模型能正确消化。附带三点：
     1. **缓存策略验证有效**：首个问题 `cached_tokens=0`，后两个均为 1664/1725 ≈ **96% 命中**。§9.8 要求的「schema 后缀追加在末尾、前缀字节级稳定」确实拿到了 3% 的缓存价。
-    2. **planner 延迟是真实风险**：单次 17–60s，与输出 token 量（1.1k–4k）正相关，因为 v4-pro 是推理模型。60s 会吃掉 `TOTAL_TIMEOUT_S=420` 的 14%，P1-9 需评估 planner 换 flash 或限制推理长度。
-    3. **推理模型的空输出陷阱**：`reasoning_content` 与正式输出共享 `max_tokens`，预算耗尽时接口返回 200 但 `content` 为空。已加 `EmptyOutputError` 并**不重试**（同样配置只会得到同样结果）。
+    2. **planner 延迟是真实风险**：单次 17–60s，与输出 token 量（1.1k–4k）正相关，因为 v4-pro 是推理模型。60s 会吃掉 `TOTAL_TIMEOUT_S=420` 的 14%，P1-9 需评估 planner 换 flash 或限制推理长度。→ P1-9 已实测，**换 flash 无效**，见下。
+    3. **推理模型的空输出陷阱**：接口返回 200 但 `content` 为空。当时归因为「`reasoning_content` 与正式输出共享 `max_tokens`，预算耗尽」，据此设计为**不重试**。→ P1-9 否证了这个归因，改为重试，见下。
   - **SDK 的 `output_type` 与 `json_mode` 互斥**（读 `chatcmpl_converter.convert_response_format()` 得知）：只要设了 `output_type`，SDK 就无条件发送 `response_format={"type":"json_schema"}`，`is_strict_json_schema()` 只能切换其中的 `strict` 标志，无法降级为 `json_object`。因此 `json_mode` / `prompt_only` 两条路径必须**不设 `output_type`**，改由我们自己内嵌 schema、解析文本、带错误重试。这是 P1-4b 的核心约束，也是它不能简单委托给 SDK 的原因。
   - SDK tracing 依赖 `OPENAI_API_KEY` 上传，且**独立于业务模型**：有 OpenAI key 后，用国内模型的 run 也能上传 trace。
 - 当前 OpenAI 阵容（2026-09 核实）：`gpt-6-astra` $10/$50（1.05M ctx）、`gpt-5.6-sol` $4/$20、`terra` $2/$12、`luna` $0.20/$1.20。
@@ -284,6 +284,21 @@
 10. **慢网络下大二进制包超时**：`.npmrc` 放宽 fetch 重试与超时（`@next/swc` 约 31MB）。
 
 **新增技术债**：D13（TS 6 降级）、D14（CI 远端未验证）、D15（shadcn/ui 未初始化）。
+
+### P1-9 — Research Manager（planner）✅（2026-09-07）
+
+**完成内容**：`prompts/`（模板加载 + 占位符校验）、`prompts/research_manager.md`、`agents/research_manager.py`、`orchestrator/plan_validation.py`、`orchestrator/planner.py`、`scripts/probe_planner.py`（取代 `probe_deepseek.py`）。离线测试 29 个。
+
+**验收结果**（真实 DeepSeek key，2026-09-07 高峰时段）：v4-pro 对三个样例问题 **3/3 产出合法计划、零修复**，中位延迟 42s，均成本 $0.010。`report_sections` 确实随问题类型变化（对比类问题精确产出 `Executive Summary / Comparison / Key Differences / Conclusion`），实体解析（英伟达→NVDA）与假设披露都符合预期。
+
+**两个被实测否证的先前判断**：
+
+1. **「planner 换 v4-flash 提速」不成立。** flash 在规划任务上输出 4.3k–4.7k token，而 v4-pro 只要 2.1k–2.7k；推理模型的延迟由输出量决定，于是 flash 中位延迟 42s **反而略高于** pro 的 38s，标称 1/3 的价格优势也只剩 1.6 倍。更糟的是稳定性：flash 3 个问题只成功 2 个，同一问题连跑 5 次有 1 次返回空 `content`，延迟方差 14–71s。**结论：PLANNER 保留 v4-pro。**
+2. **空输出不是 `max_tokens` 被推理耗尽。** P1-4b 时据此把 `EmptyOutputError` 设计成不重试。实测否证：把出错的那次请求原样直接发给接口，正常返回（`finish_reason=stop`，reasoning 仅用 2126 token，远未打满 384k 预算）；且它是偶发的（5 次 1 次）。既然规划失败会带走整个会话（§7.2），为一次偶发空响应放弃会话不值得 → **改为可重试**，但重试时**重发原请求而不回喂历史**（空输出没有可纠正的信息，且空 assistant 消息有被 provider 拒绝的风险，重发还能保住 prompt 缓存命中）。
+
+**另一个观察到的失败模式**：模型偶尔把内嵌的 JSON Schema **本身**当输出返回（`{"properties": {...}}`）。P1-4b 的「回喂字段级错误 + 重试」机制正确救回，这是该机制第一次在真实模型上被触发。
+
+**设计取舍：计划校验以修复为主而非拒绝。** §7.2 规定 planner 失败即整体失败，而「引用了不存在的任务 id」这类笔误对研究结果影响微乎其微。因此只有**无法安全修复**的才拒绝（任务列表为空；任务 id 重复——`depends_on` 指向哪一个无从判断），其余修复并记录：超限按 `priority` 降序截断、丢弃悬空/自引用依赖、按「只保留指向前方的边」确定性地打断环。修复记录以 `warning` 事件暴露给用户——静默修复等于让用户看到一份悄悄缩水的报告。截断必须先于依赖清理，否则会留下指向已删除任务的依赖，执行器分层时永远等不到它（已加回归测试）。
 
 ---
 

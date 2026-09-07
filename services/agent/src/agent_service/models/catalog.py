@@ -75,9 +75,9 @@ CATALOG: tuple[ModelEntry, ...] = (
             "开发期 PLANNER / BALANCED / WRITING 的默认模型。"
             "json_mode 已实测确认：发送 response_format=json_schema 会被 400 拒绝，"
             'message 为 "This response_format type is unavailable now"，只支持 json_object。'
-            "另需注意它是推理模型，reasoning_content 与正式输出共享 max_tokens 预算，"
-            "预算不足时接口返回 200 但 content 为空（见 EmptyOutputError）。"
-            "planner 场景实测单次 17-60s，输出 1.1k-4k token，延迟与输出量正相关。"
+            "planner 场景实测单次 17-60s，输出 1.1k-4k token，延迟与输出量正相关；"
+            "三个样例问题 3/3 产出无需修复的合法计划，故保留为 PLANNER 默认。"
+            "偶发返回 200 + 空 content（见 EmptyOutputError），已按可重试处理。"
         ),
         capabilities=ModelCapabilities(
             tool_calling=True,
@@ -102,7 +102,13 @@ CATALOG: tuple[ModelEntry, ...] = (
         adapter=AdapterKind.OPENAI_CHAT,
         display_name="DeepSeek V4 Flash",
         verified_at=_VERIFIED,
-        notes="开发期 FAST 的默认模型：意图分类与 Web Research。",
+        notes=(
+            "开发期 FAST 的默认模型：意图分类与 Web Research。"
+            "**不适合做 planner**（P1-9 实测）：它同样是推理模型，规划这类任务上"
+            "输出 4.3k-4.7k token（v4-pro 只要 2.1k-2.7k），因此中位延迟 42s"
+            "反而略高于 v4-pro 的 38s，价格优势也被输出量吃掉大半；"
+            "同一问题连跑 5 次有 1 次返回空 content，延迟方差 14-71s。"
+        ),
         capabilities=ModelCapabilities(
             tool_calling=True,
             parallel_tool_calls=True,

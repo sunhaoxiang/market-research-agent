@@ -175,20 +175,24 @@ def parse_output[T: BaseModel](text: str, output_model: type[T]) -> T:
 
 
 class EmptyOutputError(ValueError):
-    """模型返回空文本。
+    """模型返回 200 但 `content` 是空字符串。
 
-    实测于 deepseek-v4-pro：它是推理模型，`reasoning_content` 与正式输出
-    **共享同一个 max_tokens 预算**。预算被推理耗尽时接口仍返回 200，但
-    `content` 为空字符串。单独成一类是因为重试对它无效——同样的
-    max_tokens 会得到同样的结果，必须改配置。
+    DeepSeek 的推理模型上都能观察到。**它是偶发的，不是配置问题**——
+    实测 v4-flash 同一个请求连跑 5 次出现 1 次空输出，而把那次的完整请求
+    原样直接发给接口则正常返回（`finish_reason=stop`，reasoning 只用了 2126
+    token，远未打满预算）。
+
+    起初以为原因是「reasoning_content 与正式输出共享 max_tokens 预算，预算被
+    推理耗尽」，于是设计成不重试。上面的实测否证了这个假设：预算充足时同样会空。
+    因此现在按可重试处理——规划阶段失败会导致整个会话失败（§7.2），
+    为一次偶发空响应放弃会话不值得。
+
+    单独成一类的价值不在「是否重试」，而在**重试方式不同**：空输出不含任何
+    可纠正的信息，回喂历史没有意义，见 `run_structured`。
     """
 
     def __init__(self) -> None:
-        super().__init__(
-            "模型返回了空文本。若为推理模型（如 deepseek-v4-pro），"
-            "通常是 max_tokens 被 reasoning token 耗尽——加大 max_output_tokens，"
-            "重试无效"
-        )
+        super().__init__("模型返回了空文本（HTTP 200 但 content 为空）")
 
 
 def format_validation_feedback(error: Exception) -> str:
@@ -351,10 +355,20 @@ async def run_structured[T: BaseModel](
         last_raw = str(result.final_output or "")
         try:
             parsed = strategy.parse(last_raw)
-        except EmptyOutputError:
-            # 不重试：原因是 token 预算而非模型理解偏差，同样的配置只会得到
-            # 同样的空输出，重试纯属浪费成本与时间
-            raise
+        except EmptyOutputError as error:
+            last_error = error
+            log.warning(
+                "structured_output.empty_output",
+                agent=agent.name,
+                mode=strategy.mode.value,
+                attempt=attempt,
+            )
+            # 重发原始请求，不追加历史。两个原因：空输出不含可纠正的信息，
+            # 回喂等于让模型自己揣摩「上次为什么什么都没说」；而把一条空的
+            # assistant 消息塞进历史有被 provider 拒绝的风险。
+            # 顺带的好处是 prompt 前缀不变，这次重试仍能命中缓存（§9.8）。
+            current_input = user_input
+            continue
         except (ValidationError, ValueError) as error:
             last_error = error
             feedback = format_validation_feedback(error)
