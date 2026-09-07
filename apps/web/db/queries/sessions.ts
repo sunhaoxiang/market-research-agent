@@ -54,7 +54,9 @@ export function updateSessionStatus(
   db: Db,
   id: string,
   status: SessionStatus,
-  patch: Partial<Pick<ResearchSession, "completedAt" | "durationMs" | "error" | "costUsd">> = {},
+  patch: Partial<
+    Pick<ResearchSession, "completedAt" | "durationMs" | "error" | "costUsd" | "tokenUsage">
+  > = {},
 ): void {
   db.update(researchSessions)
     .set({ status, ...patch })

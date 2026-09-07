@@ -6,7 +6,7 @@
 > **每完成一个任务就更新此表的状态**；每完成一个阶段，跑 `[DP §26]` 的收尾清单并写阶段小结。
 
 - 最后更新：2026-09-07
-- 当前阶段：**Phase 0 已完成 → Phase 1 待开始**
+- 当前阶段：**Phase 1 进行中**（P1-1 ~ P1-12 已完成，剩 P1-13 埋点）
 
 ### 已确认的前置决策（2026-09-07）
 
@@ -88,7 +88,7 @@
 | P1-9  | Research Manager Agent（planner）+ prompt + plan 代码校验（任务数上限/agent 合法/无环）                                                                                                                | P1-4, P1-1        | ✅   | v4-pro 对 3 个样例问题 3/3 产出合法 plan，零修复                                                          |
 | P1-10 | Orchestrator 骨架：`state.py` / `executor.py`（分层 fan-out + 超时 + 失败降级）/ `pipeline.py`；接入执行上限 `[DP §7.2]`                                                                               | P1-9, P1-6        | ✅   | ScriptedModel 下走完 planning→执行→完成                                                                   |
 | P1-11 | `POST /v1/research/stream` SSE 端点 + Next `POST /api/research`（消费/落库/转发，客户端断开仍落库）+ `lib/sse.ts` 解析器                                                                               | P1-10, P0-7       | ✅   | 真实 DeepSeek 跑通浏览器→DB 全链路；kill -9 断连后 19/19 事件仍落库                                       |
-| P1-12 | 前端最小闭环：提问框 + 模型选择器 + Activity Panel 骨架（计划树 + 状态点亮）+ 事件 reducer + store                                                                                                     | P1-11, P1-5, P1-2 | ⬜   | 提问后能看到计划与逐节点点亮                                                                              |
+| P1-12 | 前端最小闭环：提问框 + 模型选择器 + Activity Panel 骨架（计划树 + 状态点亮）+ 事件 reducer + store                                                                                                     | P1-11, P1-5, P1-2 | ✅   | 真实浏览器验收：DeepSeek 27.5s 出 5 任务计划，节点 ○→●→✓ 全程点亮，无 JS 报错                             |
 | P1-13 | **可观察性埋点**（`[DP §20.1]`）：`agent_runs` / `tool_calls` 写入 + prompt hash / token / 成本记录；SDK tracing 开关验证                                                                              | P1-11             | ⬜   | 一次研究后两张表数据完整，成本可核算；`/debug` 与 eval 的数据基础就绪                                     |
 
 **阶段验收**：输入任意问题 → 前端实时显示"理解问题 / 制定计划 / 任务树点亮 / 完成"，session 与 events 完整落库；至少 2 个不同 Provider 的模型都能跑通。
@@ -362,7 +362,7 @@
 | D12 | 无跨任务 tool 配额协调                                                                                                                                                                      | 按需                               | ⬜   |
 | D13 | **TypeScript 固定在 6.x**：TS 7 下 typescript-eslint 崩溃（[typescript-eslint#10940](https://github.com/typescript-eslint/typescript-eslint/issues/10940)）。代价仅是编译慢一些，功能无影响 | typescript-eslint 支持 TS 7 后升级 | ⬜   |
 | D14 | ~~CI 仅验证了本地等价命令，GitHub Actions 未实际跑过~~ → 首次远端运行暴露两个问题，均已修（见下）                                                                                           | 已偿还（2026-09-07）               | ✅   |
-| D15 | shadcn/ui 未初始化（Phase 0 无组件需求，避免空目录）                                                                                                                                        | P1-12 需要组件时                   | ⬜   |
+| D15 | ~~shadcn/ui 未初始化~~ → P1-12 按其"复制式、非依赖"的定位手写了所需原语，未跑 `init`（见下）                                                                                                | 已偿还（2026-09-07）               | ✅   |
 
 ### D14 偿还记录 — GitHub Actions 首次远端运行（2026-09-07）
 
@@ -370,3 +370,11 @@ P1-9 与 P1-10 两次 push 的 CI 都是红的，暴露两个本地检查覆盖�
 
 1. **Prettier 想重排 prompt 模板。** `prompts/research_manager.md` 是发给 LLM 的输入而不是文档，一次"无害"的格式化就会让 §9.8 的 prompt 缓存前缀失效，命中率从 90%+ 掉到 0，且不报任何错。已把 `prompts/` 加进 `.prettierignore`。本地漏掉是因为我只跑了 Python 侧的检查，没跑 `pnpm check` 的前端部分。
 2. **gitleaks-action 会随机误报。** 它按 push 的 commit 范围构造 `--log-opts`，git 往 stderr 写任何东西都会被判为扫描失败（P1-9 挂、P1-10 同样配置又过了）。会随机误报的安全门等于没有门——很快就会被无视。已改为直接跑固定版本的二进制、每次全量扫历史，并加 `--redact` 避免真命中时把明文印进公开日志。本地也装上了 gitleaks，pre-commit 钩子不再静默跳过。
+
+### D15 偿还记录 — shadcn/ui（2026-09-07）
+
+没有跑 `shadcn init`，而是按 §4 给它的定位——"复制式，非依赖"——把 P1-12 需要的三个原语（`button` / `textarea` / `select`）连同标准的 `cn()` 直接写进 `components/ui/`，只装了 shadcn 自己也要用的 `clsx` 与 `tailwind-merge`。
+
+理由是 `init` 会用它自带的一整套 CSS 变量重写 `globals.css`，覆盖掉 Phase 0 已经调好的明暗色板，换来的却只是三个十几行的组件；而且既然组件是复制进仓库的，手写和让 CLI 复制在结果上没有区别。模型选择器也刻意用原生 `<select>`：单选下拉用原生控件就自带键盘导航、屏幕阅读器支持和移动端系统选择器。
+
+等 P2-10 的 Source Panel 需要真正的悬浮卡（焦点管理、碰撞检测、传送门）时再 `shadcn add tooltip`——那种组件手写确实不值得。

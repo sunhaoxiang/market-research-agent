@@ -173,6 +173,8 @@ function applyStatus(db: ReturnType<typeof getDb>, sessionId: string, event: Res
       patchSession(db, sessionId, { plan: payload.plan ?? null });
       break;
     case "usage_updated":
+      // 中途的增量用量。目前 pipeline 只在收尾时给一次总账，但历史会话列表
+      // 不该依赖"会话必须跑完"才有用量——中途崩掉的会话也要能看到烧了多少
       patchSession(db, sessionId, { tokenUsage: toTokenUsage(payload.usage) });
       break;
     case "stage_changed": {
@@ -187,6 +189,9 @@ function applyStatus(db: ReturnType<typeof getDb>, sessionId: string, event: Res
         completedAt: Date.now(),
         durationMs: numberOrNull(payload.duration_ms),
         costUsd: numberOrNull(payload.cost_usd),
+        // 权威用量在这里，不在 usage_updated——pipeline 目前根本不发那个事件，
+        // 只依赖它的话历史会话的 token_usage 会一直是空的
+        tokenUsage: toTokenUsage(payload.usage),
       });
       break;
     case "session_failed":

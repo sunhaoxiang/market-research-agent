@@ -84,7 +84,11 @@ const HAPPY_PATH = [
   event(3, "intent_classified", { question_type: "crypto", entities: [] }),
   event(4, "plan_created", { plan: PLAN }),
   event(5, "agent_started", { agent: "crypto_research", task_id: "t1", objective: "o" }),
-  event(6, "session_completed", { duration_ms: 1234, cost_usd: 0.02, usage: {} }),
+  event(6, "session_completed", {
+    duration_ms: 1234,
+    cost_usd: 0.02,
+    usage: { input: 2419, output: 2395, cached: 2304 },
+  }),
 ];
 
 function sessions() {
@@ -182,6 +186,19 @@ describe("正常路径", () => {
     expect(session.plan).toEqual(PLAN);
     // 请求里没指定模型，真实用的是 Python 按角色解析出来的那个
     expect(session.modelId).toBe("deepseek:deepseek-v4-pro");
+  });
+
+  it("终态事件里的用量与成本都落库", async () => {
+    // 权威用量只在 session_completed 里：pipeline 目前不发 usage_updated，
+    // 只监听后者的话历史列表的 token_usage 会永远是空的
+    startResearch.mockResolvedValue(upstreamOf(HAPPY_PATH));
+
+    await drain(await ask({ question: "Q" }));
+
+    const session = sessions()[0]!;
+    expect(session.tokenUsage).toEqual({ input: 2419, output: 2395, cached: 2304 });
+    expect(session.costUsd).toBeCloseTo(0.02);
+    expect(session.durationMs).toBe(1234);
   });
 
   it("把 payload 里的 agent / task_id 提到列上", async () => {
