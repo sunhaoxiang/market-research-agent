@@ -9,6 +9,7 @@ import json
 
 import pytest
 from agents import Agent, AgentOutputSchema, ModelSettings
+from agents.testing import ScriptedModel, assistant_message
 from pydantic import BaseModel, Field
 
 from agent_service.models.capabilities import (
@@ -29,13 +30,17 @@ from agent_service.models.structured_output import (
     run_structured,
 )
 from agent_service.schemas import ResearchPlan
-from agent_service.testing import FakeModel
 
 
 class Sample(BaseModel):
     symbol: str
     price: float
     tags: list[str] = Field(default_factory=list)
+
+
+def _scripted(*replies: str) -> ScriptedModel:
+    """按顺序返回若干条助手文本。"""
+    return ScriptedModel([[assistant_message(reply)] for reply in replies])
 
 
 def _caps(mode: StructuredOutputMode) -> ModelCapabilities:
@@ -195,7 +200,7 @@ def test_deepseek_resolves_to_json_mode() -> None:
 
 def test_apply_appends_schema_to_instructions_end() -> None:
     """必须追加在末尾：插在开头会破坏 prompt 缓存前缀（§9.8）。"""
-    agent = Agent(name="t", instructions="你是研究助手。", model=FakeModel())
+    agent = Agent(name="t", instructions="你是研究助手。", model=ScriptedModel())
     strategy = build_strategy(Sample, _caps(StructuredOutputMode.JSON_MODE))
 
     prepared = apply_strategy(agent, strategy)
@@ -206,7 +211,7 @@ def test_apply_appends_schema_to_instructions_end() -> None:
 
 
 def test_apply_does_not_mutate_original_agent() -> None:
-    agent = Agent(name="t", instructions="原始", model=FakeModel())
+    agent = Agent(name="t", instructions="原始", model=ScriptedModel())
     apply_strategy(agent, build_strategy(Sample, _caps(StructuredOutputMode.JSON_MODE)))
     assert agent.instructions == "原始"
 
@@ -215,7 +220,7 @@ def test_apply_merges_extra_body_without_dropping_existing() -> None:
     agent = Agent(
         name="t",
         instructions="x",
-        model=FakeModel(),
+        model=ScriptedModel(),
         model_settings=ModelSettings(extra_body={"custom": 1}),
     )
     prepared = apply_strategy(agent, build_strategy(Sample, _caps(StructuredOutputMode.JSON_MODE)))
@@ -228,21 +233,21 @@ def test_apply_merges_extra_body_without_dropping_existing() -> None:
 
 def test_apply_rejects_callable_instructions_in_json_mode() -> None:
     """动态 instructions 无法在编译期追加 schema，也会破坏缓存前缀。"""
-    agent = Agent(name="t", instructions=lambda _ctx, _agent: "动态", model=FakeModel())
+    agent = Agent(name="t", instructions=lambda _ctx, _agent: "动态", model=ScriptedModel())
     with pytest.raises(TypeError, match="静态字符串"):
         apply_strategy(agent, build_strategy(Sample, _caps(StructuredOutputMode.JSON_MODE)))
 
 
-# ─── 重试（用 FakeModel 驱动）─────────────────────────────────────────────────
+# ─── 重试（用 ScriptedModel 驱动）─────────────────────────────────────────────
 
 
 @pytest.fixture
 def json_mode_agent() -> Agent[None]:
-    return Agent(name="tester", instructions="你是测试助手。", model=FakeModel())
+    return Agent(name="tester", instructions="你是测试助手。", model=ScriptedModel())
 
 
 async def test_valid_output_needs_one_attempt(json_mode_agent: Agent[None]) -> None:
-    json_mode_agent.model = FakeModel(['{"symbol": "HYPE", "price": 42.0, "tags": ["defi"]}'])
+    json_mode_agent.model = _scripted('{"symbol": "HYPE", "price": 42.0, "tags": ["defi"]}')
     strategy = build_strategy(Sample, _caps(StructuredOutputMode.JSON_MODE))
 
     outcome = await run_structured(json_mode_agent, "查 HYPE", strategy=strategy)
@@ -254,11 +259,9 @@ async def test_valid_output_needs_one_attempt(json_mode_agent: Agent[None]) -> N
 
 async def test_malformed_json_is_repaired_on_retry(json_mode_agent: Agent[None]) -> None:
     """P1-4b 的核心验收：故意返回坏 JSON 能被修正。"""
-    model = FakeModel(
-        [
-            "这不是 JSON，只是一段闲聊。",
-            '{"symbol": "HYPE", "price": 42.0, "tags": []}',
-        ]
+    model = _scripted(
+        "这不是 JSON，只是一段闲聊。",
+        '{"symbol": "HYPE", "price": 42.0, "tags": []}',
     )
     json_mode_agent.model = model
     strategy = build_strategy(Sample, _caps(StructuredOutputMode.JSON_MODE))
@@ -270,11 +273,9 @@ async def test_malformed_json_is_repaired_on_retry(json_mode_agent: Agent[None])
 
 
 async def test_missing_field_is_repaired_on_retry(json_mode_agent: Agent[None]) -> None:
-    model = FakeModel(
-        [
-            '{"symbol": "HYPE"}',  # 缺 price
-            '{"symbol": "HYPE", "price": 42.0, "tags": []}',
-        ]
+    model = _scripted(
+        '{"symbol": "HYPE"}',  # 缺 price
+        '{"symbol": "HYPE", "price": 42.0, "tags": []}',
     )
     json_mode_agent.model = model
     strategy = build_strategy(Sample, _caps(StructuredOutputMode.JSON_MODE))
@@ -287,7 +288,7 @@ async def test_retry_feeds_the_error_back_to_the_model(
     json_mode_agent: Agent[None],
 ) -> None:
     """重试必须带上具体错误；不带就只是碰运气。"""
-    model = FakeModel(['{"symbol": "HYPE"}', '{"symbol": "HYPE", "price": 1.0, "tags": []}'])
+    model = _scripted('{"symbol": "HYPE"}', '{"symbol": "HYPE", "price": 1.0, "tags": []}')
     json_mode_agent.model = model
 
     await run_structured(
@@ -302,7 +303,10 @@ async def test_retry_feeds_the_error_back_to_the_model(
 
 
 async def test_gives_up_after_max_retries(json_mode_agent: Agent[None]) -> None:
-    json_mode_agent.model = FakeModel(["永远不是 JSON"])
+    # 三步：初次 + 两次重试。ScriptedModel 在步骤用尽后会抛 UnexpectedModelCall，
+    # 所以脚本长度本身就在断言「不会多调一次」
+    model = _scripted(*["永远不是 JSON"] * 3)
+    json_mode_agent.model = model
     strategy = build_strategy(Sample, _caps(StructuredOutputMode.JSON_MODE))
 
     with pytest.raises(StructuredOutputError) as excinfo:
@@ -318,21 +322,21 @@ async def test_empty_output_fails_fast_without_retrying(
     """实测于 deepseek-v4-pro：推理 token 耗尽 max_tokens 时接口返回 200 但
     content 为空。重试对它无效——同样的配置只会得到同样的结果，所以必须
     立刻失败并指向真正的原因，而不是白烧两次调用。"""
-    model = FakeModel(["", '{"symbol": "X", "price": 1.0, "tags": []}'])
+    model = _scripted("", '{"symbol": "X", "price": 1.0, "tags": []}')
     json_mode_agent.model = model
     strategy = build_strategy(Sample, _caps(StructuredOutputMode.JSON_MODE))
 
     with pytest.raises(EmptyOutputError, match="max_tokens"):
         await run_structured(json_mode_agent, "查 X", strategy=strategy)
 
-    assert model.call_count == 1  # 没有浪费重试
+    assert len(model.calls) == 1  # 没有浪费重试；第二步脚本刻意留着不被消费
 
 
 async def test_native_schema_path_skips_manual_parsing(
     json_mode_agent: Agent[None],
 ) -> None:
     """native_schema 下 SDK 已校验过，我们不应再解析一遍文本。"""
-    json_mode_agent.model = FakeModel(['{"symbol": "NVDA", "price": 9.9, "tags": []}'])
+    json_mode_agent.model = _scripted('{"symbol": "NVDA", "price": 9.9, "tags": []}')
     strategy = build_strategy(Sample, _caps(StructuredOutputMode.NATIVE_SCHEMA))
 
     outcome = await run_structured(json_mode_agent, "查 NVDA", strategy=strategy)
@@ -345,7 +349,7 @@ async def test_json_mode_sends_json_object_response_format(
     json_mode_agent: Agent[None],
 ) -> None:
     """端到端确认 response_format 真的传到了模型层。"""
-    model = FakeModel(['{"symbol": "X", "price": 1.0, "tags": []}'])
+    model = _scripted('{"symbol": "X", "price": 1.0, "tags": []}')
     json_mode_agent.model = model
 
     await run_structured(
@@ -354,6 +358,8 @@ async def test_json_mode_sends_json_object_response_format(
         strategy=build_strategy(Sample, _caps(StructuredOutputMode.JSON_MODE)),
     )
 
-    extra_body = model.last_call.model_settings.extra_body
-    assert extra_body == {"response_format": {"type": "json_object"}}
-    assert model.last_call.output_schema_name is None
+    last_call = model.last_call
+    assert last_call is not None
+    assert last_call.model_settings.extra_body == {"response_format": {"type": "json_object"}}
+    # output_schema 为 None 才能保证 SDK 不去发 json_schema 格式的 response_format
+    assert last_call.output_schema is None

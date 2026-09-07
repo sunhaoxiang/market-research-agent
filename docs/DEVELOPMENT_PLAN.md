@@ -125,7 +125,7 @@ Handoff 会**转移控制权且不返回**调用方，无法做"多路并行 + �
 
 - **完整覆盖第一阶段需求**：Agent、function tool（自动从 Python 类型签名生成 JSON Schema）、Agents-as-Tools、Handoff、Guardrails、Streaming、内置 Tracing。
 - **模型抽象是 SDK 的一等公民**：`Model` / `ModelProvider` 协议 + `MultiProvider` + `LitellmModel`，多 Provider 支持不需要自己写 HTTP 层（见 §9）。
-- **`Model` 协议可被 stub**：可以实现一个 `FakeModel` 脚本化返回 tool call 序列，从而**零成本、确定性地测试整个 workflow**（见 §18）。这一点对本项目的可测试性至关重要。
+- **`Model` 协议可被 stub**：SDK 自带 `agents.testing.ScriptedModel`，可脚本化返回 tool call 序列，从而**零成本、确定性地测试整个 workflow**（见 §18）。这一点对本项目的可测试性至关重要。
 - 依赖轻、心智负担小，不引入运行时 DAG/图状态概念。
 
 ### 3.2 uv 而非 pip / Poetry / PDM
@@ -1388,26 +1388,32 @@ OPENAI_AGENTS_DISABLE_TRACING=false
 | Python 单元          | pytest                 | schema 校验、指标计算、URL 归一化、SSRF 判定、事件序列化、降级逻辑 | 否         |
 | Provider 契约        | pytest + **respx**     | 每个 provider：正常/404/429/超时/畸形响应/缓存命中                 | 否         |
 | Tool 集成            | pytest（录制 fixture） | 真实响应快照 → 断言结构化解析与 provenance                         | 否         |
-| **Workflow（关键）** | pytest + **FakeModel** | 全流程：planning→fan-out→fact check→report。含失败/超时/冲突场景   | **否**     |
+| **Workflow（关键）** | pytest + **ScriptedModel** | 全流程：planning→fan-out→fact check→report。含失败/超时/冲突场景   | **否**     |
 | Live smoke           | pytest `-m live`       | 少量真实 API + 真实 LLM 调用，本地手动/每周 CI                     | 是         |
 | 前端单元             | Vitest                 | 事件 reducer、SSE 解析、引用解析、格式化                           | 否         |
 | 前端组件             | Vitest + RTL           | Activity Panel 状态渲染、Citation 交互                             | 否         |
 | DB                   | Vitest + 内存 SQLite   | migration、queries、事务、事件批写                                 | 否         |
 | E2E                  | Playwright [P6]        | 打桩 Python 服务，跑完整 UI 流程                                   | 否         |
 
-### 18.2 `FakeModel` — 测试策略的核心
+### 18.2 `ScriptedModel` — 测试策略的核心
 
-实现 Agents SDK 的 `Model` 协议，按脚本返回预设的 tool call 与结构化输出：
+用 SDK 自带的 `agents.testing.ScriptedModel` 按脚本返回预设的 tool call 与结构化输出：
 
 ```python
-model = FakeModel(script=[
-    ToolCallTurn("get_market_data", {"asset": "HYPE"}),
-    ToolCallTurn("get_tvl", {"protocol": "hyperliquid", "days": 30}),
-    FinalOutputTurn(ResearchFinding(...)),
+from agents.testing import ScriptedModel, assistant_message, function_call
+
+model = ScriptedModel([
+    [function_call("get_market_data", {"asset": "HYPE"}, call_id="c1")],
+    [function_call("get_tvl", {"protocol": "hyperliquid", "days": 30}, call_id="c2")],
+    [assistant_message('{"summary": "…"}')],
 ])
 ```
 
 价值：整个 multi-agent workflow 可以**确定性、零成本、毫秒级**地测试，包括工具失败、超时、schema 解析失败重试、引用缺失等难以用真实 LLM 复现的路径。这也验证了 §9 模型抽象层的设计正确性。
+
+> **决策修正（P1-7 期间）**：原计划自建 `FakeModel`，已实现并通过测试后被替换掉。原因是它只实现了 `get_response`，而 `Runner.run_streamed` 走的是 `stream_response`——P1-7 的翻译层测试一跑，13 个用例一次性报错。这暴露了自建替身的根本问题：它必须跟着 SDK 的内部约定走，而那些约定我们既不控制、也难以独立验证。`ScriptedModel` 由 SDK 维护，同时覆盖两条调用路径，并额外提供调用快照（`ModelCall`，含 `streamed` 标记）、步骤级错误注入（`ModelStep.raise_error`）与 `assert_complete()`。
+>
+> 教训值得记下来：**针对 SDK 边界写测试时，要让测试跑在真实的 SDK 入口上**（这里是 `Runner.run_streamed`），而不是手搓 SDK 事件对象——后者只能验证我们对 SDK 结构的假设，而假设正是最容易错的地方。
 
 ### 18.3 CI（GitHub Actions）
 
