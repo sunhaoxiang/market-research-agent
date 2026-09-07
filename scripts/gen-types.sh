@@ -10,38 +10,28 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUT_DIR="$REPO_ROOT/packages/shared/src/generated"
-
-cd "$REPO_ROOT/services/agent"
+SCHEMA_JSON="$OUT_DIR/schema.json"
+OUT_TS="$OUT_DIR/types.ts"
 
 mkdir -p "$OUT_DIR"
 
-# Phase 1 会在 agent_service.schemas 中定义事件协议等模型，并在此导出 JSON Schema。
-# Phase 0 仅打通链路：若尚无可导出的模型，生成占位文件并退出。
-if ! uv run python -c "import agent_service.schemas" 2>/dev/null; then
-  echo "→ agent_service.schemas 尚未创建（Phase 1 任务），写入占位类型"
-  cat >"$OUT_DIR/events.ts" <<'EOF'
-/**
- * 由 scripts/gen-types.sh 生成，请勿手改。
- *
- * 占位文件：事件协议的 Pydantic 模型将在 Phase 1（任务 P1-1）定义，
- * 之后此文件会被真实生成的类型替换。
- */
-
-export type PlaceholderGeneratedTypes = never;
-EOF
-  echo "✓ 已写入占位类型：$OUT_DIR/events.ts"
-  exit 0
-fi
-
 echo "→ 从 Pydantic 导出 JSON Schema"
-uv run python -m agent_service.schemas.export --out "$OUT_DIR/schema.json"
+(cd "$REPO_ROOT/services/agent" && uv run python -m agent_service.schemas.export --out "$SCHEMA_JSON")
 
 echo "→ JSON Schema 转 TypeScript"
 cd "$REPO_ROOT"
-pnpm exec json-schema-to-typescript \
-  --input "$OUT_DIR/schema.json" \
-  --output "$OUT_DIR/events.ts" \
-  --bannerComment "/** 由 scripts/gen-types.sh 生成，请勿手改。真源：services/agent 的 Pydantic 模型 */"
+pnpm exec json2ts \
+  --input "$SCHEMA_JSON" \
+  --output "$OUT_TS" \
+  --additionalProperties false \
+  --enableConstEnums false \
+  --unknownAny false \
+  --bannerComment "/* eslint-disable */
+/**
+ * 由 scripts/gen-types.sh 生成，请勿手改。
+ * 真源：services/agent/src/agent_service/schemas/
+ * 修改模型后运行 \`pnpm gen:types\` 重新生成并提交。
+ */"
 
-pnpm exec prettier --write "$OUT_DIR/events.ts" >/dev/null
-echo "✓ 类型已生成：$OUT_DIR/events.ts"
+pnpm exec prettier --write "$OUT_TS" "$SCHEMA_JSON" >/dev/null
+echo "✓ 类型已生成：$OUT_TS"

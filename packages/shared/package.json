@@ -12,6 +12,10 @@
     "build": "tsc --noEmit",
     "lint": "echo 'no lint (types only)'",
     "typecheck": "tsc --noEmit",
-    "test": "echo 'no tests (types only)'"
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "typescript": "6.0.2",
+    "vitest": "^4.0.18"
   }
 }

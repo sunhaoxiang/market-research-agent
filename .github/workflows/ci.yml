@@ -70,19 +70,21 @@ jobs:
             || (echo "::error::生成的类型已过期，请在本地运行 pnpm gen:types 并提交" && exit 1)
 
       - name: ESLint
-        run: pnpm --filter @mra/web lint
+        run: pnpm -r lint
 
       - name: Prettier
         run: pnpm exec prettier --check .
 
+      # -r 而非 --filter：确保 @mra/shared 的类型断言测试也在 CI 里跑，
+      # 它是判别联合没有退化成 unknown 的唯一防线
       - name: Type check
-        run: pnpm --filter @mra/web typecheck
+        run: pnpm -r typecheck
 
       - name: Drizzle migration check
         run: pnpm --filter @mra/web db:check
 
       - name: Tests
-        run: pnpm --filter @mra/web test
+        run: pnpm -r test
 
       - name: Build
         run: pnpm --filter @mra/web build

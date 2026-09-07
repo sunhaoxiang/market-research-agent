@@ -5,4 +5,5 @@
  * 不要手改。Pydantic 是唯一真源（DEVELOPMENT_PLAN.md §5.1）。
  */
 
-export * from "./generated/events.js";
+export * from "./generated/types.js";
+export * from "./events.js";

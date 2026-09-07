@@ -1,0 +1,3521 @@
+{
+  "$defs": {
+    "AgentCompletedEvent": {
+      "properties": {
+        "seq": {
+          "description": "会话内单调递增，用于顺序保证与断线重连",
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "format": "date-time",
+          "title": "Ts",
+          "type": "string"
+        },
+        "message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "面向用户的一句话，前端可直接显示（§12.3）",
+          "title": "Message"
+        },
+        "type": {
+          "const": "agent_completed",
+          "default": "agent_completed",
+          "title": "Type",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/AgentCompletedPayload"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "ts",
+        "message",
+        "type",
+        "payload"
+      ],
+      "title": "AgentCompletedEvent",
+      "type": "object"
+    },
+    "AgentCompletedPayload": {
+      "properties": {
+        "agent": {
+          "$ref": "#/$defs/AgentName"
+        },
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        },
+        "claim_count": {
+          "default": 0,
+          "title": "Claim Count",
+          "type": "integer"
+        },
+        "source_count": {
+          "default": 0,
+          "title": "Source Count",
+          "type": "integer"
+        },
+        "duration_ms": {
+          "title": "Duration Ms",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "agent",
+        "task_id",
+        "summary",
+        "claim_count",
+        "source_count",
+        "duration_ms"
+      ],
+      "title": "AgentCompletedPayload",
+      "type": "object"
+    },
+    "AgentFailedEvent": {
+      "properties": {
+        "seq": {
+          "description": "会话内单调递增，用于顺序保证与断线重连",
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "format": "date-time",
+          "title": "Ts",
+          "type": "string"
+        },
+        "message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "面向用户的一句话，前端可直接显示（§12.3）",
+          "title": "Message"
+        },
+        "type": {
+          "const": "agent_failed",
+          "default": "agent_failed",
+          "title": "Type",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/AgentFailedPayload"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "ts",
+        "message",
+        "type",
+        "payload"
+      ],
+      "title": "AgentFailedEvent",
+      "type": "object"
+    },
+    "AgentFailedPayload": {
+      "properties": {
+        "agent": {
+          "$ref": "#/$defs/AgentName"
+        },
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        },
+        "error": {
+          "$ref": "#/$defs/ErrorInfo"
+        }
+      },
+      "required": [
+        "agent",
+        "task_id",
+        "error"
+      ],
+      "title": "AgentFailedPayload",
+      "type": "object"
+    },
+    "AgentFinding": {
+      "description": "子 Agent 的 LLM 输出（`output_type`）。",
+      "properties": {
+        "summary": {
+          "description": "本任务发现的要点，2-4 句",
+          "title": "Summary",
+          "type": "string"
+        },
+        "claims": {
+          "items": {
+            "$ref": "#/$defs/ClaimDraft"
+          },
+          "title": "Claims",
+          "type": "array"
+        },
+        "metrics": {
+          "items": {
+            "$ref": "#/$defs/MetricPoint"
+          },
+          "title": "Metrics",
+          "type": "array"
+        },
+        "data_gaps": {
+          "description": "明确声明拿不到什么数据。这是反幻觉的关键设计——强制显式声明缺失，而不是用推测填补空白",
+          "items": {
+            "type": "string"
+          },
+          "title": "Data Gaps",
+          "type": "array"
+        }
+      },
+      "required": [
+        "summary",
+        "claims",
+        "metrics",
+        "data_gaps"
+      ],
+      "title": "AgentFinding",
+      "type": "object"
+    },
+    "AgentHandoffEvent": {
+      "properties": {
+        "seq": {
+          "description": "会话内单调递增，用于顺序保证与断线重连",
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "format": "date-time",
+          "title": "Ts",
+          "type": "string"
+        },
+        "message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "面向用户的一句话，前端可直接显示（§12.3）",
+          "title": "Message"
+        },
+        "type": {
+          "const": "agent_handoff",
+          "default": "agent_handoff",
+          "title": "Type",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/AgentHandoffPayload"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "ts",
+        "message",
+        "type",
+        "payload"
+      ],
+      "title": "AgentHandoffEvent",
+      "type": "object"
+    },
+    "AgentHandoffPayload": {
+      "properties": {
+        "from_agent": {
+          "$ref": "#/$defs/AgentName"
+        },
+        "to_agent": {
+          "$ref": "#/$defs/AgentName"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
+        }
+      },
+      "required": [
+        "from_agent",
+        "to_agent",
+        "reason"
+      ],
+      "title": "AgentHandoffPayload",
+      "type": "object"
+    },
+    "AgentName": {
+      "description": "六个 Agent（§6.2）。裁剪理由见 §6.1。",
+      "enum": [
+        "research_manager",
+        "crypto_research",
+        "stock_research",
+        "web_research",
+        "fact_checker",
+        "report_writer"
+      ],
+      "title": "AgentName",
+      "type": "string"
+    },
+    "AgentProgressEvent": {
+      "properties": {
+        "seq": {
+          "description": "会话内单调递增，用于顺序保证与断线重连",
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "format": "date-time",
+          "title": "Ts",
+          "type": "string"
+        },
+        "message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "面向用户的一句话，前端可直接显示（§12.3）",
+          "title": "Message"
+        },
+        "type": {
+          "const": "agent_progress",
+          "default": "agent_progress",
+          "title": "Type",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/AgentProgressPayload"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "ts",
+        "message",
+        "type",
+        "payload"
+      ],
+      "title": "AgentProgressEvent",
+      "type": "object"
+    },
+    "AgentProgressPayload": {
+      "properties": {
+        "agent": {
+          "$ref": "#/$defs/AgentName"
+        },
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "agent",
+        "task_id",
+        "message"
+      ],
+      "title": "AgentProgressPayload",
+      "type": "object"
+    },
+    "AgentReasoningEvent": {
+      "properties": {
+        "seq": {
+          "description": "会话内单调递增，用于顺序保证与断线重连",
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "format": "date-time",
+          "title": "Ts",
+          "type": "string"
+        },
+        "message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "面向用户的一句话，前端可直接显示（§12.3）",
+          "title": "Message"
+        },
+        "type": {
+          "const": "agent_reasoning",
+          "default": "agent_reasoning",
+          "title": "Type",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/AgentReasoningPayload"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "ts",
+        "message",
+        "type",
+        "payload"
+      ],
+      "title": "AgentReasoningEvent",
+      "type": "object"
+    },
+    "AgentReasoningPayload": {
+      "properties": {
+        "agent": {
+          "$ref": "#/$defs/AgentName"
+        },
+        "task_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Task Id"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        }
+      },
+      "required": [
+        "agent",
+        "task_id",
+        "summary"
+      ],
+      "title": "AgentReasoningPayload",
+      "type": "object"
+    },
+    "AgentStartedEvent": {
+      "properties": {
+        "seq": {
+          "description": "会话内单调递增，用于顺序保证与断线重连",
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "format": "date-time",
+          "title": "Ts",
+          "type": "string"
+        },
+        "message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "面向用户的一句话，前端可直接显示（§12.3）",
+          "title": "Message"
+        },
+        "type": {
+          "const": "agent_started",
+          "default": "agent_started",
+          "title": "Type",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/AgentStartedPayload"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "ts",
+        "message",
+        "type",
+        "payload"
+      ],
+      "title": "AgentStartedEvent",
+      "type": "object"
+    },
+    "AgentStartedPayload": {
+      "properties": {
+        "agent": {
+          "$ref": "#/$defs/AgentName"
+        },
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        },
+        "objective": {
+          "title": "Objective",
+          "type": "string"
+        },
+        "model_id": {
+          "title": "Model Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "agent",
+        "task_id",
+        "objective",
+        "model_id"
+      ],
+      "title": "AgentStartedPayload",
+      "type": "object"
+    },
+    "AssetType": {
+      "enum": [
+        "crypto",
+        "stock"
+      ],
+      "title": "AssetType",
+      "type": "string"
+    },
+    "Claim": {
+      "description": "编排层补全后的陈述。",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "epistemic_type": {
+          "$ref": "#/$defs/EpistemicType"
+        },
+        "confidence": {
+          "$ref": "#/$defs/ConfidenceLevel"
+        },
+        "source_ids": {
+          "description": "指向 Source.id",
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Ids",
+          "type": "array"
+        },
+        "as_of": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "As Of"
+        },
+        "task_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Task Id"
+        },
+        "agent": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Agent"
+        },
+        "verification": {
+          "$ref": "#/$defs/VerificationStatus",
+          "default": "unverified"
+        },
+        "verification_note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Verification Note"
+        },
+        "citation_index": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Citation Index"
+        }
+      },
+      "required": [
+        "id",
+        "text",
+        "epistemic_type",
+        "confidence",
+        "source_ids",
+        "as_of",
+        "task_id",
+        "agent",
+        "verification",
+        "verification_note",
+        "citation_index"
+      ],
+      "title": "Claim",
+      "type": "object"
+    },
+    "ClaimDraft": {
+      "description": "LLM 输出的陈述。\n\n`epistemic_type` 必填是 §15.3 三重强制机制的第一重（schema 强制）——\nLLM 无法省略对陈述性质的判断。",
+      "properties": {
+        "text": {
+          "description": "一句自包含的陈述，不依赖上下文即可理解",
+          "title": "Text",
+          "type": "string"
+        },
+        "epistemic_type": {
+          "$ref": "#/$defs/EpistemicType"
+        },
+        "confidence": {
+          "$ref": "#/$defs/ConfidenceLevel"
+        },
+        "source_refs": {
+          "description": "支撑本陈述的来源短引用，如 ['s1', 's3']。只能引用工具结果中出现过的 ref",
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Refs",
+          "type": "array"
+        },
+        "as_of": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "数据时点（不是抓取时点）。金融数据必须填",
+          "title": "As Of"
+        }
+      },
+      "required": [
+        "text",
+        "epistemic_type",
+        "confidence",
+        "source_refs",
+        "as_of"
+      ],
+      "title": "ClaimDraft",
+      "type": "object"
+    },
+    "ClaimVerification": {
+      "description": "Fact Checker 对单条 claim 的裁定。",
+      "properties": {
+        "claim_id": {
+          "title": "Claim Id",
+          "type": "string"
+        },
+        "verification": {
+          "$ref": "#/$defs/VerificationStatus"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "裁定理由，冲突时需说明取舍依据",
+          "title": "Note"
+        },
+        "confidence_adjustment": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ConfidenceLevel"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "若核查后置信度需调整，给出新值"
+        },
+        "additional_source_refs": {
+          "description": "核查过程中新增的支撑来源",
+          "items": {
+            "type": "string"
+          },
+          "title": "Additional Source Refs",
+          "type": "array"
+        }
+      },
+      "required": [
+        "claim_id",
+        "verification",
+        "note",
+        "confidence_adjustment",
+        "additional_source_refs"
+      ],
+      "title": "ClaimVerification",
+      "type": "object"
+    },
+    "ClaimVerifiedEvent": {
+      "properties": {
+        "seq": {
+          "description": "会话内单调递增，用于顺序保证与断线重连",
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "format": "date-time",
+          "title": "Ts",
+          "type": "string"
+        },
+        "message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "面向用户的一句话，前端可直接显示（§12.3）",
+          "title": "Message"
+        },
+        "type": {
+          "const": "claim_verified",
+          "default": "claim_verified",
+          "title": "Type",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/ClaimVerifiedPayload"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "ts",
+        "message",
+        "type",
+        "payload"
+      ],
+      "title": "ClaimVerifiedEvent",
+      "type": "object"
+    },
+    "ClaimVerifiedPayload": {
+      "properties": {
+        "claim_id": {
+          "title": "Claim Id",
+          "type": "string"
+        },
+        "verification": {
+          "$ref": "#/$defs/VerificationStatus"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
+        }
+      },
+      "required": [
+        "claim_id",
+        "verification",
+        "note"
+      ],
+      "title": "ClaimVerifiedPayload",
+      "type": "object"
+    },
+    "ConfidenceLevel": {
+      "enum": [
+        "high",
+        "medium",
+        "low"
+      ],
+      "title": "ConfidenceLevel",
+      "type": "string"
+    },
+    "Conflict": {
+      "description": "多来源冲突（§12.2 CONFLICT_DETECTED）。",
+      "properties": {
+        "claim_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Claim Ids",
+          "type": "array"
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "values": {
+          "description": "各来源给出的不同值，用于 UI 并列展示",
+          "items": {
+            "type": "string"
+          },
+          "title": "Values",
+          "type": "array"
+        }
+      },
+      "required": [
+        "claim_ids",
+        "description",
+        "values"
+      ],
+      "title": "Conflict",
+      "type": "object"
+    },
+    "ConflictDetectedEvent": {
+      "properties": {
+        "seq": {
+          "description": "会话内单调递增，用于顺序保证与断线重连",
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "format": "date-time",
+          "title": "Ts",
+          "type": "string"
+        },
+        "message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "面向用户的一句话，前端可直接显示（§12.3）",
+          "title": "Message"
+        },
+        "type": {
+          "const": "conflict_detected",
+          "default": "conflict_detected",
+          "title": "Type",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/ConflictDetectedPayload"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "ts",
+        "message",
+        "type",
+        "payload"
+      ],
+      "title": "ConflictDetectedEvent",
+      "type": "object"
+    },
+    "ConflictDetectedPayload": {
+      "properties": {
+        "conflict": {
+          "$ref": "#/$defs/Conflict"
+        }
+      },
+      "required": [
+        "conflict"
+      ],
+      "title": "ConflictDetectedPayload",
+      "type": "object"
+    },
+    "DataProvenance": {
+      "description": "数据出处。每个成功的 tool 调用都必须产生。",
+      "properties": {
+        "provider": {
+          "description": "coingecko / defillama / fmp / sec / tavily",
+          "title": "Provider",
+          "type": "string"
+        },
+        "endpoint": {
+          "title": "Endpoint",
+          "type": "string"
+        },
+        "source_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "人类可访问的 URL，用于 Citation",
+          "title": "Source Url"
+        },
+        "retrieved_at": {
+          "description": "抓取时间",
+          "format": "date-time",
+          "title": "Retrieved At",
+          "type": "string"
+        },
+        "as_of": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "数据本身的时点",
+          "title": "As Of"
+        },
+        "is_cached": {
+          "default": false,
+          "title": "Is Cached",
+          "type": "boolean"
+        },
+        "cache_age_s": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cache Age S"
+        }
+      },
+      "required": [
+        "provider",
+        "endpoint",
+        "source_url",
+        "retrieved_at",
+        "as_of",
+        "is_cached",
+        "cache_age_s"
+      ],
+      "title": "DataProvenance",
+      "type": "object"
+    },
+    "DataQuality": {
+      "description": "数据完整性声明。让\"部分成功\"可被 Agent 感知，而不是静默当成完整数据。",
+      "properties": {
+        "completeness": {
+          "default": "full",
+          "enum": [
+            "full",
+            "partial"
+          ],
+          "title": "Completeness",
+          "type": "string"
+        },
+        "missing_fields": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Missing Fields",
+          "type": "array"
+        },
+        "caveats": {
+          "description": "如 \"FDV 基于最大供应量估算\"",
+          "items": {
+            "type": "string"
+          },
+          "title": "Caveats",
+          "type": "array"
+        }
+      },
+      "title": "DataQuality",
+      "type": "object",
+      "required": [
+        "completeness",
+        "missing_fields",
+        "caveats"
+      ]
+    },
+    "Entity": {
+      "description": "已解析的研究标的。\n\n由 Research Manager 在规划阶段解析（\"英伟达\" → `{stock, NVDA}`），\n后续所有 Agent 与 Tool 都基于此结构，避免各自重复做名称解析。",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/AssetType"
+        },
+        "symbol": {
+          "description": "标准化代号，如 NVDA / BTC / HYPE",
+          "title": "Symbol",
+          "type": "string"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "全称，如 NVIDIA Corporation",
+          "title": "Name"
+        },
+        "chain": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "仅 crypto：所在链，如 ethereum / solana / hyperliquid",
+          "title": "Chain"
+        },
+        "contract_address": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "仅 crypto：合约地址（用于链上数据查询）",
+          "title": "Contract Address"
+        }
+      },
+      "required": [
+        "type",
+        "symbol",
+        "name",
+        "chain",
+        "contract_address"
+      ],
+      "title": "Entity",
+      "type": "object"
+    },
+    "EpistemicType": {
+      "description": "认知类型（§15.3）。事实与推测分离的载体。\n\n报告主体应以 SOURCE_BACKED_FACT 为主；ANALYSIS / INFERENCE / PREDICTION\n必须出现在带标记的段落中，不得与事实段落混排。",
+      "enum": [
+        "fact",
+        "source_backed_fact",
+        "analysis",
+        "inference",
+        "prediction",
+        "opinion"
+      ],
+      "title": "EpistemicType",
+      "type": "string"
+    },
+    "ErrorInfo": {
+      "properties": {
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "ErrorInfo",
+      "type": "object"
+    },
+    "FactCheckProgressEvent": {
+      "properties": {
+        "seq": {
+          "description": "会话内单调递增，用于顺序保证与断线重连",
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "format": "date-time",
+          "title": "Ts",
+          "type": "string"
+        },
+        "message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "面向用户的一句话，前端可直接显示（§12.3）",
+          "title": "Message"
+        },
+        "type": {
+          "const": "fact_check_progress",
+          "default": "fact_check_progress",
+          "title": "Type",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/FactCheckProgressPayload"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "ts",
+        "message",
+        "type",
+        "payload"
+      ],
+      "title": "FactCheckProgressEvent",
+      "type": "object"
+    },
+    "FactCheckProgressPayload": {
+      "properties": {
+        "checked": {
+          "title": "Checked",
+          "type": "integer"
+        },
+        "total": {
+          "title": "Total",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "checked",
+        "total"
+      ],
+      "title": "FactCheckProgressPayload",
+      "type": "object"
+    },
+    "FactCheckResult": {
+      "description": "Fact Checker 的 `output_type`。",
+      "properties": {
+        "verifications": {
+          "items": {
+            "$ref": "#/$defs/ClaimVerification"
+          },
+          "title": "Verifications",
+          "type": "array"
+        },
+        "conflicts": {
+          "items": {
+            "$ref": "#/$defs/Conflict"
+          },
+          "title": "Conflicts",
+          "type": "array"
+        },
+        "notes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Notes",
+          "type": "array"
+        }
+      },
+      "title": "FactCheckResult",
+      "type": "object",
+      "required": [
+        "verifications",
+        "conflicts",
+        "notes"
+      ]
+    },
+    "FactCheckStartedEvent": {
+      "properties": {
+        "seq": {
+          "description": "会话内单调递增，用于顺序保证与断线重连",
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "format": "date-time",
+          "title": "Ts",
+          "type": "string"
+        },
+        "message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "面向用户的一句话，前端可直接显示（§12.3）",
+          "title": "Message"
+        },
+        "type": {
+          "const": "fact_check_started",
+          "default": "fact_check_started",
+          "title": "Type",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/FactCheckStartedPayload"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "ts",
+        "message",
+        "type",
+        "payload"
+      ],
+      "title": "FactCheckStartedEvent",
+      "type": "object"
+    },
+    "FactCheckStartedPayload": {
+      "properties": {
+        "claim_count": {
+          "title": "Claim Count",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "claim_count"
+      ],
+      "title": "FactCheckStartedPayload",
+      "type": "object"
+    },
+    "HeartbeatEvent": {
+      "properties": {
+        "seq": {
+          "description": "会话内单调递增，用于顺序保证与断线重连",
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "format": "date-time",
+          "title": "Ts",
+          "type": "string"
+        },
+        "message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "面向用户的一句话，前端可直接显示（§12.3）",
+          "title": "Message"
+        },
+        "type": {
+          "const": "heartbeat",
+          "default": "heartbeat",
+          "title": "Type",
+          "type": "string"
+        },
+        "payload": {
+          "default": null,
+          "title": "Payload",
+          "type": "null"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "ts",
+        "message",
+        "type",
+        "payload"
+      ],
+      "title": "HeartbeatEvent",
+      "type": "object"
+    },
+    "IntentClassifiedEvent": {
+      "properties": {
+        "seq": {
+          "description": "会话内单调递增，用于顺序保证与断线重连",
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "format": "date-time",
+          "title": "Ts",
+          "type": "string"
+        },
+        "message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "面向用户的一句话，前端可直接显示（§12.3）",
+          "title": "Message"
+        },
+        "type": {
+          "const": "intent_classified",
+          "default": "intent_classified",
+          "title": "Type",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/IntentClassifiedPayload"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "ts",
+        "message",
+        "type",
+        "payload"
+      ],
+      "title": "IntentClassifiedEvent",
+      "type": "object"
+    },
+    "IntentClassifiedPayload": {
+      "properties": {
+        "question_type": {
+          "$ref": "#/$defs/QuestionType"
+        },
+        "entities": {
+          "items": {
+            "$ref": "#/$defs/Entity"
+          },
+          "title": "Entities",
+          "type": "array"
+        }
+      },
+      "required": [
+        "question_type",
+        "entities"
+      ],
+      "title": "IntentClassifiedPayload",
+      "type": "object"
+    },
+    "MetricFoundEvent": {
+      "properties": {
+        "seq": {
+          "description": "会话内单调递增，用于顺序保证与断线重连",
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "format": "date-time",
+          "title": "Ts",
+          "type": "string"
+        },
+        "message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "面向用户的一句话，前端可直接显示（§12.3）",
+          "title": "Message"
+        },
+        "type": {
+          "const": "metric_found",
+          "default": "metric_found",
+          "title": "Type",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/MetricFoundPayload"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "ts",
+        "message",
+        "type",
+        "payload"
+      ],
+      "title": "MetricFoundEvent",
+      "type": "object"
+    },
+    "MetricFoundPayload": {
+      "properties": {
+        "metric": {
+          "$ref": "#/$defs/MetricPoint"
+        }
+      },
+      "required": [
+        "metric"
+      ],
+      "title": "MetricFoundPayload",
+      "type": "object"
+    },
+    "MetricPoint": {
+      "description": "一个结构化数值观测点，供前端画图（§6.2）。\n\n刻意与 Claim 分开：Claim 是自然语言陈述，MetricPoint 是机器可读的数字。\n同一事实通常同时产生两者——\"TVL 达到 12 亿美元\" 与 `{name: tvl, value: 1.2e9}`。\n时间序列表示为 `name` 相同、`as_of` 不同的多个点。",
+      "properties": {
+        "name": {
+          "description": "机器可读指标名，snake_case，如 tvl / market_cap / pe_ratio",
+          "title": "Name",
+          "type": "string"
+        },
+        "label": {
+          "description": "人类可读标签，如 TVL / 市值 / 市盈率",
+          "title": "Label",
+          "type": "string"
+        },
+        "value": {
+          "title": "Value",
+          "type": "number"
+        },
+        "unit": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "USD / % / 倍 等",
+          "title": "Unit"
+        },
+        "entity_symbol": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "所属标的，便于前端分组",
+          "title": "Entity Symbol"
+        },
+        "as_of": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "数据时点，不是抓取时点",
+          "title": "As Of"
+        },
+        "source_ref": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "来源短引用（如 s1），由编排层解析为 source_id",
+          "title": "Source Ref"
+        }
+      },
+      "required": [
+        "name",
+        "label",
+        "value",
+        "unit",
+        "entity_symbol",
+        "as_of",
+        "source_ref"
+      ],
+      "title": "MetricPoint",
+      "type": "object"
+    },
+    "PlanCreatedEvent": {
+      "properties": {
+        "seq": {
+          "description": "会话内单调递增，用于顺序保证与断线重连",
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "format": "date-time",
+          "title": "Ts",
+          "type": "string"
+        },
+        "message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "面向用户的一句话，前端可直接显示（§12.3）",
+          "title": "Message"
+        },
+        "type": {
+          "const": "plan_created",
+          "default": "plan_created",
+          "title": "Type",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/PlanCreatedPayload"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "ts",
+        "message",
+        "type",
+        "payload"
+      ],
+      "title": "PlanCreatedEvent",
+      "type": "object"
+    },
+    "PlanCreatedPayload": {
+      "properties": {
+        "plan": {
+          "$ref": "#/$defs/ResearchPlan"
+        }
+      },
+      "required": [
+        "plan"
+      ],
+      "title": "PlanCreatedPayload",
+      "type": "object"
+    },
+    "PlanUpdatedEvent": {
+      "properties": {
+        "seq": {
+          "description": "会话内单调递增，用于顺序保证与断线重连",
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "format": "date-time",
+          "title": "Ts",
+          "type": "string"
+        },
+        "message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "面向用户的一句话，前端可直接显示（§12.3）",
+          "title": "Message"
+        },
+        "type": {
+          "const": "plan_updated",
+          "default": "plan_updated",
+          "title": "Type",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/PlanUpdatedPayload"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "ts",
+        "message",
+        "type",
+        "payload"
+      ],
+      "title": "PlanUpdatedEvent",
+      "type": "object"
+    },
+    "PlanUpdatedPayload": {
+      "properties": {
+        "added_tasks": {
+          "items": {
+            "$ref": "#/$defs/ResearchTask"
+          },
+          "title": "Added Tasks",
+          "type": "array"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
+        }
+      },
+      "title": "PlanUpdatedPayload",
+      "type": "object",
+      "required": [
+        "added_tasks",
+        "reason"
+      ]
+    },
+    "QuestionType": {
+      "enum": [
+        "crypto",
+        "stock",
+        "macro",
+        "compare",
+        "generic"
+      ],
+      "title": "QuestionType",
+      "type": "string"
+    },
+    "ReportCompletedEvent": {
+      "properties": {
+        "seq": {
+          "description": "会话内单调递增，用于顺序保证与断线重连",
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "format": "date-time",
+          "title": "Ts",
+          "type": "string"
+        },
+        "message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "面向用户的一句话，前端可直接显示（§12.3）",
+          "title": "Message"
+        },
+        "type": {
+          "const": "report_completed",
+          "default": "report_completed",
+          "title": "Type",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/ReportCompletedPayload"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "ts",
+        "message",
+        "type",
+        "payload"
+      ],
+      "title": "ReportCompletedEvent",
+      "type": "object"
+    },
+    "ReportCompletedPayload": {
+      "properties": {
+        "report": {
+          "$ref": "#/$defs/ResearchReport"
+        },
+        "citation_count": {
+          "default": 0,
+          "title": "Citation Count",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "report",
+        "citation_count"
+      ],
+      "title": "ReportCompletedPayload",
+      "type": "object"
+    },
+    "ReportMetadata": {
+      "description": "报告的附加信息，由编排层填充而非 LLM 输出。",
+      "properties": {
+        "report_sections": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Report Sections",
+          "type": "array"
+        },
+        "generated_by_model": {
+          "title": "Generated By Model",
+          "type": "string"
+        },
+        "data_gaps": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Data Gaps",
+          "type": "array"
+        },
+        "citation_check_passed": {
+          "default": true,
+          "title": "Citation Check Passed",
+          "type": "boolean"
+        },
+        "citation_warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Citation Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "report_sections",
+        "generated_by_model",
+        "data_gaps",
+        "citation_check_passed",
+        "citation_warnings"
+      ],
+      "title": "ReportMetadata",
+      "type": "object"
+    },
+    "ReportSection": {
+      "properties": {
+        "id": {
+          "description": "章节标识，对应 ResearchPlan.report_sections 中的项",
+          "title": "Id",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "markdown": {
+          "description": "章节正文。引用用 [n] 形式，n 对应 Source.citation_index",
+          "title": "Markdown",
+          "type": "string"
+        },
+        "claim_ids": {
+          "description": "本章节引用的 claim，供 UI 反查与引用完整性校验",
+          "items": {
+            "type": "string"
+          },
+          "title": "Claim Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "markdown",
+        "claim_ids"
+      ],
+      "title": "ReportSection",
+      "type": "object"
+    },
+    "ReportSectionDeltaEvent": {
+      "properties": {
+        "seq": {
+          "description": "会话内单调递增，用于顺序保证与断线重连",
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "format": "date-time",
+          "title": "Ts",
+          "type": "string"
+        },
+        "message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "面向用户的一句话，前端可直接显示（§12.3）",
+          "title": "Message"
+        },
+        "type": {
+          "const": "report_section_delta",
+          "default": "report_section_delta",
+          "title": "Type",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/ReportSectionDeltaPayload"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "ts",
+        "message",
+        "type",
+        "payload"
+      ],
+      "title": "ReportSectionDeltaEvent",
+      "type": "object"
+    },
+    "ReportSectionDeltaPayload": {
+      "properties": {
+        "section_id": {
+          "title": "Section Id",
+          "type": "string"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "section_id",
+        "text"
+      ],
+      "title": "ReportSectionDeltaPayload",
+      "type": "object"
+    },
+    "ReportStartedEvent": {
+      "properties": {
+        "seq": {
+          "description": "会话内单调递增，用于顺序保证与断线重连",
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "format": "date-time",
+          "title": "Ts",
+          "type": "string"
+        },
+        "message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "面向用户的一句话，前端可直接显示（§12.3）",
+          "title": "Message"
+        },
+        "type": {
+          "const": "report_started",
+          "default": "report_started",
+          "title": "Type",
+          "type": "string"
+        },
+        "payload": {
+          "default": null,
+          "title": "Payload",
+          "type": "null"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "ts",
+        "message",
+        "type",
+        "payload"
+      ],
+      "title": "ReportStartedEvent",
+      "type": "object"
+    },
+    "ResearchFinding": {
+      "description": "编排层组装后的完整结果，进入 Report Writer 的输入。",
+      "properties": {
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        },
+        "agent": {
+          "$ref": "#/$defs/AgentName"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        },
+        "claims": {
+          "items": {
+            "$ref": "#/$defs/Claim"
+          },
+          "title": "Claims",
+          "type": "array"
+        },
+        "sources": {
+          "items": {
+            "$ref": "#/$defs/Source"
+          },
+          "title": "Sources",
+          "type": "array"
+        },
+        "metrics": {
+          "items": {
+            "$ref": "#/$defs/MetricPoint"
+          },
+          "title": "Metrics",
+          "type": "array"
+        },
+        "data_gaps": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Data Gaps",
+          "type": "array"
+        },
+        "tool_errors": {
+          "items": {
+            "$ref": "#/$defs/ToolError"
+          },
+          "title": "Tool Errors",
+          "type": "array"
+        }
+      },
+      "required": [
+        "task_id",
+        "agent",
+        "summary",
+        "claims",
+        "sources",
+        "metrics",
+        "data_gaps",
+        "tool_errors"
+      ],
+      "title": "ResearchFinding",
+      "type": "object"
+    },
+    "ResearchPlan": {
+      "properties": {
+        "question_type": {
+          "$ref": "#/$defs/QuestionType"
+        },
+        "interpretation": {
+          "description": "Agent 对问题的理解，展示给用户以便及早发现偏差",
+          "title": "Interpretation",
+          "type": "string"
+        },
+        "entities": {
+          "items": {
+            "$ref": "#/$defs/Entity"
+          },
+          "title": "Entities",
+          "type": "array"
+        },
+        "tasks": {
+          "items": {
+            "$ref": "#/$defs/ResearchTask"
+          },
+          "title": "Tasks",
+          "type": "array"
+        },
+        "report_sections": {
+          "description": "动态报告结构。单标的深研用完整章节；\"为什么今天涨\"用 Overview/Catalysts/Analysis/Risks 精简结构",
+          "items": {
+            "type": "string"
+          },
+          "title": "Report Sections",
+          "type": "array"
+        },
+        "assumptions": {
+          "description": "规划时做的假设，需在报告中披露",
+          "items": {
+            "type": "string"
+          },
+          "title": "Assumptions",
+          "type": "array"
+        }
+      },
+      "required": [
+        "question_type",
+        "interpretation",
+        "entities",
+        "tasks",
+        "report_sections",
+        "assumptions"
+      ],
+      "title": "ResearchPlan",
+      "type": "object"
+    },
+    "ResearchReport": {
+      "description": "Report Writer 的 `output_type`。",
+      "properties": {
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "executive_summary": {
+          "description": "结论先行，3-5 句",
+          "title": "Executive Summary",
+          "type": "string"
+        },
+        "sections": {
+          "items": {
+            "$ref": "#/$defs/ReportSection"
+          },
+          "title": "Sections",
+          "type": "array"
+        },
+        "data_gaps": {
+          "description": "汇总各任务的 data_gaps，进入报告的「数据限制」章节",
+          "items": {
+            "type": "string"
+          },
+          "title": "Data Gaps",
+          "type": "array"
+        }
+      },
+      "required": [
+        "title",
+        "executive_summary",
+        "sections",
+        "data_gaps"
+      ],
+      "title": "ResearchReport",
+      "type": "object"
+    },
+    "ResearchTask": {
+      "properties": {
+        "id": {
+          "description": "计划内唯一，建议 t1/t2/…（供 depends_on 引用）",
+          "title": "Id",
+          "type": "string"
+        },
+        "agent": {
+          "$ref": "#/$defs/AgentName",
+          "description": "承担此任务的 Agent。枚举值，由代码校验"
+        },
+        "objective": {
+          "description": "给子 Agent 的具体目标，需自包含",
+          "title": "Objective",
+          "type": "string"
+        },
+        "entities": {
+          "items": {
+            "$ref": "#/$defs/Entity"
+          },
+          "title": "Entities",
+          "type": "array"
+        },
+        "suggested_tools": {
+          "description": "建议使用的工具，非强制——Agent 可自行判断",
+          "items": {
+            "type": "string"
+          },
+          "title": "Suggested Tools",
+          "type": "array"
+        },
+        "depends_on": {
+          "description": "依赖的任务 id。用于分层 fan-out，必须无环",
+          "items": {
+            "type": "string"
+          },
+          "title": "Depends On",
+          "type": "array"
+        },
+        "priority": {
+          "default": 0,
+          "title": "Priority",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "agent",
+        "objective",
+        "entities",
+        "suggested_tools",
+        "depends_on",
+        "priority"
+      ],
+      "title": "ResearchTask",
+      "type": "object"
+    },
+    "RootModel_Annotated_Union_SessionStartedEvent__SessionCompletedEvent__SessionFailedEvent__SessionCancelledEvent__IntentClassifiedEvent__PlanCreatedEvent__PlanUpdatedEvent__StageChangedEvent__AgentStartedEvent__AgentProgressEvent__AgentReasoningEvent__AgentCompletedEvent__AgentFailedEvent__AgentHandoffEvent__ToolStartedEvent__ToolCompletedEvent__ToolFailedEvent__SourceFoundEvent__MetricFoundEvent__FactCheckStartedEvent__FactCheckProgressEvent__ClaimVerifiedEvent__ConflictDetectedEvent__ReportStartedEvent__ReportSectionDeltaEvent__ReportCompletedEvent__UsageUpdatedEvent__WarningEvent__HeartbeatEvent___FieldInfo_annotation_NoneType__required_True__discriminator__type____": {
+      "discriminator": {
+        "mapping": {
+          "agent_completed": "#/$defs/AgentCompletedEvent",
+          "agent_failed": "#/$defs/AgentFailedEvent",
+          "agent_handoff": "#/$defs/AgentHandoffEvent",
+          "agent_progress": "#/$defs/AgentProgressEvent",
+          "agent_reasoning": "#/$defs/AgentReasoningEvent",
+          "agent_started": "#/$defs/AgentStartedEvent",
+          "claim_verified": "#/$defs/ClaimVerifiedEvent",
+          "conflict_detected": "#/$defs/ConflictDetectedEvent",
+          "fact_check_progress": "#/$defs/FactCheckProgressEvent",
+          "fact_check_started": "#/$defs/FactCheckStartedEvent",
+          "heartbeat": "#/$defs/HeartbeatEvent",
+          "intent_classified": "#/$defs/IntentClassifiedEvent",
+          "metric_found": "#/$defs/MetricFoundEvent",
+          "plan_created": "#/$defs/PlanCreatedEvent",
+          "plan_updated": "#/$defs/PlanUpdatedEvent",
+          "report_completed": "#/$defs/ReportCompletedEvent",
+          "report_section_delta": "#/$defs/ReportSectionDeltaEvent",
+          "report_started": "#/$defs/ReportStartedEvent",
+          "session_cancelled": "#/$defs/SessionCancelledEvent",
+          "session_completed": "#/$defs/SessionCompletedEvent",
+          "session_failed": "#/$defs/SessionFailedEvent",
+          "session_started": "#/$defs/SessionStartedEvent",
+          "source_found": "#/$defs/SourceFoundEvent",
+          "stage_changed": "#/$defs/StageChangedEvent",
+          "tool_completed": "#/$defs/ToolCompletedEvent",
+          "tool_failed": "#/$defs/ToolFailedEvent",
+          "tool_started": "#/$defs/ToolStartedEvent",
+          "usage_updated": "#/$defs/UsageUpdatedEvent",
+          "warning": "#/$defs/WarningEvent"
+        },
+        "propertyName": "type"
+      },
+      "oneOf": [
+        {
+          "$ref": "#/$defs/SessionStartedEvent"
+        },
+        {
+          "$ref": "#/$defs/SessionCompletedEvent"
+        },
+        {
+          "$ref": "#/$defs/SessionFailedEvent"
+        },
+        {
+          "$ref": "#/$defs/SessionCancelledEvent"
+        },
+        {
+          "$ref": "#/$defs/IntentClassifiedEvent"
+        },
+        {
+          "$ref": "#/$defs/PlanCreatedEvent"
+        },
+        {
+          "$ref": "#/$defs/PlanUpdatedEvent"
+        },
+        {
+          "$ref": "#/$defs/StageChangedEvent"
+        },
+        {
+          "$ref": "#/$defs/AgentStartedEvent"
+        },
+        {
+          "$ref": "#/$defs/AgentProgressEvent"
+        },
+        {
+          "$ref": "#/$defs/AgentReasoningEvent"
+        },
+        {
+          "$ref": "#/$defs/AgentCompletedEvent"
+        },
+        {
+          "$ref": "#/$defs/AgentFailedEvent"
+        },
+        {
+          "$ref": "#/$defs/AgentHandoffEvent"
+        },
+        {
+          "$ref": "#/$defs/ToolStartedEvent"
+        },
+        {
+          "$ref": "#/$defs/ToolCompletedEvent"
+        },
+        {
+          "$ref": "#/$defs/ToolFailedEvent"
+        },
+        {
+          "$ref": "#/$defs/SourceFoundEvent"
+        },
+        {
+          "$ref": "#/$defs/MetricFoundEvent"
+        },
+        {
+          "$ref": "#/$defs/FactCheckStartedEvent"
+        },
+        {
+          "$ref": "#/$defs/FactCheckProgressEvent"
+        },
+        {
+          "$ref": "#/$defs/ClaimVerifiedEvent"
+        },
+        {
+          "$ref": "#/$defs/ConflictDetectedEvent"
+        },
+        {
+          "$ref": "#/$defs/ReportStartedEvent"
+        },
+        {
+          "$ref": "#/$defs/ReportSectionDeltaEvent"
+        },
+        {
+          "$ref": "#/$defs/ReportCompletedEvent"
+        },
+        {
+          "$ref": "#/$defs/UsageUpdatedEvent"
+        },
+        {
+          "$ref": "#/$defs/WarningEvent"
+        },
+        {
+          "$ref": "#/$defs/HeartbeatEvent"
+        }
+      ],
+      "title": "ResearchEvent"
+    },
+    "SessionCancelledEvent": {
+      "properties": {
+        "seq": {
+          "description": "会话内单调递增，用于顺序保证与断线重连",
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "format": "date-time",
+          "title": "Ts",
+          "type": "string"
+        },
+        "message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "面向用户的一句话，前端可直接显示（§12.3）",
+          "title": "Message"
+        },
+        "type": {
+          "const": "session_cancelled",
+          "default": "session_cancelled",
+          "title": "Type",
+          "type": "string"
+        },
+        "payload": {
+          "default": null,
+          "title": "Payload",
+          "type": "null"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "ts",
+        "message",
+        "type",
+        "payload"
+      ],
+      "title": "SessionCancelledEvent",
+      "type": "object"
+    },
+    "SessionCompletedEvent": {
+      "properties": {
+        "seq": {
+          "description": "会话内单调递增，用于顺序保证与断线重连",
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "format": "date-time",
+          "title": "Ts",
+          "type": "string"
+        },
+        "message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "面向用户的一句话，前端可直接显示（§12.3）",
+          "title": "Message"
+        },
+        "type": {
+          "const": "session_completed",
+          "default": "session_completed",
+          "title": "Type",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/SessionCompletedPayload"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "ts",
+        "message",
+        "type",
+        "payload"
+      ],
+      "title": "SessionCompletedEvent",
+      "type": "object"
+    },
+    "SessionCompletedPayload": {
+      "properties": {
+        "duration_ms": {
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "usage": {
+          "$ref": "#/$defs/TokenUsage"
+        },
+        "cost_usd": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cost Usd"
+        }
+      },
+      "required": [
+        "duration_ms",
+        "usage",
+        "cost_usd"
+      ],
+      "title": "SessionCompletedPayload",
+      "type": "object"
+    },
+    "SessionFailedEvent": {
+      "properties": {
+        "seq": {
+          "description": "会话内单调递增，用于顺序保证与断线重连",
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "format": "date-time",
+          "title": "Ts",
+          "type": "string"
+        },
+        "message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "面向用户的一句话，前端可直接显示（§12.3）",
+          "title": "Message"
+        },
+        "type": {
+          "const": "session_failed",
+          "default": "session_failed",
+          "title": "Type",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/SessionFailedPayload"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "ts",
+        "message",
+        "type",
+        "payload"
+      ],
+      "title": "SessionFailedEvent",
+      "type": "object"
+    },
+    "SessionFailedPayload": {
+      "properties": {
+        "error": {
+          "$ref": "#/$defs/ErrorInfo"
+        },
+        "stage": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Stage"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "error",
+        "stage"
+      ],
+      "title": "SessionFailedPayload",
+      "type": "object"
+    },
+    "SessionStartedEvent": {
+      "properties": {
+        "seq": {
+          "description": "会话内单调递增，用于顺序保证与断线重连",
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "format": "date-time",
+          "title": "Ts",
+          "type": "string"
+        },
+        "message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "面向用户的一句话，前端可直接显示（§12.3）",
+          "title": "Message"
+        },
+        "type": {
+          "const": "session_started",
+          "default": "session_started",
+          "title": "Type",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/SessionStartedPayload"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "ts",
+        "message",
+        "type",
+        "payload"
+      ],
+      "title": "SessionStartedEvent",
+      "type": "object"
+    },
+    "SessionStartedPayload": {
+      "properties": {
+        "question": {
+          "title": "Question",
+          "type": "string"
+        },
+        "model_id": {
+          "title": "Model Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "question",
+        "model_id"
+      ],
+      "title": "SessionStartedPayload",
+      "type": "object"
+    },
+    "Source": {
+      "description": "一个可引用的信息来源。\n\nAPI 类数据源也是 Source（provider + endpoint + 人类可访问 URL），\n这样\"HYPE TVL 增长 18%\"这种来自 API 的数字同样可溯源。",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "ref": {
+          "description": "会话内短引用，如 s1。LLM 在 claim 中用它指代本来源",
+          "title": "Ref",
+          "type": "string"
+        },
+        "url": {
+          "title": "Url",
+          "type": "string"
+        },
+        "url_canonical": {
+          "description": "归一化 URL，用于跨 Agent 去重（§15.1）",
+          "title": "Url Canonical",
+          "type": "string"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title"
+        },
+        "domain": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Domain"
+        },
+        "source_type": {
+          "$ref": "#/$defs/SourceType"
+        },
+        "provider": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "coingecko / defillama / tavily …",
+          "title": "Provider"
+        },
+        "reliability": {
+          "$ref": "#/$defs/SourceReliability",
+          "default": "unknown"
+        },
+        "published_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Published At"
+        },
+        "retrieved_at": {
+          "format": "date-time",
+          "title": "Retrieved At",
+          "type": "string"
+        },
+        "excerpt": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "支撑证据片段，供 UI 悬浮预览与引用有效性校验",
+          "title": "Excerpt"
+        },
+        "citation_index": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "报告中的引用序号 [n]。未被引用的来源为 None（§15.4-3）",
+          "title": "Citation Index"
+        },
+        "http_status": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "抓取时的 HTTP 状态，404 标记为不可用",
+          "title": "Http Status"
+        }
+      },
+      "required": [
+        "id",
+        "ref",
+        "url",
+        "url_canonical",
+        "title",
+        "domain",
+        "source_type",
+        "provider",
+        "reliability",
+        "published_at",
+        "retrieved_at",
+        "excerpt",
+        "citation_index",
+        "http_status"
+      ],
+      "title": "Source",
+      "type": "object"
+    },
+    "SourceFoundEvent": {
+      "properties": {
+        "seq": {
+          "description": "会话内单调递增，用于顺序保证与断线重连",
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "format": "date-time",
+          "title": "Ts",
+          "type": "string"
+        },
+        "message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "面向用户的一句话，前端可直接显示（§12.3）",
+          "title": "Message"
+        },
+        "type": {
+          "const": "source_found",
+          "default": "source_found",
+          "title": "Type",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/SourceFoundPayload"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "ts",
+        "message",
+        "type",
+        "payload"
+      ],
+      "title": "SourceFoundEvent",
+      "type": "object"
+    },
+    "SourceFoundPayload": {
+      "properties": {
+        "source": {
+          "$ref": "#/$defs/Source"
+        }
+      },
+      "required": [
+        "source"
+      ],
+      "title": "SourceFoundPayload",
+      "type": "object"
+    },
+    "SourceReliability": {
+      "description": "来源可靠性分级（§15.2）。冲突时优先 primary。",
+      "enum": [
+        "primary",
+        "secondary",
+        "aggregator",
+        "unknown"
+      ],
+      "title": "SourceReliability",
+      "type": "string"
+    },
+    "SourceType": {
+      "enum": [
+        "web",
+        "news",
+        "official",
+        "sec",
+        "api",
+        "docs",
+        "github",
+        "social"
+      ],
+      "title": "SourceType",
+      "type": "string"
+    },
+    "Stage": {
+      "description": "研究流程的四个阶段（§12.2 STAGE_CHANGED）。",
+      "enum": [
+        "planning",
+        "researching",
+        "checking",
+        "writing"
+      ],
+      "title": "Stage",
+      "type": "string"
+    },
+    "StageChangedEvent": {
+      "properties": {
+        "seq": {
+          "description": "会话内单调递增，用于顺序保证与断线重连",
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "format": "date-time",
+          "title": "Ts",
+          "type": "string"
+        },
+        "message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "面向用户的一句话，前端可直接显示（§12.3）",
+          "title": "Message"
+        },
+        "type": {
+          "const": "stage_changed",
+          "default": "stage_changed",
+          "title": "Type",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/StageChangedPayload"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "ts",
+        "message",
+        "type",
+        "payload"
+      ],
+      "title": "StageChangedEvent",
+      "type": "object"
+    },
+    "StageChangedPayload": {
+      "properties": {
+        "stage": {
+          "$ref": "#/$defs/Stage"
+        },
+        "previous": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Stage"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "stage",
+        "previous"
+      ],
+      "title": "StageChangedPayload",
+      "type": "object"
+    },
+    "TokenUsage": {
+      "properties": {
+        "input": {
+          "default": 0,
+          "title": "Input",
+          "type": "integer"
+        },
+        "output": {
+          "default": 0,
+          "title": "Output",
+          "type": "integer"
+        },
+        "cached": {
+          "default": 0,
+          "title": "Cached",
+          "type": "integer"
+        }
+      },
+      "title": "TokenUsage",
+      "type": "object",
+      "required": [
+        "input",
+        "output",
+        "cached"
+      ]
+    },
+    "ToolCompletedEvent": {
+      "properties": {
+        "seq": {
+          "description": "会话内单调递增，用于顺序保证与断线重连",
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "format": "date-time",
+          "title": "Ts",
+          "type": "string"
+        },
+        "message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "面向用户的一句话，前端可直接显示（§12.3）",
+          "title": "Message"
+        },
+        "type": {
+          "const": "tool_completed",
+          "default": "tool_completed",
+          "title": "Type",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/ToolCompletedPayload"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "ts",
+        "message",
+        "type",
+        "payload"
+      ],
+      "title": "ToolCompletedEvent",
+      "type": "object"
+    },
+    "ToolCompletedPayload": {
+      "properties": {
+        "call_id": {
+          "title": "Call Id",
+          "type": "string"
+        },
+        "tool": {
+          "title": "Tool",
+          "type": "string"
+        },
+        "ok": {
+          "title": "Ok",
+          "type": "boolean"
+        },
+        "provider": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Provider"
+        },
+        "cache_hit": {
+          "default": false,
+          "title": "Cache Hit",
+          "type": "boolean"
+        },
+        "duration_ms": {
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "result_summary": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Result Summary"
+        }
+      },
+      "required": [
+        "call_id",
+        "tool",
+        "ok",
+        "provider",
+        "cache_hit",
+        "duration_ms",
+        "result_summary"
+      ],
+      "title": "ToolCompletedPayload",
+      "type": "object"
+    },
+    "ToolError": {
+      "properties": {
+        "code": {
+          "$ref": "#/$defs/ToolErrorCode"
+        },
+        "message": {
+          "description": "面向 LLM 的说明，需可据此决策；不含栈信息",
+          "title": "Message",
+          "type": "string"
+        },
+        "tool": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tool"
+        },
+        "provider": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Provider"
+        },
+        "retryable": {
+          "default": false,
+          "title": "Retryable",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "tool",
+        "provider",
+        "retryable"
+      ],
+      "title": "ToolError",
+      "type": "object"
+    },
+    "ToolErrorCode": {
+      "description": "§8.2。UNSUPPORTED / QUOTA_EXHAUSTED 必须与 NOT_FOUND 区分：\n前两者应产生 data gap，后者可能意味着标的名解析错误、值得重试。",
+      "enum": [
+        "not_found",
+        "rate_limited",
+        "quota_exhausted",
+        "timeout",
+        "upstream_error",
+        "invalid_input",
+        "unsupported",
+        "blocked",
+        "parse_error"
+      ],
+      "title": "ToolErrorCode",
+      "type": "string"
+    },
+    "ToolFailedEvent": {
+      "properties": {
+        "seq": {
+          "description": "会话内单调递增，用于顺序保证与断线重连",
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "format": "date-time",
+          "title": "Ts",
+          "type": "string"
+        },
+        "message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "面向用户的一句话，前端可直接显示（§12.3）",
+          "title": "Message"
+        },
+        "type": {
+          "const": "tool_failed",
+          "default": "tool_failed",
+          "title": "Type",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/ToolFailedPayload"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "ts",
+        "message",
+        "type",
+        "payload"
+      ],
+      "title": "ToolFailedEvent",
+      "type": "object"
+    },
+    "ToolFailedPayload": {
+      "properties": {
+        "call_id": {
+          "title": "Call Id",
+          "type": "string"
+        },
+        "tool": {
+          "title": "Tool",
+          "type": "string"
+        },
+        "error_code": {
+          "$ref": "#/$defs/ToolErrorCode"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "call_id",
+        "tool",
+        "error_code",
+        "message"
+      ],
+      "title": "ToolFailedPayload",
+      "type": "object"
+    },
+    "ToolStartedEvent": {
+      "properties": {
+        "seq": {
+          "description": "会话内单调递增，用于顺序保证与断线重连",
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "format": "date-time",
+          "title": "Ts",
+          "type": "string"
+        },
+        "message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "面向用户的一句话，前端可直接显示（§12.3）",
+          "title": "Message"
+        },
+        "type": {
+          "const": "tool_started",
+          "default": "tool_started",
+          "title": "Type",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/ToolStartedPayload"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "ts",
+        "message",
+        "type",
+        "payload"
+      ],
+      "title": "ToolStartedEvent",
+      "type": "object"
+    },
+    "ToolStartedPayload": {
+      "properties": {
+        "call_id": {
+          "title": "Call Id",
+          "type": "string"
+        },
+        "tool": {
+          "title": "Tool",
+          "type": "string"
+        },
+        "agent": {
+          "$ref": "#/$defs/AgentName"
+        },
+        "task_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Task Id"
+        },
+        "input_summary": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "摘要而非完整入参，避免事件流膨胀",
+          "title": "Input Summary"
+        }
+      },
+      "required": [
+        "call_id",
+        "tool",
+        "agent",
+        "task_id",
+        "input_summary"
+      ],
+      "title": "ToolStartedPayload",
+      "type": "object"
+    },
+    "UsageUpdatedEvent": {
+      "properties": {
+        "seq": {
+          "description": "会话内单调递增，用于顺序保证与断线重连",
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "format": "date-time",
+          "title": "Ts",
+          "type": "string"
+        },
+        "message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "面向用户的一句话，前端可直接显示（§12.3）",
+          "title": "Message"
+        },
+        "type": {
+          "const": "usage_updated",
+          "default": "usage_updated",
+          "title": "Type",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/UsageUpdatedPayload"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "ts",
+        "message",
+        "type",
+        "payload"
+      ],
+      "title": "UsageUpdatedEvent",
+      "type": "object"
+    },
+    "UsageUpdatedPayload": {
+      "properties": {
+        "usage": {
+          "$ref": "#/$defs/TokenUsage"
+        },
+        "cost_usd": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cost Usd"
+        }
+      },
+      "required": [
+        "usage",
+        "cost_usd"
+      ],
+      "title": "UsageUpdatedPayload",
+      "type": "object"
+    },
+    "VerificationStatus": {
+      "enum": [
+        "unverified",
+        "verified",
+        "conflicting",
+        "unsupported",
+        "refuted"
+      ],
+      "title": "VerificationStatus",
+      "type": "string"
+    },
+    "WarningEvent": {
+      "properties": {
+        "seq": {
+          "description": "会话内单调递增，用于顺序保证与断线重连",
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "format": "date-time",
+          "title": "Ts",
+          "type": "string"
+        },
+        "message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "面向用户的一句话，前端可直接显示（§12.3）",
+          "title": "Message"
+        },
+        "type": {
+          "const": "warning",
+          "default": "warning",
+          "title": "Type",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/WarningPayload"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "ts",
+        "message",
+        "type",
+        "payload"
+      ],
+      "title": "WarningEvent",
+      "type": "object"
+    },
+    "WarningPayload": {
+      "properties": {
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "WarningPayload",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "ResearchEvent": {
+      "$ref": "#/$defs/RootModel_Annotated_Union_SessionStartedEvent__SessionCompletedEvent__SessionFailedEvent__SessionCancelledEvent__IntentClassifiedEvent__PlanCreatedEvent__PlanUpdatedEvent__StageChangedEvent__AgentStartedEvent__AgentProgressEvent__AgentReasoningEvent__AgentCompletedEvent__AgentFailedEvent__AgentHandoffEvent__ToolStartedEvent__ToolCompletedEvent__ToolFailedEvent__SourceFoundEvent__MetricFoundEvent__FactCheckStartedEvent__FactCheckProgressEvent__ClaimVerifiedEvent__ConflictDetectedEvent__ReportStartedEvent__ReportSectionDeltaEvent__ReportCompletedEvent__UsageUpdatedEvent__WarningEvent__HeartbeatEvent___FieldInfo_annotation_NoneType__required_True__discriminator__type____"
+    },
+    "ResearchPlan": {
+      "$ref": "#/$defs/ResearchPlan"
+    },
+    "ResearchTask": {
+      "$ref": "#/$defs/ResearchTask"
+    },
+    "Entity": {
+      "$ref": "#/$defs/Entity"
+    },
+    "MetricPoint": {
+      "$ref": "#/$defs/MetricPoint"
+    },
+    "Source": {
+      "$ref": "#/$defs/Source"
+    },
+    "Claim": {
+      "$ref": "#/$defs/Claim"
+    },
+    "ClaimDraft": {
+      "$ref": "#/$defs/ClaimDraft"
+    },
+    "ClaimVerification": {
+      "$ref": "#/$defs/ClaimVerification"
+    },
+    "Conflict": {
+      "$ref": "#/$defs/Conflict"
+    },
+    "AgentFinding": {
+      "$ref": "#/$defs/AgentFinding"
+    },
+    "ResearchFinding": {
+      "$ref": "#/$defs/ResearchFinding"
+    },
+    "FactCheckResult": {
+      "$ref": "#/$defs/FactCheckResult"
+    },
+    "ResearchReport": {
+      "$ref": "#/$defs/ResearchReport"
+    },
+    "ReportSection": {
+      "$ref": "#/$defs/ReportSection"
+    },
+    "ReportMetadata": {
+      "$ref": "#/$defs/ReportMetadata"
+    },
+    "ToolError": {
+      "$ref": "#/$defs/ToolError"
+    },
+    "DataProvenance": {
+      "$ref": "#/$defs/DataProvenance"
+    },
+    "DataQuality": {
+      "$ref": "#/$defs/DataQuality"
+    },
+    "ErrorInfo": {
+      "$ref": "#/$defs/ErrorInfo"
+    },
+    "TokenUsage": {
+      "$ref": "#/$defs/TokenUsage"
+    }
+  },
+  "required": [
+    "ResearchEvent",
+    "ResearchPlan",
+    "ResearchTask",
+    "Entity",
+    "MetricPoint",
+    "Source",
+    "Claim",
+    "ClaimDraft",
+    "ClaimVerification",
+    "Conflict",
+    "AgentFinding",
+    "ResearchFinding",
+    "FactCheckResult",
+    "ResearchReport",
+    "ReportSection",
+    "ReportMetadata",
+    "ToolError",
+    "DataProvenance",
+    "DataQuality",
+    "ErrorInfo",
+    "TokenUsage"
+  ],
+  "title": "MraSharedTypes",
+  "type": "object",
+  "description": "由 services/agent 的 Pydantic 模型生成，请勿手改。真源见 agent_service/schemas/，改动后运行 pnpm gen:types。"
+}
