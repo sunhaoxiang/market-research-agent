@@ -26,7 +26,9 @@ if [ -n "$staged_env" ]; then
 fi
 
 # ── 3. 格式检查
-staged=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(ts|tsx|css|mjs|json|ya?ml)$' || true)
+# 扩展名列表必须覆盖 CI 里 `prettier --check .` 会扫到的一切，否则钩子放过的
+# 提交会在 CI 挂掉（漏掉 .md 就发生过一次）。宁可多列，--ignore-unknown 会兜住
+staged=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(ts|tsx|js|jsx|mjs|cjs|css|json|jsonc|ya?ml|md|mdx|html)$' || true)
 if [ -n "$staged" ]; then
   echo "→ prettier 检查"
   echo "$staged" | xargs pnpm exec prettier --check --ignore-unknown

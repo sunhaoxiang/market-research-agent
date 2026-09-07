@@ -17,6 +17,8 @@
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
     "gen:types": "./scripts/gen-types.sh",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "db:generate": "pnpm --filter @mra/web db:generate",
     "db:migrate": "pnpm --filter @mra/web db:migrate",
     "db:studio": "pnpm --filter @mra/web db:studio",
@@ -24,7 +26,7 @@
     "py:format": "cd services/agent && uv run ruff format .",
     "py:typecheck": "cd services/agent && uv run basedpyright",
     "py:test": "cd services/agent && uv run pytest -m 'not live'",
-    "check": "pnpm gen:types && pnpm lint && pnpm typecheck && pnpm test && pnpm py:lint && pnpm py:typecheck && pnpm py:test",
+    "check": "pnpm gen:types && pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm py:lint && pnpm py:format --check && pnpm py:typecheck && pnpm py:test",
     "prepare": "husky"
   },
   "devDependencies": {
