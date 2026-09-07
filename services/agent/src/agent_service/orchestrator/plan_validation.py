@@ -24,6 +24,7 @@ from typing import TYPE_CHECKING
 
 import structlog
 
+from agent_service.schemas.events import TokenUsage
 from agent_service.schemas.plan import ResearchPlan, ResearchTask
 
 if TYPE_CHECKING:
@@ -38,6 +39,12 @@ class PlanRejectedError(ValueError):
     def __init__(self, reason: str) -> None:
         super().__init__(f"研究计划不可用：{reason}")
         self.reason = reason
+        self.usage = TokenUsage()
+        """产出这份被拒计划所烧掉的用量，由 `create_plan` 填。
+
+        模型调用本身是成功的（钱已经花了），只是产物不可用。不带上它，
+        `/debug` 里"规划失败的会话花了多少钱"就永远是 0（§20.1）。
+        """
 
 
 @dataclass(frozen=True)

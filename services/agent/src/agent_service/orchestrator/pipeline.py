@@ -13,17 +13,19 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 import structlog
 
+from agent_service.models.structured_output import StructuredOutputError
 from agent_service.orchestrator.executor import execute_plan
 from agent_service.orchestrator.plan_validation import PlanRejectedError
-from agent_service.orchestrator.planner import create_plan
-from agent_service.orchestrator.state import ResearchState
-from agent_service.schemas.common import Stage, TaskStatus
+from agent_service.orchestrator.planner import PlanningResult, create_plan
+from agent_service.orchestrator.state import AgentRun, ResearchState
+from agent_service.schemas.common import AgentName, Stage, TaskStatus
 from agent_service.schemas.events import (
     ErrorInfo,
     SessionCancelledEvent,
@@ -33,6 +35,7 @@ from agent_service.schemas.events import (
     SessionFailedPayload,
     SessionStartedEvent,
     SessionStartedPayload,
+    TokenUsage,
 )
 from agent_service.utils.ids import new_id
 
@@ -97,6 +100,10 @@ async def run_research(
     except PlanRejectedError as error:
         # 规划失败没有降级形态：没有计划就没有任务可执行（§7.2）
         return _fail(state, code="plan_rejected", message=error.reason)
+    except StructuredOutputError as error:
+        # 同上：拿不到合法计划就没有可执行的任务。单独一个分支只为给出更准确的
+        # 错误码——"模型输出无法解析" 与 "计划语义不合法" 的排查方向完全不同
+        return _fail(state, code="structured_output", message=str(error))
     except asyncio.CancelledError:
         bus.emit(
             SessionCancelledEvent,
@@ -130,19 +137,8 @@ async def _plan_and_execute(
     now: datetime | None,
 ) -> None:
     state.advance_to(Stage.PLANNING)
-    planning = await create_plan(
-        state.question,
-        planner=planner,
-        limits=limits,
-        bus=state.bus,
-        now=now,
-    )
+    planning = await _plan(state, planner=planner, limits=limits, now=now)
     state.attach_plan(planning.validated)
-    state.record_run(
-        planner.entry,
-        planning.run_result.context_wrapper.usage,
-        at=now or datetime.now(UTC),
-    )
 
     state.advance_to(Stage.RESEARCHING)
     await execute_plan(
@@ -152,6 +148,53 @@ async def _plan_and_execute(
         # 规划已经花掉的时间要从预算里扣掉，否则总耗时会超出 total_timeout_s
         deadline_s=state.remaining_s(limits.total_timeout_s),
     )
+
+
+async def _plan(
+    state: ResearchState,
+    *,
+    planner: PlannerAgent,
+    limits: ExecutionLimits,
+    now: datetime | None,
+) -> PlanningResult:
+    """跑规划，并且**无论成败**都把这次 run 记进埋点。
+
+    失败路径同样要记账：规划调用失败时钱已经花了，而"规划反复重试后失败"
+    恰恰是最贵的一种会话。只在成功时记录会让 `/debug` 里的成本系统性偏低，
+    且偏低的幅度正好集中在最该被关注的那些会话上（§20.1）。
+    """
+    started = time.monotonic()
+
+    def record(usage: TokenUsage, error: ErrorInfo | None = None) -> None:
+        state.record_run(
+            AgentRun(
+                agent=AgentName.RESEARCH_MANAGER,
+                model=planner.entry,
+                duration_ms=int((time.monotonic() - started) * 1000),
+                token_usage_override=usage,
+                prompt=planner.prompt,
+                error=error,
+            ),
+            at=now or datetime.now(UTC),
+        )
+
+    try:
+        planning = await create_plan(
+            state.question,
+            planner=planner,
+            limits=limits,
+            bus=state.bus,
+            now=now,
+        )
+    except PlanRejectedError as error:
+        record(error.usage, ErrorInfo(code="plan_rejected", message=error.reason))
+        raise
+    except StructuredOutputError as error:
+        record(error.usage, ErrorInfo(code="structured_output", message=str(error)))
+        raise
+
+    record(planning.usage)
+    return planning
 
 
 def _fail(state: ResearchState, *, code: str, message: str) -> ResearchOutcome:

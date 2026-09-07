@@ -18,12 +18,17 @@ from typing import TYPE_CHECKING
 import structlog
 
 from agent_service.models.structured_output import run_structured
-from agent_service.orchestrator.plan_validation import ValidatedPlan, validate_plan
+from agent_service.orchestrator.plan_validation import (
+    PlanRejectedError,
+    ValidatedPlan,
+    validate_plan,
+)
 from agent_service.schemas.events import (
     IntentClassifiedEvent,
     IntentClassifiedPayload,
     PlanCreatedEvent,
     PlanCreatedPayload,
+    TokenUsage,
     WarningEvent,
     WarningPayload,
 )
@@ -46,7 +51,9 @@ class PlanningResult:
     attempts: int
     """模型被调用了几次。>1 说明首次输出不合 schema。"""
     run_result: RunResult
-    """原始 RunResult，供上层取 usage 做成本核算（§20.1）。"""
+    """最后一次调用的原始 RunResult。"""
+    usage: TokenUsage
+    """**全部**尝试的用量之和，供上层做成本核算（§20.1）。"""
 
     @property
     def plan(self) -> ResearchPlan:
@@ -75,7 +82,13 @@ async def create_plan(
         _user_message(question, now or datetime.now(UTC)),
         strategy=planner.strategy,
     )
-    validated = validate_plan(structured.output, limits)
+    try:
+        validated = validate_plan(structured.output, limits)
+    except PlanRejectedError as error:
+        # 模型调用成功了，钱已经花掉，只是产物不可用。把用量挂到异常上，
+        # 上层才能把这笔成本记进 agent_runs（§20.1）
+        error.usage = structured.usage
+        raise
 
     log.info(
         "plan.created",
@@ -94,6 +107,7 @@ async def create_plan(
         model_id=planner.model_id,
         attempts=structured.attempts,
         run_result=structured.result,
+        usage=structured.usage,
     )
 
 

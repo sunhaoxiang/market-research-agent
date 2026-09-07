@@ -33,6 +33,7 @@ export type ResearchEvent =
   | ReportSectionDeltaEvent
   | ReportCompletedEvent
   | UsageUpdatedEvent
+  | AgentRunMetricsEvent
   | WarningEvent
   | HeartbeatEvent;
 /**
@@ -564,9 +565,14 @@ export type Ts27 = string;
  * 面向用户的一句话，前端可直接显示（§12.3）
  */
 export type Message30 = string | null;
-export type Type27 = "warning";
-export type Code1 = string;
-export type Message31 = string;
+export type Type27 = "agent_run_metrics";
+export type TaskId6 = string | null;
+export type ModelId2 = string;
+export type TaskStatus = "pending" | "running" | "completed" | "failed" | "skipped";
+export type Hash = string;
+export type Chars = number;
+export type CostUsd2 = number | null;
+export type DurationMs3 = number;
 /**
  * 会话内单调递增，用于顺序保证与断线重连
  */
@@ -576,8 +582,21 @@ export type Ts28 = string;
 /**
  * 面向用户的一句话，前端可直接显示（§12.3）
  */
-export type Message32 = string | null;
-export type Type28 = "heartbeat";
+export type Message31 = string | null;
+export type Type28 = "warning";
+export type Code1 = string;
+export type Message32 = string;
+/**
+ * 会话内单调递增，用于顺序保证与断线重连
+ */
+export type Seq29 = number;
+export type SessionId29 = string;
+export type Ts29 = string;
+/**
+ * 面向用户的一句话，前端可直接显示（§12.3）
+ */
+export type Message33 = string | null;
+export type Type29 = "heartbeat";
 export type Payload2 = null;
 export type Id3 = string;
 export type Text1 = string;
@@ -594,7 +613,7 @@ export type ConfidenceLevel = "high" | "medium" | "low";
  */
 export type SourceIds = string[];
 export type AsOf1 = string | null;
-export type TaskId6 = string | null;
+export type TaskId7 = string | null;
 export type Agent = string | null;
 export type VerificationStatus1 = "unverified" | "verified" | "conflicting" | "unsupported" | "refuted";
 export type VerificationNote = string | null;
@@ -630,7 +649,7 @@ export type Metrics = MetricPoint[];
  * 明确声明拿不到什么数据。这是反幻觉的关键设计——强制显式声明缺失，而不是用推测填补空白
  */
 export type DataGaps1 = string[];
-export type TaskId7 = string;
+export type TaskId8 = string;
 export type Summary3 = string;
 export type Claims1 = Claim[];
 export type Sources = Source[];
@@ -639,7 +658,7 @@ export type DataGaps2 = string[];
 /**
  * 面向 LLM 的说明，需可据此决策；不含栈信息
  */
-export type Message33 = string;
+export type Message34 = string;
 export type Tool3 = string | null;
 export type Provider2 = string | null;
 export type Retryable = boolean;
@@ -1137,24 +1156,63 @@ export interface UsageUpdatedPayload {
   usage: TokenUsage;
   cost_usd: CostUsd1;
 }
-export interface WarningEvent {
+export interface AgentRunMetricsEvent {
   seq: Seq27;
   session_id: SessionId27;
   ts: Ts27;
   message: Message30;
   type: Type27;
+  payload: AgentRunMetricsPayload;
+}
+/**
+ * 一次 Agent run 的工程指标，对应 `agent_runs` 表的一行（§20.1）。
+ *
+ * 为什么要单独一个事件类型，而不是把这些字段塞进 `AGENT_COMPLETED`：
+ *
+ * 1. 决策 C 规定 Python 不碰业务库（§4），埋点数据只能经事件流到 Next 侧；
+ * 2. 规划阶段的 run 没有 `task_id`，也不产生 `AGENT_COMPLETED`
+ *    （它不是计划里的任务），塞进去就得为它伪造一个任务节点；
+ * 3. `AGENT_COMPLETED` 是给 UI 看的，prompt hash 这类字段对界面毫无意义，
+ *    混在一起会让前端 reducer 承载它不需要的概念。
+ *
+ * 一个事件 = 一行，Next 侧直接 insert，不需要任何关联状态。
+ */
+export interface AgentRunMetricsPayload {
+  agent: AgentName1;
+  task_id: TaskId6;
+  model_id: ModelId2;
+  status: TaskStatus;
+  prompt: PromptDigest | null;
+  usage: TokenUsage;
+  cost_usd: CostUsd2;
+  duration_ms: DurationMs3;
+  error: ErrorInfo | null;
+}
+/**
+ * prompt 的 hash 与长度。**不含全文**（§20.3）。
+ */
+export interface PromptDigest {
+  hash: Hash;
+  chars: Chars;
+}
+export interface WarningEvent {
+  seq: Seq28;
+  session_id: SessionId28;
+  ts: Ts28;
+  message: Message31;
+  type: Type28;
   payload: WarningPayload;
 }
 export interface WarningPayload {
   code: Code1;
-  message: Message31;
+  message: Message32;
 }
 export interface HeartbeatEvent {
-  seq: Seq28;
-  session_id: SessionId28;
-  ts: Ts28;
-  message: Message32;
-  type: Type28;
+  seq: Seq29;
+  session_id: SessionId29;
+  ts: Ts29;
+  message: Message33;
+  type: Type29;
   payload: Payload2;
 }
 /**
@@ -1167,7 +1225,7 @@ export interface Claim {
   confidence: ConfidenceLevel;
   source_ids: SourceIds;
   as_of: AsOf1;
-  task_id: TaskId6;
+  task_id: TaskId7;
   agent: Agent;
   verification: VerificationStatus1;
   verification_note: VerificationNote;
@@ -1212,7 +1270,7 @@ export interface AgentFinding {
  * 编排层组装后的完整结果，进入 Report Writer 的输入。
  */
 export interface ResearchFinding {
-  task_id: TaskId7;
+  task_id: TaskId8;
   agent: AgentName1;
   summary: Summary3;
   claims: Claims1;
@@ -1223,7 +1281,7 @@ export interface ResearchFinding {
 }
 export interface ToolError {
   code: ToolErrorCode;
-  message: Message33;
+  message: Message34;
   tool: Tool3;
   provider: Provider2;
   retryable: Retryable;

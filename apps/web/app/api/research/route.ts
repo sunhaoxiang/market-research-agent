@@ -122,10 +122,11 @@ function forward(
         } catch (error) {
           // 上游中途断裂。session 会停在最后一个已知状态上，而不是假装完成
           console.error("[research] 上游流中断", { sessionId, error });
-          buffer.flush();
           failSession(sessionId, "UPSTREAM_STREAM_BROKEN", "与 Agent 服务的连接中断");
         } finally {
-          buffer.flush();
+          // close 而非 flush：还要把中途断裂时没闭合的工具调用落成
+          // ok=false 的行，否则"卡住的工具"在 /debug 里完全不可见
+          buffer.close();
           if (!clientGone) {
             try {
               controller.close();

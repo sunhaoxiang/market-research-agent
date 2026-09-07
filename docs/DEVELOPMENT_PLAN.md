@@ -1053,9 +1053,22 @@ class EventType(StrEnum):
     REPORT_COMPLETED        # {report}
     # 其他
     USAGE_UPDATED           # {tokens, cost_usd}
+    AGENT_RUN_METRICS       # 一次 run 的埋点，= agent_runs 一行（见下）
     WARNING                 # {code, message}  额度不足/数据缺失等
     HEARTBEAT               # 保活，防代理超时
 ```
+
+`AGENT_RUN_METRICS` 是唯一一个**不面向 UI** 的事件（前端 reducer 忽略它）。它存在的原因是决策 C：Python 不碰业务数据库（§4），而 `agent_runs` 是 `/debug` 与跨模型 eval 的唯一数据源（§20.1），这行数据只能经事件流到 Next 侧。
+
+payload 与表结构一一对应：`{agent, task_id, model_id, status, prompt: {hash, chars}, usage, cost_usd, duration_ms, error}`。
+
+为什么不把这些字段塞进 `AGENT_COMPLETED`：
+
+1. 规划阶段的 run 不属于计划里的任何任务，既没有 `task_id` 也不产生 `AGENT_COMPLETED`，塞进去就得为它伪造一个任务节点；
+2. `AGENT_COMPLETED` 是给 UI 看的，prompt hash 对界面毫无意义，混在一起会让前端 reducer 承载它不需要的概念；
+3. 一个事件 = 一行，Next 侧直接 insert，不需要任何关联状态。
+
+`tool_calls` 则不需要新事件：`TOOL_STARTED` 与 `TOOL_COMPLETED` / `TOOL_FAILED` 按 `call_id` 关联即可凑出完整一行（前者提供 `agent` / `task_id` / 输入摘要，后者提供结果与耗时）。
 
 ### 12.3 信封格式
 

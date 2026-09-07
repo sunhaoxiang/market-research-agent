@@ -8,8 +8,9 @@ from __future__ import annotations
 import json
 
 import pytest
-from agents import Agent, AgentOutputSchema, ModelSettings
+from agents import Agent, AgentOutputSchema, ModelSettings, Usage
 from agents.testing import ScriptedModel, assistant_message
+from openai.types.responses.response_usage import InputTokensDetails
 from pydantic import BaseModel, Field
 
 from agent_service.models.capabilities import (
@@ -29,6 +30,7 @@ from agent_service.models.structured_output import (
     run_structured,
 )
 from agent_service.schemas import ResearchPlan
+from agent_service.schemas.events import TokenUsage
 
 
 class Sample(BaseModel):
@@ -357,6 +359,80 @@ async def test_persistent_empty_output_eventually_fails(
         await run_structured(json_mode_agent, "查 X", strategy=strategy, max_retries=2)
 
     assert "content 为空" in excinfo.value.last_error
+
+
+# ─── 用量累计（§20.1）────────────────────────────────────────────────────────
+
+
+def _metered(*replies: str, per_call: Usage) -> ScriptedModel:
+    """每次调用都报同样用量的 ScriptedModel。"""
+    return ScriptedModel(
+        [[assistant_message(reply)] for reply in replies],
+        default_usage=per_call,
+    )
+
+
+async def test_usage_covers_every_attempt_not_just_the_last(
+    json_mode_agent: Agent[None],
+) -> None:
+    """重试烧掉的 token 必须计入。
+
+    每次 `Runner.run` 都新建一个 `RunContextWrapper`，`result.context_wrapper.usage`
+    里只有最后一次调用的用量。而 json_mode 下重试是正常路径（§9.4），照最后一次
+    记账等于系统性低估成本——且低估的正是最该被关注的那些会话。
+    """
+    json_mode_agent.model = _metered(
+        "这不是 JSON",
+        '{"symbol": "HYPE", "price": 1.0, "tags": []}',
+        per_call=Usage(input_tokens=100, output_tokens=30),
+    )
+    strategy = build_strategy(Sample, _caps(StructuredOutputMode.JSON_MODE))
+
+    outcome = await run_structured(json_mode_agent, "查 HYPE", strategy=strategy)
+
+    assert outcome.attempts == 2
+    assert outcome.usage == TokenUsage(input=200, output=60)
+    # 对照：SDK 那份只有最后一次
+    assert outcome.result.context_wrapper.usage.input_tokens == 100
+
+
+async def test_failed_run_still_reports_what_it_burned(
+    json_mode_agent: Agent[None],
+) -> None:
+    """重试用尽而失败时，已花的钱也要能记账。
+
+    "最贵的一次研究"往往正是反复重试后失败的那次；异常不带用量，
+    这笔成本在 `/debug` 里就永远查不到（§20.1）。
+    """
+    json_mode_agent.model = _metered(
+        *["永远不是 JSON"] * 3,
+        per_call=Usage(input_tokens=50, output_tokens=10),
+    )
+    strategy = build_strategy(Sample, _caps(StructuredOutputMode.JSON_MODE))
+
+    with pytest.raises(StructuredOutputError) as excinfo:
+        await run_structured(json_mode_agent, "查 X", strategy=strategy, max_retries=2)
+
+    assert excinfo.value.usage == TokenUsage(input=150, output=30)
+
+
+async def test_cached_tokens_survive_accumulation(
+    json_mode_agent: Agent[None],
+) -> None:
+    """缓存命中量要分开累加：命中价仅为未命中的 3%（§9.8）。"""
+    json_mode_agent.model = _metered(
+        '{"symbol": "X", "price": 1.0, "tags": []}',
+        per_call=Usage(
+            input_tokens=1000,
+            output_tokens=100,
+            input_tokens_details=InputTokensDetails(cached_tokens=960, cache_write_tokens=0),
+        ),
+    )
+    strategy = build_strategy(Sample, _caps(StructuredOutputMode.JSON_MODE))
+
+    outcome = await run_structured(json_mode_agent, "查 X", strategy=strategy)
+
+    assert outcome.usage == TokenUsage(input=1000, output=100, cached=960)
 
 
 async def test_native_schema_path_skips_manual_parsing(

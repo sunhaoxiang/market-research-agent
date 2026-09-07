@@ -8,12 +8,15 @@ from __future__ import annotations
 import pytest
 from agents import OpenAIChatCompletionsModel, OpenAIResponsesModel
 from agents.extensions.models.litellm_model import LitellmModel
+from agents.tracing import get_trace_provider
+from agents.tracing.traces import NoOpTrace
 
 from agent_service.models.capabilities import ProviderId
 from agent_service.models.registry import (
     ModelRegistry,
     ProviderUnavailableError,
     bootstrap_sdk,
+    tracing_status,
 )
 from agent_service.schemas.common import ModelRole
 from agent_service.testing import IsolatedSettings
@@ -219,6 +222,51 @@ def test_explicit_disable_wins_over_present_key(clean_env: pytest.MonkeyPatch) -
     clean_env.setenv("OPENAI_API_KEY", "sk-openai")
     clean_env.setenv("OPENAI_AGENTS_DISABLE_TRACING", "true")
     assert bootstrap_sdk(IsolatedSettings()) is False
+
+
+def _tracing_is_live() -> bool:
+    """SDK 是否真的会记 trace。
+
+    直接问 SDK 而不是看 `bootstrap_sdk()` 的返回值：后者只说明我们的判断逻辑，
+    真正要验的是这个判断有没有落到 SDK 的全局开关上。tracing 关闭时
+    `create_trace()` 返回 `NoOpTrace`，这是最贴近实际行为的观测点。
+    """
+    trace = get_trace_provider().create_trace(name="probe")
+    return not isinstance(trace, NoOpTrace)
+
+
+def test_disabling_actually_silences_the_sdk(clean_env: pytest.MonkeyPatch) -> None:
+    """P1-13：开关必须真的作用到 SDK，不能只是我们自己记了个 bool。
+
+    没有 OpenAI key 却让 SDK 以为 tracing 开着，每次 run 都会尝试上传并报错。
+    """
+    clean_env.setenv("DEEPSEEK_API_KEY", "sk-test")
+    bootstrap_sdk(IsolatedSettings())
+
+    assert not _tracing_is_live()
+
+
+def test_enabling_actually_turns_the_sdk_back_on(clean_env: pytest.MonkeyPatch) -> None:
+    """反向也要验：只测关闭的话，一个永远返回 disabled 的实现同样能通过。"""
+    clean_env.setenv("DEEPSEEK_API_KEY", "sk-deepseek")
+    clean_env.setenv("OPENAI_API_KEY", "sk-openai")
+    bootstrap_sdk(IsolatedSettings())
+
+    assert _tracing_is_live()
+
+
+def test_health_report_cannot_drift_from_what_took_effect(
+    clean_env: pytest.MonkeyPatch,
+) -> None:
+    """`/v1/health` 报告的状态与实际生效的状态必须一致。
+
+    两者用同一个 `tracing_status()`，所以这里真正防的是将来有人在
+    `bootstrap_sdk` 里加一条独立的判断分支。
+    """
+    clean_env.setenv("OPENAI_API_KEY", "sk-openai")
+    settings = IsolatedSettings()
+
+    assert bootstrap_sdk(settings) is tracing_status(settings).enabled is _tracing_is_live()
 
 
 def test_bootstrap_does_not_make_openai_the_default_provider(

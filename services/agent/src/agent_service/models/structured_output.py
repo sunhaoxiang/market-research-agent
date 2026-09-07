@@ -30,6 +30,8 @@ from agents import Agent, AgentOutputSchema, AgentOutputSchemaBase, ModelSetting
 from pydantic import BaseModel, ValidationError
 
 from agent_service.models.capabilities import ModelCapabilities, StructuredOutputMode
+from agent_service.observability.cost import to_token_usage
+from agent_service.schemas.events import TokenUsage
 
 if TYPE_CHECKING:
     from agents.items import TResponseInputItem
@@ -46,7 +48,14 @@ _FENCE_RE = re.compile(r"```(?:json)?\s*(.*?)\s*```", re.DOTALL)
 class StructuredOutputError(ValueError):
     """模型输出无法解析成目标 schema，且重试已用尽。"""
 
-    def __init__(self, model_name: str, attempts: int, last_error: str, raw: str) -> None:
+    def __init__(
+        self,
+        model_name: str,
+        attempts: int,
+        last_error: str,
+        raw: str,
+        usage: TokenUsage | None = None,
+    ) -> None:
         super().__init__(
             f"{attempts} 次尝试后仍无法把模型输出解析为 {model_name}。最后一次错误：{last_error}"
         )
@@ -54,6 +63,9 @@ class StructuredOutputError(ValueError):
         self.attempts = attempts
         self.last_error = last_error
         self.raw = raw
+        self.usage = usage or TokenUsage()
+        """失败前已经烧掉的用量。带上它，调用方才能把这笔钱记进账（§20.1）——
+        失败的调用照样计费，而"最贵的一次研究"往往正是反复重试后失败的那次。"""
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -313,9 +325,15 @@ def apply_strategy[T: BaseModel](
 class StructuredRunResult[T: BaseModel]:
     output: T
     result: RunResult
-    """原始 RunResult，编排层从中取 usage 与 new_items 做埋点。"""
+    """最后一次调用的原始 RunResult，编排层从中取 new_items 做埋点。"""
     attempts: int
     """总共调用了几次模型。>1 说明触发了修正重试，值得记 warning。"""
+    usage: TokenUsage
+    """**所有**尝试的用量之和。
+
+    不要用 `result.context_wrapper.usage` 代替：每次 `Runner.run` 都新建一个
+    `RunContextWrapper`，那里只有最后一次调用的用量。json_mode 下重试是正常
+    路径而非异常分支（§9.4），照最后一次算等于系统性地低估成本。"""
 
 
 async def run_structured[T: BaseModel](
@@ -340,9 +358,11 @@ async def run_structured[T: BaseModel](
     current_input = user_input
     last_error: Exception | None = None
     last_raw = ""
+    usage = TokenUsage()
 
     for attempt in range(1, max_retries + 2):
         result = await run_fn(starting_agent=prepared, input=current_input)
+        usage = usage + to_token_usage(result.context_wrapper.usage)
 
         if not strategy.needs_manual_parsing:
             # SDK 已按 schema 校验过，直接取
@@ -350,6 +370,7 @@ async def run_structured[T: BaseModel](
                 output=result.final_output_as(strategy.output_model),
                 result=result,
                 attempts=attempt,
+                usage=usage,
             )
 
         last_raw = str(result.final_output or "")
@@ -385,11 +406,12 @@ async def run_structured[T: BaseModel](
             ]
             continue
 
-        return StructuredRunResult(output=parsed, result=result, attempts=attempt)
+        return StructuredRunResult(output=parsed, result=result, attempts=attempt, usage=usage)
 
     raise StructuredOutputError(
         model_name=strategy.output_model.__name__,
         attempts=max_retries + 1,
         last_error=str(last_error),
         raw=last_raw,
+        usage=usage,
     )

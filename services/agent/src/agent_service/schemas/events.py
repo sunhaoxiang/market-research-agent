@@ -26,6 +26,7 @@ from agent_service.schemas.common import (
     QuestionType,
     Schema,
     Stage,
+    TaskStatus,
     VerificationStatus,
 )
 from agent_service.schemas.entities import Entity, MetricPoint
@@ -73,6 +74,7 @@ class EventType(StrEnum):
     REPORT_COMPLETED = "report_completed"
     # ── 其他
     USAGE_UPDATED = "usage_updated"
+    AGENT_RUN_METRICS = "agent_run_metrics"
     WARNING = "warning"
     HEARTBEAT = "heartbeat"
 
@@ -87,6 +89,19 @@ class TokenUsage(Schema):
     output: int = 0
     cached: int = 0
     """命中 prompt 缓存的输入 token。缓存命中价仅为未命中的 3%，必须单独统计（§9.8）。"""
+
+    def __add__(self, other: TokenUsage) -> TokenUsage:
+        """合并两次调用的用量。
+
+        一次 Agent run 常包含多次模型调用（结构化输出的修正重试、Phase 2 起的
+        工具循环），而 SDK 的 usage 是**每次调用**独立的。没有这个运算就只能
+        手抄三个字段相加，抄漏一处的后果是成本被静默低估。
+        """
+        return TokenUsage(
+            input=self.input + other.input,
+            output=self.output + other.output,
+            cached=self.cached + other.cached,
+        )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -239,6 +254,42 @@ class ReportCompletedPayload(Schema):
 class UsageUpdatedPayload(Schema):
     usage: TokenUsage
     cost_usd: float | None = None
+
+
+class PromptDigest(Schema):
+    """prompt 的 hash 与长度。**不含全文**（§20.3）。"""
+
+    hash: str
+    chars: int
+
+
+class AgentRunMetricsPayload(Schema):
+    """一次 Agent run 的工程指标，对应 `agent_runs` 表的一行（§20.1）。
+
+    为什么要单独一个事件类型，而不是把这些字段塞进 `AGENT_COMPLETED`：
+
+    1. 决策 C 规定 Python 不碰业务库（§4），埋点数据只能经事件流到 Next 侧；
+    2. 规划阶段的 run 没有 `task_id`，也不产生 `AGENT_COMPLETED`
+       （它不是计划里的任务），塞进去就得为它伪造一个任务节点；
+    3. `AGENT_COMPLETED` 是给 UI 看的，prompt hash 这类字段对界面毫无意义，
+       混在一起会让前端 reducer 承载它不需要的概念。
+
+    一个事件 = 一行，Next 侧直接 insert，不需要任何关联状态。
+    """
+
+    agent: AgentName
+    task_id: str | None = None
+    """规划阶段的 run 为 None。"""
+    model_id: str
+    status: TaskStatus
+    """只会是 COMPLETED 或 FAILED。复用 TaskStatus 而非新造枚举，
+    因为语义完全一致，多一个枚举就多一处要同步的 CHECK 约束。"""
+    prompt: PromptDigest | None = None
+    usage: TokenUsage = Field(default_factory=TokenUsage)
+    cost_usd: float | None = None
+    """None 表示该模型定价未知（见 `cost_usd()`），不是 0。"""
+    duration_ms: int
+    error: ErrorInfo | None = None
 
 
 class WarningPayload(Schema):
@@ -398,6 +449,12 @@ class UsageUpdatedEvent(EventEnvelope):
     payload: UsageUpdatedPayload
 
 
+class AgentRunMetricsEvent(EventEnvelope):
+    type: Literal[EventType.AGENT_RUN_METRICS] = EventType.AGENT_RUN_METRICS
+    payload: AgentRunMetricsPayload
+    """埋点专用，前端 UI 应忽略（reducer 的 default 分支）。"""
+
+
 class WarningEvent(EventEnvelope):
     type: Literal[EventType.WARNING] = EventType.WARNING
     payload: WarningPayload
@@ -437,6 +494,7 @@ ResearchEvent = Annotated[
     | ReportSectionDeltaEvent
     | ReportCompletedEvent
     | UsageUpdatedEvent
+    | AgentRunMetricsEvent
     | WarningEvent
     | HeartbeatEvent,
     Field(discriminator="type"),

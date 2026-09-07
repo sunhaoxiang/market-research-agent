@@ -19,9 +19,12 @@ from agent_service.models.capabilities import (
 from agent_service.models.catalog import ModelEntry, get_entry
 from agent_service.observability.cost import cost_usd, to_token_usage
 from agent_service.observability.event_bus import EventBus
-from agent_service.orchestrator.state import ResearchState
-from agent_service.schemas.common import Stage, TaskStatus
+from agent_service.observability.prompts import PromptFingerprint
+from agent_service.orchestrator.state import AgentRun, ResearchState
+from agent_service.schemas.common import AgentName, Stage, TaskStatus
 from agent_service.schemas.events import (
+    AgentRunMetricsEvent,
+    ErrorInfo,
     EventType,
     ResearchEvent,
     StageChangedPayload,
@@ -68,6 +71,16 @@ def _pricing_entry(pricing: Pricing | None) -> ModelEntry:
     base = get_entry("deepseek:deepseek-v4-pro")
     return base.model_copy(
         update={"capabilities": base.capabilities.model_copy(update={"pricing": pricing})}
+    )
+
+
+def _run(entry: ModelEntry, usage: _Usage | None = None, **overrides: object) -> AgentRun:
+    return AgentRun(
+        agent=AgentName.RESEARCH_MANAGER,
+        model=entry,
+        duration_ms=100,
+        usage=usage or _Usage(),
+        **overrides,  # pyright: ignore[reportArgumentType]
     )
 
 
@@ -171,17 +184,84 @@ def test_usage_accumulates_across_runs() -> None:
     state = _state()
     entry = _pricing_entry(Pricing(peak=TokenPrices(input=1.0, output=1.0)))
 
-    state.record_run(entry, _Usage(input_tokens=100, output_tokens=10), at=_AT)
-    state.record_run(entry, _Usage(input_tokens=200, output_tokens=20), at=_AT)
+    state.record_run(_run(entry, _Usage(input_tokens=100, output_tokens=10)), at=_AT)
+    state.record_run(_run(entry, _Usage(input_tokens=200, output_tokens=20)), at=_AT)
 
     assert state.usage == TokenUsage(input=300, output=30, cached=0)
     assert state.cost_usd == pytest.approx(330 / 1_000_000)
 
 
+async def test_record_run_emits_a_metrics_event() -> None:
+    """记账与发事件必须绑在一起（§20.1）。
+
+    `agent_runs` 是 `/debug` 与跨模型 eval 的唯一数据源，而 Python 不碰业务库
+    （决策 C），这行数据只能靠事件流过去。留一个"只记账不发事件"的口子，
+    就一定会有某条路径忘记发，且不会有任何报错。
+    """
+    state = _state()
+    entry = _pricing_entry(Pricing(peak=TokenPrices(input=1.0, output=1.0)))
+
+    state.record_run(
+        _run(
+            entry,
+            _Usage(input_tokens=100, output_tokens=10),
+            task_id="t1",
+            prompt=PromptFingerprint(hash="abc123", chars=4096),
+        ),
+        at=_AT,
+    )
+
+    (event,) = await _drain(state.bus)
+    assert isinstance(event, AgentRunMetricsEvent)
+    assert event.payload.model_id == entry.id
+    assert event.payload.task_id == "t1"
+    assert event.payload.status is TaskStatus.COMPLETED
+    assert event.payload.usage == TokenUsage(input=100, output=10)
+    assert event.payload.cost_usd == pytest.approx(110 / 1_000_000)
+    assert event.payload.prompt is not None
+    assert event.payload.prompt.hash == "abc123"
+    assert event.payload.prompt.chars == 4096
+
+
+async def test_failed_run_is_recorded_with_its_error() -> None:
+    state = _state()
+
+    state.record_run(
+        _run(
+            _pricing_entry(Pricing(peak=TokenPrices(input=1.0, output=1.0))),
+            _Usage(input_tokens=100),
+            error=ErrorInfo(code="structured_output", message="重试用尽"),
+        ),
+        at=_AT,
+    )
+
+    (event,) = await _drain(state.bus)
+    assert isinstance(event, AgentRunMetricsEvent)
+    assert event.payload.status is TaskStatus.FAILED
+    assert event.payload.error is not None
+    assert event.payload.error.code == "structured_output"
+    # 失败照样计费
+    assert event.payload.cost_usd == pytest.approx(100 / 1_000_000)
+
+
+async def test_metrics_event_never_carries_the_prompt_text() -> None:
+    """§20.3：日志与埋点里禁止出现完整 prompt。"""
+    state = _state()
+    secret = "你是一个金融研究规划器" * 100
+
+    state.record_run(
+        _run(_pricing_entry(None), prompt=PromptFingerprint(hash="h", chars=len(secret))),
+        at=_AT,
+    )
+
+    (event,) = await _drain(state.bus)
+    assert secret not in event.model_dump_json()
+
+
 def test_cost_stays_none_when_pricing_is_unknown() -> None:
     state = _state()
 
-    state.record_run(_pricing_entry(None), _Usage(input_tokens=100), at=_AT)
+    state.record_run(_run(_pricing_entry(None), _Usage(input_tokens=100)), at=_AT)
 
     assert state.usage.input == 100  # 用量照记，只是算不出钱
     assert state.cost_usd is None
@@ -190,7 +270,7 @@ def test_cost_stays_none_when_pricing_is_unknown() -> None:
 def test_unknown_pricing_does_not_trip_the_budget_guard() -> None:
     """宁可放行也不要因为目录缺一个价格就把会话拦死。"""
     state = _state()
-    state.record_run(_pricing_entry(None), _Usage(input_tokens=10**9), at=_AT)
+    state.record_run(_run(_pricing_entry(None), _Usage(input_tokens=10**9)), at=_AT)
 
     assert not state.over_budget(0.01)
 

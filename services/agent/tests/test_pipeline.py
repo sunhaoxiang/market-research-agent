@@ -14,6 +14,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 import pytest
+from agents import Usage
 from agents.testing import ScriptedModel, assistant_message
 from pydantic import SecretStr
 
@@ -27,12 +28,14 @@ from agent_service.schemas.common import AgentName, Stage, TaskStatus
 from agent_service.schemas.events import (
     TERMINAL_EVENT_TYPES,
     AgentCompletedPayload,
+    AgentRunMetricsEvent,
     AgentStartedPayload,
     EventType,
     ResearchEvent,
     SessionCompletedPayload,
     SessionFailedPayload,
     StageChangedPayload,
+    TokenUsage,
 )
 from agent_service.schemas.findings import ResearchFinding
 from agent_service.testing import (
@@ -80,18 +83,26 @@ def _limits(**overrides: float | int) -> IsolatedExecutionLimits:
     return IsolatedExecutionLimits(**overrides)  # pyright: ignore[reportArgumentType]
 
 
-def _planner(*replies: str, limits: IsolatedExecutionLimits | None = None) -> PlannerAgent:
+def _planner(
+    *replies: str,
+    limits: IsolatedExecutionLimits | None = None,
+    per_call: Usage | None = None,
+) -> PlannerAgent:
     registry = ModelRegistry(
         IsolatedSettings(
             providers=IsolatedProviderCredentials(deepseek_api_key=SecretStr("sk-test"))
         )
     )
     built = build_research_manager(registry, limits or _limits())
-    scripted = ScriptedModel([[assistant_message(reply)] for reply in replies])
+    scripted = ScriptedModel(
+        [[assistant_message(reply)] for reply in replies],
+        default_usage=per_call,
+    )
     return PlannerAgent(
         agent=built.agent.clone(model=scripted),
         strategy=built.strategy,
         entry=built.entry,
+        prompt=built.prompt,
     )
 
 
@@ -181,6 +192,7 @@ async def test_event_sequence_covers_the_whole_flow() -> None:
         EventType.STAGE_CHANGED,  # planning
         EventType.INTENT_CLASSIFIED,
         EventType.PLAN_CREATED,
+        EventType.AGENT_RUN_METRICS,  # planner 这次 run 的埋点
         EventType.STAGE_CHANGED,  # researching
         EventType.SESSION_COMPLETED,
     ]
@@ -320,6 +332,73 @@ async def test_rejected_plan_fails_the_session() -> None:
     payload = _payload(events[-1], SessionFailedPayload)
     assert payload.error.code == "plan_rejected"
     assert payload.stage is Stage.PLANNING  # 前端据此知道是在哪一步挂的
+
+
+async def test_planner_run_is_metered_even_when_the_plan_is_rejected() -> None:
+    """失败路径也要记账（§20.1）。
+
+    模型调用本身成功了，钱已经花掉，只是产物不可用。只在成功时记录会让
+    `/debug` 里的成本系统性偏低，而偏低的幅度正好集中在最该被关注的
+    那些会话——"反复重试后失败"往往就是最贵的一次。
+    """
+    bus = _bus()
+    await run_research(
+        "你好",
+        planner=_planner(_plan_json(tasks=[]), per_call=Usage(input_tokens=800, output_tokens=200)),
+        runner=StubRunner(),
+        limits=_limits(),
+        bus=bus,
+        now=_NOW,
+    )
+
+    metrics = [e for e in await _drain(bus) if isinstance(e, AgentRunMetricsEvent)]
+    assert len(metrics) == 1
+    assert metrics[0].payload.status is TaskStatus.FAILED
+    assert metrics[0].payload.error is not None
+    assert metrics[0].payload.error.code == "plan_rejected"
+    assert metrics[0].payload.usage == TokenUsage(input=800, output=200)
+
+
+async def test_planner_run_records_prompt_and_model() -> None:
+    """`agent_runs` 要能回答"这次用了哪个模型、哪版 prompt"（§20.1）。"""
+    bus = _bus()
+    await run_research(
+        "Hyperliquid 怎么样？",
+        planner=_planner(_plan_json(), per_call=Usage(input_tokens=1000, output_tokens=300)),
+        runner=StubRunner(),
+        limits=_limits(),
+        bus=bus,
+        now=_NOW,
+    )
+
+    (metrics,) = [e for e in await _drain(bus) if isinstance(e, AgentRunMetricsEvent)]
+    assert metrics.payload.agent is AgentName.RESEARCH_MANAGER
+    assert metrics.payload.model_id == "deepseek:deepseek-v4-pro"
+    # 规划不属于计划里的任何任务，所以没有 task_id
+    assert metrics.payload.task_id is None
+    assert metrics.payload.prompt is not None
+    assert metrics.payload.prompt.chars > 1000
+    assert metrics.payload.duration_ms >= 0
+
+
+async def test_retried_planning_reports_the_total_usage() -> None:
+    """规划重试烧掉的 token 要全部计入会话成本。"""
+    bus = _bus()
+    await run_research(
+        "Hyperliquid 怎么样？",
+        planner=_planner(
+            "这不是 JSON",
+            _plan_json(),
+            per_call=Usage(input_tokens=1000, output_tokens=300),
+        ),
+        runner=StubRunner(),
+        limits=_limits(),
+        bus=bus,
+        now=_NOW,
+    )
+
+    (metrics,) = [e for e in await _drain(bus) if isinstance(e, AgentRunMetricsEvent)]
+    assert metrics.payload.usage == TokenUsage(input=2000, output=600)
 
 
 async def test_unexpected_error_still_emits_a_terminal_event() -> None:

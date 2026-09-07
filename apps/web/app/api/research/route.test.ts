@@ -64,6 +64,31 @@ function upstreamOf(frames: string[], gate?: Promise<void>): Response {
   return new Response(body, { status: 200, headers: { "Content-Type": "text/event-stream" } });
 }
 
+/**
+ * 交出若干帧后连接断裂的上游。
+ *
+ * 分两次 pull：先把帧真正交出去，再报错。写成 `enqueue(); error();` 是不行的
+ * ——规范要求 `error()` 清空队列，那些帧根本到不了消费端，也就模拟不出
+ * "已收到的数据不能丢"这个场景。
+ */
+function truncatedUpstream(...frames: string[]): Response {
+  const encoder = new TextEncoder();
+  let pulls = 0;
+  return new Response(
+    new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulls += 1;
+        if (pulls <= frames.length) {
+          controller.enqueue(encoder.encode(frames[pulls - 1]!));
+          return;
+        }
+        controller.error(new Error("连接被重置"));
+      },
+    }),
+    { status: 200 },
+  );
+}
+
 function event(seq: number, type: string, payload: unknown = null, message?: string): string {
   const body = JSON.stringify({
     seq,
@@ -84,7 +109,18 @@ const HAPPY_PATH = [
   event(3, "intent_classified", { question_type: "crypto", entities: [] }),
   event(4, "plan_created", { plan: PLAN }),
   event(5, "agent_started", { agent: "crypto_research", task_id: "t1", objective: "o" }),
-  event(6, "session_completed", {
+  event(6, "agent_run_metrics", {
+    agent: "research_manager",
+    task_id: null,
+    model_id: "deepseek:deepseek-v4-pro",
+    status: "completed",
+    prompt: { hash: "a1b2c3d4e5f60718", chars: 4096 },
+    usage: { input: 2419, output: 2395, cached: 2304 },
+    cost_usd: 0.0048,
+    duration_ms: 27549,
+    error: null,
+  }),
+  event(7, "session_completed", {
     duration_ms: 1234,
     cost_usd: 0.02,
     usage: { input: 2419, output: 2395, cached: 2304 },
@@ -170,9 +206,10 @@ describe("正常路径", () => {
       "intent_classified",
       "plan_created",
       "agent_started",
+      "agent_run_metrics",
       "session_completed",
     ]);
-    expect(events().map((e) => e.seq)).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(events().map((e) => e.seq)).toEqual([1, 2, 3, 4, 5, 6, 7]);
   });
 
   it("会话级元数据从事件里补齐", async () => {
@@ -186,6 +223,85 @@ describe("正常路径", () => {
     expect(session.plan).toEqual(PLAN);
     // 请求里没指定模型，真实用的是 Python 按角色解析出来的那个
     expect(session.modelId).toBe("deepseek:deepseek-v4-pro");
+  });
+
+  it("埋点行与事件同批落库", async () => {
+    // §20.1 的第二条数据线。Python 不碰业务库（决策 C），所以这些行只能由
+    // BFF 在消费 SSE 时派生出来——事件流是它们唯一的来源
+    startResearch.mockResolvedValue(upstreamOf(HAPPY_PATH));
+
+    await drain(await ask({ question: "Q" }));
+
+    const runs = db.select().from(schema.agentRuns).all();
+    expect(runs).toHaveLength(1);
+    expect(runs[0]).toMatchObject({
+      agent: "research_manager",
+      modelId: "deepseek:deepseek-v4-pro",
+      status: "completed",
+      promptHash: "a1b2c3d4e5f60718",
+      tokensIn: 2419,
+      tokensCached: 2304,
+    });
+  });
+
+  it("工具调用由开始与完成两条事件合成一行", async () => {
+    startResearch.mockResolvedValue(
+      upstreamOf([
+        event(1, "session_started", { question: "Q", model_id: "m" }),
+        event(2, "tool_started", {
+          call_id: "c1",
+          tool: "get_tvl",
+          agent: "crypto_research",
+          task_id: "t1",
+          input_summary: { protocol: "hyperliquid" },
+        }),
+        event(3, "tool_completed", {
+          call_id: "c1",
+          tool: "get_tvl",
+          ok: true,
+          provider: "defillama",
+          cache_hit: true,
+          duration_ms: 340,
+          result_summary: { tvl: 1.2e9 },
+        }),
+        event(4, "session_completed", { duration_ms: 1, cost_usd: 0, usage: {} }),
+      ]),
+    );
+
+    await drain(await ask({ question: "Q" }));
+
+    const calls = db.select().from(schema.toolCalls).all();
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({
+      tool: "get_tvl",
+      agent: "crypto_research",
+      taskId: "t1",
+      provider: "defillama",
+      cacheHit: true,
+      ok: true,
+      durationMs: 340,
+    });
+  });
+
+  it("流中断时未闭合的工具调用落成 abandoned", async () => {
+    // 「卡住的工具」是最该被 /debug 发现的一类问题，不能因为流断了就丢掉
+    startResearch.mockResolvedValue(
+      truncatedUpstream(
+        event(1, "tool_started", {
+          call_id: "c1",
+          tool: "web_fetch",
+          agent: "web_research",
+          task_id: "t1",
+          input_summary: {},
+        }),
+      ),
+    );
+
+    await drain(await ask({ question: "Q" }));
+
+    const calls = db.select().from(schema.toolCalls).all();
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({ tool: "web_fetch", ok: false, errorCode: "abandoned" });
   });
 
   it("终态事件里的用量与成本都落库", async () => {
@@ -305,26 +421,7 @@ describe("上游故障", () => {
   });
 
   it("流中途断裂时 session 落成 failed，而不是假装完成", async () => {
-    const encoder = new TextEncoder();
-    let pulls = 0;
-    startResearch.mockResolvedValue(
-      new Response(
-        // 分两次 pull：先把第一帧真正交出去，再报错。写成
-        // `enqueue(); error();` 是不行的——规范要求 `error()` 清空队列，
-        // 那一帧根本到不了消费端，也就模拟不出"已收到的数据不能丢"
-        new ReadableStream<Uint8Array>({
-          pull(controller) {
-            pulls += 1;
-            if (pulls === 1) {
-              controller.enqueue(encoder.encode(HAPPY_PATH[0]!));
-              return;
-            }
-            controller.error(new Error("连接被重置"));
-          },
-        }),
-        { status: 200 },
-      ),
-    );
+    startResearch.mockResolvedValue(truncatedUpstream(HAPPY_PATH[0]!));
 
     await drain(await ask({ question: "Q" })).catch(() => {});
     await vi.waitFor(() => expect(sessions()[0]!.status).toBe("failed"));

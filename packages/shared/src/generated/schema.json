@@ -444,6 +444,137 @@
       "title": "AgentReasoningPayload",
       "type": "object"
     },
+    "AgentRunMetricsEvent": {
+      "properties": {
+        "seq": {
+          "description": "会话内单调递增，用于顺序保证与断线重连",
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session_id": {
+          "title": "Session Id",
+          "type": "string"
+        },
+        "ts": {
+          "format": "date-time",
+          "title": "Ts",
+          "type": "string"
+        },
+        "message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "面向用户的一句话，前端可直接显示（§12.3）",
+          "title": "Message"
+        },
+        "type": {
+          "const": "agent_run_metrics",
+          "default": "agent_run_metrics",
+          "title": "Type",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/AgentRunMetricsPayload"
+        }
+      },
+      "required": [
+        "seq",
+        "session_id",
+        "ts",
+        "message",
+        "type",
+        "payload"
+      ],
+      "title": "AgentRunMetricsEvent",
+      "type": "object"
+    },
+    "AgentRunMetricsPayload": {
+      "description": "一次 Agent run 的工程指标，对应 `agent_runs` 表的一行（§20.1）。\n\n为什么要单独一个事件类型，而不是把这些字段塞进 `AGENT_COMPLETED`：\n\n1. 决策 C 规定 Python 不碰业务库（§4），埋点数据只能经事件流到 Next 侧；\n2. 规划阶段的 run 没有 `task_id`，也不产生 `AGENT_COMPLETED`\n   （它不是计划里的任务），塞进去就得为它伪造一个任务节点；\n3. `AGENT_COMPLETED` 是给 UI 看的，prompt hash 这类字段对界面毫无意义，\n   混在一起会让前端 reducer 承载它不需要的概念。\n\n一个事件 = 一行，Next 侧直接 insert，不需要任何关联状态。",
+      "properties": {
+        "agent": {
+          "$ref": "#/$defs/AgentName"
+        },
+        "task_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Task Id"
+        },
+        "model_id": {
+          "title": "Model Id",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/TaskStatus"
+        },
+        "prompt": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PromptDigest"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "usage": {
+          "$ref": "#/$defs/TokenUsage"
+        },
+        "cost_usd": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cost Usd"
+        },
+        "duration_ms": {
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ErrorInfo"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "agent",
+        "task_id",
+        "model_id",
+        "status",
+        "prompt",
+        "usage",
+        "cost_usd",
+        "duration_ms",
+        "error"
+      ],
+      "title": "AgentRunMetricsPayload",
+      "type": "object"
+    },
     "AgentStartedEvent": {
       "properties": {
         "seq": {
@@ -1694,6 +1825,25 @@
         "reason"
       ]
     },
+    "PromptDigest": {
+      "description": "prompt 的 hash 与长度。**不含全文**（§20.3）。",
+      "properties": {
+        "hash": {
+          "title": "Hash",
+          "type": "string"
+        },
+        "chars": {
+          "title": "Chars",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "hash",
+        "chars"
+      ],
+      "title": "PromptDigest",
+      "type": "object"
+    },
     "QuestionType": {
       "enum": [
         "crypto",
@@ -2180,7 +2330,7 @@
       "title": "ResearchTask",
       "type": "object"
     },
-    "RootModel_Annotated_Union_SessionStartedEvent__SessionCompletedEvent__SessionFailedEvent__SessionCancelledEvent__IntentClassifiedEvent__PlanCreatedEvent__PlanUpdatedEvent__StageChangedEvent__AgentStartedEvent__AgentProgressEvent__AgentReasoningEvent__AgentCompletedEvent__AgentFailedEvent__AgentHandoffEvent__ToolStartedEvent__ToolCompletedEvent__ToolFailedEvent__SourceFoundEvent__MetricFoundEvent__FactCheckStartedEvent__FactCheckProgressEvent__ClaimVerifiedEvent__ConflictDetectedEvent__ReportStartedEvent__ReportSectionDeltaEvent__ReportCompletedEvent__UsageUpdatedEvent__WarningEvent__HeartbeatEvent___FieldInfo_annotation_NoneType__required_True__discriminator__type____": {
+    "RootModel_Annotated_Union_SessionStartedEvent__SessionCompletedEvent__SessionFailedEvent__SessionCancelledEvent__IntentClassifiedEvent__PlanCreatedEvent__PlanUpdatedEvent__StageChangedEvent__AgentStartedEvent__AgentProgressEvent__AgentReasoningEvent__AgentCompletedEvent__AgentFailedEvent__AgentHandoffEvent__ToolStartedEvent__ToolCompletedEvent__ToolFailedEvent__SourceFoundEvent__MetricFoundEvent__FactCheckStartedEvent__FactCheckProgressEvent__ClaimVerifiedEvent__ConflictDetectedEvent__ReportStartedEvent__ReportSectionDeltaEvent__ReportCompletedEvent__UsageUpdatedEvent__AgentRunMetricsEvent__WarningEvent__HeartbeatEvent___FieldInfo_annotation_NoneType__required_True__discriminator__type____": {
       "discriminator": {
         "mapping": {
           "agent_completed": "#/$defs/AgentCompletedEvent",
@@ -2188,6 +2338,7 @@
           "agent_handoff": "#/$defs/AgentHandoffEvent",
           "agent_progress": "#/$defs/AgentProgressEvent",
           "agent_reasoning": "#/$defs/AgentReasoningEvent",
+          "agent_run_metrics": "#/$defs/AgentRunMetricsEvent",
           "agent_started": "#/$defs/AgentStartedEvent",
           "claim_verified": "#/$defs/ClaimVerifiedEvent",
           "conflict_detected": "#/$defs/ConflictDetectedEvent",
@@ -2296,6 +2447,9 @@
         },
         {
           "$ref": "#/$defs/UsageUpdatedEvent"
+        },
+        {
+          "$ref": "#/$defs/AgentRunMetricsEvent"
         },
         {
           "$ref": "#/$defs/WarningEvent"
@@ -2894,6 +3048,17 @@
       "title": "StageChangedPayload",
       "type": "object"
     },
+    "TaskStatus": {
+      "enum": [
+        "pending",
+        "running",
+        "completed",
+        "failed",
+        "skipped"
+      ],
+      "title": "TaskStatus",
+      "type": "string"
+    },
     "TokenUsage": {
       "properties": {
         "input": {
@@ -3429,7 +3594,7 @@
   },
   "properties": {
     "ResearchEvent": {
-      "$ref": "#/$defs/RootModel_Annotated_Union_SessionStartedEvent__SessionCompletedEvent__SessionFailedEvent__SessionCancelledEvent__IntentClassifiedEvent__PlanCreatedEvent__PlanUpdatedEvent__StageChangedEvent__AgentStartedEvent__AgentProgressEvent__AgentReasoningEvent__AgentCompletedEvent__AgentFailedEvent__AgentHandoffEvent__ToolStartedEvent__ToolCompletedEvent__ToolFailedEvent__SourceFoundEvent__MetricFoundEvent__FactCheckStartedEvent__FactCheckProgressEvent__ClaimVerifiedEvent__ConflictDetectedEvent__ReportStartedEvent__ReportSectionDeltaEvent__ReportCompletedEvent__UsageUpdatedEvent__WarningEvent__HeartbeatEvent___FieldInfo_annotation_NoneType__required_True__discriminator__type____"
+      "$ref": "#/$defs/RootModel_Annotated_Union_SessionStartedEvent__SessionCompletedEvent__SessionFailedEvent__SessionCancelledEvent__IntentClassifiedEvent__PlanCreatedEvent__PlanUpdatedEvent__StageChangedEvent__AgentStartedEvent__AgentProgressEvent__AgentReasoningEvent__AgentCompletedEvent__AgentFailedEvent__AgentHandoffEvent__ToolStartedEvent__ToolCompletedEvent__ToolFailedEvent__SourceFoundEvent__MetricFoundEvent__FactCheckStartedEvent__FactCheckProgressEvent__ClaimVerifiedEvent__ConflictDetectedEvent__ReportStartedEvent__ReportSectionDeltaEvent__ReportCompletedEvent__UsageUpdatedEvent__AgentRunMetricsEvent__WarningEvent__HeartbeatEvent___FieldInfo_annotation_NoneType__required_True__discriminator__type____"
     },
     "ResearchPlan": {
       "$ref": "#/$defs/ResearchPlan"

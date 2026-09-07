@@ -8,12 +8,16 @@ import { desc, eq, sql } from "drizzle-orm";
 
 import type { Db } from "@/db/client";
 import {
+  type NewAgentRun,
   type NewResearchEvent,
   type NewResearchSession,
+  type NewToolCall,
   type ResearchSession,
   type SessionStatus,
+  agentRuns,
   researchEvents,
   researchSessions,
+  toolCalls,
 } from "@/db/schema";
 
 export const LOCAL_USER_ID = "local";
@@ -88,6 +92,27 @@ export function appendEvents(db: Db, events: NewResearchEvent[]): void {
   if (events.length === 0) return;
   db.transaction((tx) => {
     tx.insert(researchEvents).values(events).run();
+  });
+}
+
+/**
+ * 一批事件连同它们派生出的指标行，单事务写入。
+ *
+ * 三张表放在同一个事务里，是为了让"事件已落库但指标没落"这种状态不可能出现——
+ * 否则 `/debug` 里的成本会和事件流对不上，而这种偏差没有任何办法事后修正
+ * （原始 usage 只在事件的 payload 里）。
+ */
+export function appendEventsWithMetrics(
+  db: Db,
+  events: NewResearchEvent[],
+  runs: NewAgentRun[],
+  calls: NewToolCall[],
+): void {
+  if (events.length === 0 && runs.length === 0 && calls.length === 0) return;
+  db.transaction((tx) => {
+    if (events.length > 0) tx.insert(researchEvents).values(events).run();
+    if (runs.length > 0) tx.insert(agentRuns).values(runs).run();
+    if (calls.length > 0) tx.insert(toolCalls).values(calls).run();
   });
 }
 

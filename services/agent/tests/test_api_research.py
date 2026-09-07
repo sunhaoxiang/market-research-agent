@@ -82,6 +82,7 @@ def _scripted_planner(*replies: str) -> PlannerAgent:
         agent=built.agent.clone(model=scripted),
         strategy=built.strategy,
         entry=built.entry,
+        prompt=built.prompt,
     )
 
 

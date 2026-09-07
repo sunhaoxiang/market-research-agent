@@ -14,8 +14,9 @@ import "server-only";
 import type { ResearchEvent } from "@mra/shared";
 
 import type { Db } from "@/db/client";
-import { appendEvents } from "@/db/queries/sessions";
-import type { NewResearchEvent } from "@/db/schema";
+import { ToolCallCorrelator, toAgentRun } from "@/db/queries/metrics";
+import { appendEventsWithMetrics } from "@/db/queries/sessions";
+import type { NewAgentRun, NewResearchEvent, NewToolCall } from "@/db/schema";
 import { newId } from "@/lib/ids";
 
 export const FLUSH_EVERY_EVENTS = 20;
@@ -54,6 +55,9 @@ export function toRow(sessionId: string, event: ResearchEvent): NewResearchEvent
  */
 export class EventBuffer {
   private pending: NewResearchEvent[] = [];
+  private runs: NewAgentRun[] = [];
+  private calls: NewToolCall[] = [];
+  private readonly correlator = new ToolCallCorrelator();
   private lastFlushAt = Date.now();
 
   constructor(
@@ -64,18 +68,36 @@ export class EventBuffer {
   add(event: ResearchEvent): void {
     this.pending.push(toRow(this.sessionId, event));
 
+    // 指标行和事件同批写（§20.1 的第二条数据线）。在这里派生而不是事后
+    // 扫一遍 research_events，是因为工具调用需要跨事件关联 call_id，
+    // 而流式消费时天然就有这个上下文
+    const run = toAgentRun(this.sessionId, event);
+    if (run) this.runs.push(run);
+    const call = this.correlator.accept(this.sessionId, event);
+    if (call) this.calls.push(call);
+
     const full = this.pending.length >= FLUSH_EVERY_EVENTS;
     const stale = Date.now() - this.lastFlushAt >= FLUSH_EVERY_MS;
     if (full || stale) this.flush();
   }
 
+  /** 会话结束时调用：把未闭合的工具调用也落下来，然后写完最后一批。 */
+  close(endedAt: number = Date.now()): void {
+    this.calls.push(...this.correlator.drain(this.sessionId, endedAt));
+    this.flush();
+  }
+
   flush(): void {
-    if (this.pending.length === 0) return;
     const batch = this.pending;
+    const runs = this.runs;
+    const calls = this.calls;
+    if (batch.length === 0 && runs.length === 0 && calls.length === 0) return;
     // 先清空再写：写失败时不能把这批留在缓冲里，否则下一次 flush 会重试同一批
     // 并再次撞上 (session_id, seq) 唯一索引，一条坏数据能卡死整条流
     this.pending = [];
+    this.runs = [];
+    this.calls = [];
     this.lastFlushAt = Date.now();
-    appendEvents(this.db, batch);
+    appendEventsWithMetrics(this.db, batch, runs, calls);
   }
 }
