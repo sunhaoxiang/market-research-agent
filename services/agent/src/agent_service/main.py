@@ -14,7 +14,9 @@ from fastapi import FastAPI, Response
 from pydantic import BaseModel
 
 from agent_service import __version__
+from agent_service.api import models as models_api
 from agent_service.config import Settings, get_settings
+from agent_service.models.registry import ModelRegistry, bootstrap_sdk, tracing_status
 from agent_service.observability.logging import configure_logging, get_logger
 
 log = get_logger(__name__)
@@ -68,11 +70,14 @@ def _data_source_status(settings: Settings) -> list[ProviderStatus]:
 
 
 @asynccontextmanager
-async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     configure_logging(settings.log_level)
 
     settings.cache_db_path.parent.mkdir(parents=True, exist_ok=True)
+
+    tracing_enabled = bootstrap_sdk(settings)
+    app.state.registry = ModelRegistry(settings)
 
     configured = [p.provider for p in _llm_provider_status(settings) if p.configured]
     log.info(
@@ -80,7 +85,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         version=__version__,
         configured_llm_providers=configured,
         default_model_id=settings.default_model_id,
-        tracing_enabled=not settings.openai_agents_disable_tracing,
+        tracing_enabled=tracing_enabled,
     )
     if not configured:
         log.warning(
@@ -90,6 +95,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
 
     yield
 
+    await app.state.registry.aclose()
     log.info("agent_service.shutdown")
 
 
@@ -102,6 +108,10 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
+    # registry 在 lifespan 中重建；这里先放一个，让不走 lifespan 的
+    # TestClient(app) 与 `--reload` 首次导入也能正常响应
+    app.state.registry = ModelRegistry(get_settings())
+
     @app.get("/v1/health", response_model=HealthResponse, tags=["system"])
     async def health() -> HealthResponse:
         settings = get_settings()
@@ -109,11 +119,14 @@ def create_app() -> FastAPI:
         return HealthResponse(
             status="ok" if any(p.configured for p in llm) else "degraded",
             version=__version__,
-            tracing_enabled=not settings.openai_agents_disable_tracing,
+            # 走 tracing_status() 而非直接读配置：没有 OpenAI key 时 tracing
+            # 实际上是关闭的，健康检查不能宣称它开着
+            tracing_enabled=tracing_status(settings).enabled,
             llm_providers=llm,
             data_sources=_data_source_status(settings),
         )
 
+    app.include_router(models_api.router)
     return app
 
 

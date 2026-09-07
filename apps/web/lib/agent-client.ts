@@ -33,9 +33,41 @@ function internalHeaders(): HeadersInit {
 export type AgentServiceResult<T> =
   { ok: true; data: T } | { ok: false; error: { code: string; message: string } };
 
-export async function fetchAgentHealth(timeoutMs = 3000): Promise<AgentServiceResult<AgentHealth>> {
+/** 模型能力元数据。字段与 Python 侧 `ModelCapabilities` 对应（§9.3）。 */
+export type ModelCapabilities = {
+  tool_calling: boolean;
+  parallel_tool_calls: boolean;
+  structured_output: "native_schema" | "json_mode" | "prompt_only";
+  streaming: boolean;
+  reasoning: boolean;
+  vision: boolean;
+  context_window: number;
+  max_output_tokens: number;
+  pricing: unknown;
+};
+
+export type AgentModelInfo = {
+  id: string;
+  provider: string;
+  display_name: string;
+  available: boolean;
+  /** 不可用原因，例如「未配置 DEEPSEEK_API_KEY」。UI 应把选项置灰并显示这句话。 */
+  unavailable_reason: string | null;
+  capabilities: ModelCapabilities;
+  /** 参数最后一次对照官方文档核实的日期；null 表示未核实，UI 应提示。 */
+  verified_at: string | null;
+  notes: string | null;
+};
+
+export type AgentModels = {
+  models: AgentModelInfo[];
+  role_defaults: Record<string, string>;
+  default_model_id: string;
+};
+
+async function callAgent<T>(path: string, timeoutMs: number): Promise<AgentServiceResult<T>> {
   try {
-    const response = await fetch(`${serverEnv.agentServiceUrl}/v1/health`, {
+    const response = await fetch(`${serverEnv.agentServiceUrl}${path}`, {
       headers: internalHeaders(),
       cache: "no-store",
       signal: AbortSignal.timeout(timeoutMs),
@@ -51,7 +83,7 @@ export async function fetchAgentHealth(timeoutMs = 3000): Promise<AgentServiceRe
       };
     }
 
-    return { ok: true, data: (await response.json()) as AgentHealth };
+    return { ok: true, data: (await response.json()) as T };
   } catch (error) {
     const isTimeout = error instanceof Error && error.name === "TimeoutError";
     return {
@@ -64,4 +96,12 @@ export async function fetchAgentHealth(timeoutMs = 3000): Promise<AgentServiceRe
       },
     };
   }
+}
+
+export function fetchAgentHealth(timeoutMs = 3000): Promise<AgentServiceResult<AgentHealth>> {
+  return callAgent<AgentHealth>("/v1/health", timeoutMs);
+}
+
+export function fetchAgentModels(timeoutMs = 3000): Promise<AgentServiceResult<AgentModels>> {
+  return callAgent<AgentModels>("/v1/models", timeoutMs);
 }
