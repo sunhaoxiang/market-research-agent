@@ -22,6 +22,7 @@ from datetime import UTC, datetime
 from agent_service.agents.research_manager import build_research_manager
 from agent_service.config import Settings, get_settings
 from agent_service.models.registry import ModelRegistry, bootstrap_sdk
+from agent_service.observability.cost import cost_usd, to_token_usage
 from agent_service.orchestrator.plan_validation import ValidatedPlan
 from agent_service.orchestrator.planner import create_plan
 
@@ -80,9 +81,10 @@ async def _probe(model_id: str, settings: Settings, now: datetime) -> ModelRepor
     registry = ModelRegistry(settings.model_copy(update={"model_role_planner": model_id}))
     limits = settings.limits
     planner = build_research_manager(registry, limits)
-    pricing = registry.resolve(model_id).entry.capabilities.pricing
+    entry = planner.entry
+    pricing = entry.capabilities.pricing
 
-    if pricing.schedule is not None:
+    if pricing is not None and pricing.schedule is not None:
         band = "高峰" if pricing.schedule.is_peak(now) else "闲时"
         prices = pricing.prices_at(now)
         print(f"计费时段：{band}（输入 ${prices.input}/M，输出 ${prices.output}/M）")
@@ -101,19 +103,13 @@ async def _probe(model_id: str, settings: Settings, now: datetime) -> ModelRepor
             continue
 
         elapsed = time.monotonic() - started
-        usage = result.run_result.context_wrapper.usage
-        cached = _cached_tokens(usage)
-        cost = pricing.cost_usd(
-            input_tokens=usage.input_tokens - cached,
-            output_tokens=usage.output_tokens,
-            cached_tokens=cached,
-            at=now,
-        )
+        usage = to_token_usage(result.run_result.context_wrapper.usage)
+        cost = cost_usd(entry, usage, now) or 0.0
         report.outcomes.append(Outcome(elapsed, result.attempts, cost, validated=result.validated))
 
         print(
             f"  ✅ {elapsed:.1f}s / {result.attempts} 次调用 / ${cost:.4f}"
-            f" / in={usage.input_tokens}(缓存{cached}) out={usage.output_tokens}"
+            f" / in={usage.input}(缓存{usage.cached}) out={usage.output}"
         )
         _print_plan(result.validated)
 
@@ -157,17 +153,6 @@ def _summarize(reports: list[ModelReport]) -> None:
         "\n判读：「被修复」非 0 说明 prompt 该改；延迟要连输出 token 一起看——"
         "推理模型的延迟由输出量决定，标称更快的档位不一定真的更快。"
     )
-
-
-def _cached_tokens(usage: object) -> int:
-    """从 SDK 的 Usage 里取缓存命中量。
-
-    缓存与未命中的价差可达 30 倍（§9.8），必须分开计价；但这个字段
-    并非所有 provider 都返回，取不到时按 0 算（宁可高估成本）。
-    """
-    details = getattr(usage, "input_tokens_details", None)
-    cached = getattr(details, "cached_tokens", 0)
-    return cached if isinstance(cached, int) else 0
 
 
 if __name__ == "__main__":

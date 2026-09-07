@@ -21,6 +21,7 @@ from agent_service.schemas.plan import ResearchPlan
 
 if TYPE_CHECKING:
     from agent_service.config import ExecutionLimits
+    from agent_service.models.catalog import ModelEntry
     from agent_service.models.registry import ModelRegistry
 
 PROMPT_NAME = "research_manager"
@@ -34,8 +35,13 @@ class PlannerAgent:
     strategy: StructuredOutputStrategy[ResearchPlan]
     """策略不塞进 Agent：「要不要手动解析、失败怎么重试」是调用方的职责，
     不是 Agent 的属性。"""
-    model_id: str
-    """目录里的 id（如 `deepseek:deepseek-v4-pro`），用于埋点与成本核算。"""
+    entry: ModelEntry
+    """目录条目。带着它而不只是 id，是因为成本核算需要 `capabilities.pricing`，
+    而 `Agent` 上只有构造好的 `Model` 实例，拿不回定价元数据。"""
+
+    @property
+    def model_id(self) -> str:
+        return self.entry.id
 
 
 def build_research_manager(registry: ModelRegistry, limits: ExecutionLimits) -> PlannerAgent:
@@ -55,7 +61,7 @@ def build_research_manager(registry: ModelRegistry, limits: ExecutionLimits) -> 
             tools=[],
         ),
         strategy=build_strategy(ResearchPlan, resolved.entry.capabilities),
-        model_id=resolved.id,
+        entry=resolved.entry,
     )
 
 

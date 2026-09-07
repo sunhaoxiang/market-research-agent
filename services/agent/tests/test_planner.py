@@ -104,7 +104,7 @@ def _scripted_planner(*replies: str, limits: IsolatedExecutionLimits | None = No
     return PlannerAgent(
         agent=built.agent.clone(model=scripted),
         strategy=built.strategy,
-        model_id=built.model_id,
+        entry=built.entry,
     )
 
 

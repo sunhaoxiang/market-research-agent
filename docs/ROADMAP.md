@@ -86,7 +86,7 @@
 | P1-7  | SDK 事件翻译层：`RunItemStreamEvent`/`AgentUpdatedStreamEvent` → 本协议事件 `[DP §12.1]`                                                                                                               | P1-6              | ✅   | 用 ScriptedModel 验证翻译正确                                                                             |
 | P1-8  | ~~自建 `FakeModel`~~ → **改用 SDK 自带 `agents.testing.ScriptedModel`**（自建版只实现 `get_response`，`run_streamed` 走 `stream_response`，P1-7 一跑就暴露）`[DP §18.2]`                               | P1-4              | ✅   | 能驱动一次完整 run                                                                                        |
 | P1-9  | Research Manager Agent（planner）+ prompt + plan 代码校验（任务数上限/agent 合法/无环）                                                                                                                | P1-4, P1-1        | ✅   | v4-pro 对 3 个样例问题 3/3 产出合法 plan，零修复                                                          |
-| P1-10 | Orchestrator 骨架：`state.py` / `executor.py`（分层 fan-out + 超时 + 失败降级）/ `pipeline.py`；接入执行上限 `[DP §7.2]`                                                                               | P1-9, P1-6        | ⬜   | ScriptedModel 下走完 planning→执行→完成                                                                   |
+| P1-10 | Orchestrator 骨架：`state.py` / `executor.py`（分层 fan-out + 超时 + 失败降级）/ `pipeline.py`；接入执行上限 `[DP §7.2]`                                                                               | P1-9, P1-6        | ✅   | ScriptedModel 下走完 planning→执行→完成                                                                   |
 | P1-11 | `POST /v1/research/stream` SSE 端点 + Next `POST /api/research`（消费/落库/转发，客户端断开仍落库）+ `lib/sse.ts` 解析器                                                                               | P1-10, P0-7       | ⬜   | 浏览器实时收到事件；断开后 DB 完整                                                                        |
 | P1-12 | 前端最小闭环：提问框 + 模型选择器 + Activity Panel 骨架（计划树 + 状态点亮）+ 事件 reducer + store                                                                                                     | P1-11, P1-5, P1-2 | ⬜   | 提问后能看到计划与逐节点点亮                                                                              |
 | P1-13 | **可观察性埋点**（`[DP §20.1]`）：`agent_runs` / `tool_calls` 写入 + prompt hash / token / 成本记录；SDK tracing 开关验证                                                                              | P1-11             | ⬜   | 一次研究后两张表数据完整，成本可核算；`/debug` 与 eval 的数据基础就绪                                     |
@@ -299,6 +299,22 @@
 **另一个观察到的失败模式**：模型偶尔把内嵌的 JSON Schema **本身**当输出返回（`{"properties": {...}}`）。P1-4b 的「回喂字段级错误 + 重试」机制正确救回，这是该机制第一次在真实模型上被触发。
 
 **设计取舍：计划校验以修复为主而非拒绝。** §7.2 规定 planner 失败即整体失败，而「引用了不存在的任务 id」这类笔误对研究结果影响微乎其微。因此只有**无法安全修复**的才拒绝（任务列表为空；任务 id 重复——`depends_on` 指向哪一个无从判断），其余修复并记录：超限按 `priority` 降序截断、丢弃悬空/自引用依赖、按「只保留指向前方的边」确定性地打断环。修复记录以 `warning` 事件暴露给用户——静默修复等于让用户看到一份悄悄缩水的报告。截断必须先于依赖清理，否则会留下指向已删除任务的依赖，执行器分层时永远等不到它（已加回归测试）。
+
+### P1-10 — Orchestrator 骨架 ✅（2026-09-07）
+
+**完成内容**：`orchestrator/state.py`（运行时账本 + 阶段迁移 + 用量累加）、`orchestrator/executor.py`（分层 fan-out + 并发/超时/预算三道护栏 + 失败降级）、`orchestrator/pipeline.py`（会话全流程与终态事件）、`observability/cost.py`。测试 +40（执行器 14、流程 12、状态与成本 14），累计 229。
+
+**三个设计决策**：
+
+1. **依赖失败时，依赖方照常执行而不是跳过。** 跳过会把一次失败放大成整条依赖链的失败，与 §7.2「不中断整个流程」相悖；而 prompt 要求每个 objective 自包含，多数任务缺了上游数据仍能完成大部分工作（「对比 A 和 B」里 A 挂了，B 的数据照样有价值）。代价是产出有缺口，所以执行器会把缺失的上游任务 id 写进该任务的 `data_gaps` —— 不披露比缺数据更糟，读者会以为那一节是在完整信息下得出的。`SKIPPED` 保留给预算/时间耗尽的情形。
+2. **预算与时间的护栏放在层边界，不放在任务边界。** 同层任务已经并发出去了，中途叫停只会得到一堆半成品。时间预算的算法是 `min(task_timeout_s, 整体剩余)`：不减去已用时间的话，最后一个任务能把报告撰写的时间全吃掉。执行阶段的额度由 pipeline 从 `total_timeout_s` 里划出并传入，Phase 5 想为报告预留时间时改的是流程编排而不是执行器。
+3. **`CancelledError` 必须穿透降级逻辑。** 它是 `BaseException` 而非 `Exception` 的子类，所以 `except Exception` 天然不会误捕；但仍需显式 `except asyncio.CancelledError: raise`（放在 `except TimeoutError` 之后），否则任务会被标成失败而不是跳过。吞掉它的后果是整体超时与用户取消双双失效——会话再也停不下来。测试专门覆盖了这条路径。
+
+**pipeline 的唯一硬性契约是「终态事件恰好一个」**：正常完成、规划失败、被取消、未预期异常四条路径都必须发出且只发出一个终态事件。漏发一次，用户看到的就是永远转圈的进度条，比报错更糟。因此 `run_research` 不抛业务异常（失败通过事件与 `outcome.succeeded` 表达）——否则 SSE 端点要在事件流和异常两处处理失败，两套通路迟早不一致。
+
+**顺带修正的一处算错**：`cost.py` 与相关注释原本写「96% 缓存命中率下混算会高估 20 倍以上」。实测数字是 **约 14 倍**——30 倍的价差是 100% 命中时的上限，96% 命中只拿到其中一部分。已在代码与测试里改为真实数字。
+
+**成本核算已在真实模型上验证**：v4-pro 三个问题的 `cached_tokens=2304` 均被正确识别，闲时时段自动套用半价（$0.0046/次，对比高峰 $0.0101）。`to_token_usage` 里 `getattr` 的防御式取值也顺带确认了不是白写——DeepSeek 的 `input_tokens` 确实包含缓存部分。
 
 ---
 
