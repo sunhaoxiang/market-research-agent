@@ -1,0 +1,34 @@
+{
+  "name": "market-research-agent",
+  "version": "0.0.1",
+  "private": true,
+  "description": "AI Financial Research Platform for Crypto & US Stocks",
+  "packageManager": "pnpm@12.3.4",
+  "engines": {
+    "node": ">=24.20.0",
+    "pnpm": ">=12.3.4"
+  },
+  "scripts": {
+    "dev": "./scripts/dev.sh",
+    "dev:web": "pnpm --filter @mra/web dev",
+    "dev:agent": "cd services/agent && uv run uvicorn agent_service.main:app --reload --host 127.0.0.1 --port 8000",
+    "build": "pnpm --filter @mra/shared build && pnpm --filter @mra/web build",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "gen:types": "./scripts/gen-types.sh",
+    "db:generate": "pnpm --filter @mra/web db:generate",
+    "db:migrate": "pnpm --filter @mra/web db:migrate",
+    "db:studio": "pnpm --filter @mra/web db:studio",
+    "py:lint": "cd services/agent && uv run ruff check .",
+    "py:format": "cd services/agent && uv run ruff format .",
+    "py:typecheck": "cd services/agent && uv run basedpyright",
+    "py:test": "cd services/agent && uv run pytest -m 'not live'",
+    "check": "pnpm gen:types && pnpm lint && pnpm typecheck && pnpm test && pnpm py:lint && pnpm py:typecheck && pnpm py:test",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "husky": "^9.1.7",
+    "prettier": "^3.4.2"
+  }
+}

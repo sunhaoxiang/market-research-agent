@@ -1,0 +1,102 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    name: Python (agent service)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/agent
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: services/agent/uv.lock
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Ruff lint
+        run: uv run ruff check --output-format=github .
+
+      - name: Ruff format
+        run: uv run ruff format --check .
+
+      - name: Type check
+        run: uv run basedpyright
+
+      - name: Tests
+        run: uv run pytest -m "not live" --cov=agent_service --cov-report=term-missing
+
+  web:
+    name: Web (Next.js)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: services/agent/uv.lock
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Pydantic 是跨语言类型的唯一真源，此处确保生成的 TS 类型没有漂移（§5.1）
+      - name: Check generated types are up to date
+        run: |
+          pnpm gen:types
+          git diff --exit-code -- packages/shared/src/generated \
+            || (echo "::error::生成的类型已过期，请在本地运行 pnpm gen:types 并提交" && exit 1)
+
+      - name: ESLint
+        run: pnpm --filter @mra/web lint
+
+      - name: Prettier
+        run: pnpm exec prettier --check .
+
+      - name: Type check
+        run: pnpm --filter @mra/web typecheck
+
+      - name: Drizzle migration check
+        run: pnpm --filter @mra/web db:check
+
+      - name: Tests
+        run: pnpm --filter @mra/web test
+
+      - name: Build
+        run: pnpm --filter @mra/web build
+        env:
+          DATABASE_URL: file:./data/ci.db
+          AGENT_SERVICE_URL: http://127.0.0.1:8000
+
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITLEAKS_CONFIG: .gitleaks.toml

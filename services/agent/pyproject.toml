@@ -1,0 +1,106 @@
+[project]
+name = "agent-service"
+version = "0.0.1"
+description = "AI Financial Research Agent service (Crypto & US Stocks)"
+requires-python = "==3.13.*"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.34",
+    "pydantic>=2.10",
+    "pydantic-settings>=2.7",
+    "python-dotenv>=1.0",
+    # 锁定 minor：SDK 仍在快速演进，minor 升级需人工确认（见 DEVELOPMENT_PLAN.md R8）
+    "openai-agents[litellm]>=0.22,<0.23",
+    "httpx[http2]>=0.28",
+    "tenacity>=9.0",
+    "structlog>=25.1",
+    "orjson>=3.10",
+    "aiosqlite>=0.20",
+    "trafilatura>=2.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.25",
+    "pytest-cov>=6.0",
+    "respx>=0.22",
+    "ruff>=0.9",
+    "basedpyright>=1.24",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/agent_service"]
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Ruff
+# ─────────────────────────────────────────────────────────────────────────────
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # pyflakes
+    "I",      # isort
+    "N",      # pep8-naming
+    "UP",     # pyupgrade
+    "B",      # flake8-bugbear
+    "C4",     # flake8-comprehensions
+    "SIM",    # flake8-simplify
+    "TID",    # flake8-tidy-imports
+    "RUF",    # ruff-specific
+    "ASYNC",  # flake8-async
+    "S",      # flake8-bandit（安全）
+    "DTZ",    # flake8-datetimez（强制 timezone-aware）
+    "PTH",    # flake8-use-pathlib
+    "ARG",    # unused arguments
+    "PL",     # pylint
+    "TRY",    # tryceratops
+]
+ignore = [
+    "TRY003",  # 允许在 raise 中写长消息
+    "PLR0913", # 参数过多：Agent/Tool 构造函数确实参数多
+    # 本项目注释与文档字符串使用中文，全角标点是有意为之，非"疑似歧义"
+    "RUF001",  # 字符串中的全角字符
+    "RUF002",  # docstring 中的全角字符
+    "RUF003",  # 注释中的全角字符
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "PLR2004", "ARG"]  # 测试里允许 assert 与魔数
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "parents"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# basedpyright
+# ─────────────────────────────────────────────────────────────────────────────
+[tool.basedpyright]
+pythonVersion = "3.13"
+typeCheckingMode = "standard"
+include = ["src", "tests"]
+reportMissingTypeStubs = false
+reportUnknownMemberType = false
+reportUnknownVariableType = false
+reportUnknownArgumentType = false
+reportAny = false
+reportExplicitAny = false
+
+# ─────────────────────────────────────────────────────────────────────────────
+# pytest
+# ─────────────────────────────────────────────────────────────────────────────
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = "-ra --strict-markers"
+markers = [
+    "live: 需要真实外部 API / LLM 调用（默认跳过，用 -m live 运行）",
+]

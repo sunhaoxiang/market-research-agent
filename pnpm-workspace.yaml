@@ -1,0 +1,11 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+
+# 显式允许执行 postinstall 构建脚本的包。
+# pnpm 默认阻止所有构建脚本（防止任意 postinstall 代码执行），需逐个放行。
+allowBuilds:
+  better-sqlite3: true # 需要编译原生 SQLite 绑定
+  esbuild: true # vitest / drizzle-kit 依赖，需下载平台二进制
+  unrs-resolver: true # eslint 依赖
+  sharp: false # 暂未使用

@@ -1,0 +1,302 @@
+# Roadmap & 开发状态
+
+> 本文档是**执行文档**（频繁更新），跟踪阶段任务与进度。
+> 架构与技术决策见 [`DEVELOPMENT_PLAN.md`](./DEVELOPMENT_PLAN.md)，引用记作 `[DP §n]`。
+>
+> **每完成一个任务就更新此表的状态**；每完成一个阶段，跑 `[DP §26]` 的收尾清单并写阶段小结。
+
+- 最后更新：2026-09-07
+- 当前阶段：**Phase 0 已完成 → Phase 1 待开始**
+
+### 已确认的前置决策（2026-09-07）
+
+| 项         | 结论                                                                                                                                                          | 影响                                                                                                                         |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| 开发计划   | ✅ 通过                                                                                                                                                       | 开始 Phase 0                                                                                                                 |
+| Agent 数量 | ✅ 9 → 6（采纳 `[DP §6.1]` 裁剪）                                                                                                                             | 后续有实测证据再拆                                                                                                           |
+| 项目名     | ✅ 沿用 `market-research-agent`                                                                                                                               | —                                                                                                                            |
+| 模型选型   | ✅ **OpenAI 优先**（将申请 key）：`gpt-5.6-terra` 主力 / `sol` planner+writer / `luna` fast / `gpt-6-astra` 可选升档；国内模型（Kimi/DeepSeek/GLM）保留为备选 | `native_schema` 成为主路径、SDK tracing 恢复可用（`[DP §9.6, §9.7]`）；风险 R3 降级为中，新增 R3b 成本风险（约 $0.5/次研究） |
+
+---
+
+## 状态图例
+
+| 标记 | 含义                            |
+| ---- | ------------------------------- |
+| ⬜   | 未开始                          |
+| 🟡   | 进行中                          |
+| ✅   | 已完成                          |
+| 🔴   | 阻塞（在备注写明阻塞原因）      |
+| ⏭️   | 已跳过 / 延后（在备注写明理由） |
+
+---
+
+## 总体进度
+
+| Phase | 名称                            | 任务数 | 状态 | 说明                             |
+| ----- | ------------------------------- | ------ | ---- | -------------------------------- |
+| —     | 开发计划确认                    | 1      | ✅   | 已确认，见上表                   |
+| P0    | 项目初始化                      | 10     | ✅   | Monorepo / 工具链 / DB / CI      |
+| P1    | Agent 骨架 + 多模型 + Streaming | 13     | ⬜   | **端到端最小闭环**               |
+| P2    | Web Research + Citation         | 10     | ⬜   | Source / Claim / 报告雏形        |
+| P3    | Crypto 数据能力                 | 11     | ⬜   | 市场 / TVL / Tokenomics / 链上   |
+| P4    | 美股数据能力                    | 11     | ⬜   | 行情 / 财务 / 估值 / SEC         |
+| P5    | Multi-Agent 完整编排            | 9      | ⬜   | Fact Checker / 并行 / 报告结构   |
+| P5.5  | **MVP 验收**                    | 1      | ⬜   | 见 `[DP §21.1]`                  |
+| P6    | 高级 UX + 历史 + 可观察性       | 11     | ⬜   | Activity 完善 / History / /debug |
+| P7    | Evaluation 系统                 | 8      | ⬜   | 数据集 / grader / runner         |
+| P8    | 扩展能力                        | 8      | ⬜   | 按需触发，非线性                 |
+
+---
+
+## Phase 0 — 项目初始化
+
+**目标**：两个服务能起来、能互相通、数据库能建表、CI 能跑。**不含任何业务逻辑。**
+
+| ID    | 任务                                                                                                                                                        | 依赖             | 状态 | 验收                                                        |
+| ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- | ---- | ----------------------------------------------------------- |
+| P0-1  | Monorepo 骨架：`pnpm-workspace.yaml`、根 `package.json`（scripts + `packageManager`）、`.nvmrc`、`.python-version`、`.gitignore`、`.editorconfig`、`.npmrc` | —                | ✅   | `pnpm install` 成功                                         |
+| P0-2  | `.env.example` 按 `[DP §17]` 编写；根目录 `.env.local` 加载机制（Python + Next 共用）                                                                       | P0-1             | ✅   | 两侧都能读到变量                                            |
+| P0-3  | gitleaks 配置 + husky pre-commit（secret 扫描 + 拒绝提交 `.env` + 格式检查）                                                                                | P0-1             | ✅   | 钩子就位；gitleaks 未安装时优雅降级并提示                   |
+| P0-4  | Next.js 16 app 初始化（App Router + TS strict + Tailwind 4 + ESLint flat config + Prettier）                                                                | P0-1             | ✅   | `pnpm dev` 起 3000，首页可访问；`next build` 通过           |
+| P0-5  | Python 服务初始化：uv 项目、Ruff + basedpyright、structlog（含脱敏）、FastAPI + `/v1/health`                                                                | P0-1             | ✅   | uvicorn 起 8000，health 200；7 个测试通过                   |
+| P0-6  | Drizzle 配置 + `[DP §10.2]` 全量 schema（10 张表）+ migration + PRAGMA + CHECK 约束                                                                         | P0-4             | ✅   | 从零建库成功；8 条 CHECK 约束进入 DDL                       |
+| P0-7  | `db/client.ts`（懒初始化）+ `db/queries/sessions.ts` + schema 测试（内存 SQLite）                                                                           | P0-6             | ✅   | 13 个测试通过，覆盖 CHECK/外键级联/事务回滚/JSON 往返       |
+| P0-8  | `packages/shared` 骨架 + `scripts/gen-types.sh`（Pydantic→JSON Schema→TS）                                                                                  | P0-5, P0-4       | ✅   | 脚本可运行；Phase 1 前输出占位类型                          |
+| P0-9  | `scripts/dev.sh`（并行启动 + 进程联动退出）+ Next `/api/health` 聚合探测                                                                                    | P0-4, P0-5       | ✅   | 一条命令起全栈；`/api/health` 返回 database ok + agent 状态 |
+| P0-10 | GitHub Actions CI（python / web / secret-scan 三个 job，见 `[DP §18.3]`）                                                                                   | P0-5, P0-7, P0-8 | ✅   | 本地等价命令全绿（远端待首次 push 验证）                    |
+
+**阶段验收 ✅**：`scripts/dev.sh` 同时起两个服务，首页与 `/api/health` 均能显示 Python 服务健康状态与 provider 配置情况，10 张表已建，本地全套检查通过。
+
+---
+
+## Phase 1 — Agent 骨架 + 多模型 + Streaming
+
+**目标**：**打通端到端最小闭环**。用户提问 → Planner 出计划 → 一个 Agent 调一个假 tool → 事件流实时显示 → 结果落库。这一阶段跑通后，后续都是"往框架里填内容"。
+
+| ID    | 任务                                                                                                                                                                                                   | 依赖              | 状态 | 验收                                                                                                      |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------- | ---- | --------------------------------------------------------------------------------------------------------- |
+| P1-1  | Pydantic schemas：`ResearchEvent` 全事件类型、`ResearchPlan`、`ResearchTask`、`Entity`、`Claim`、`Source`、`ResearchFinding`、`ToolResult`                                                             | P0-5              | ⬜   | 单元测试覆盖序列化/反序列化                                                                               |
+| P1-2  | 类型生成打通：P1-1 的 schema 全部导出为 TS 类型，CI 检查漂移                                                                                                                                           | P1-1, P0-8        | ⬜   | `git diff --exit-code` 通过                                                                               |
+| P1-3  | `models/capabilities.py` + `models/catalog.py`：按 `[DP §9.7]` 落库 8 个模型（OpenAI 4 + 国内 4）+ Anthropic/Google 条目标记 `available=false`                                                         | P0-5              | ⬜   | 目录可加载并校验；角色默认映射到 OpenAI                                                                   |
+| P1-4  | `models/registry.py`：`resolve(model_id)` / `for_role(role)`，三种 adapter（`openai_responses` / `openai_chat` / `litellm`），per-provider 客户端缓存；`bootstrap_sdk()` 处理 tracing 开关 `[DP §9.6]` | P1-3              | ⬜   | 每种 adapter 有构造测试（不发真请求）；无 key 的 provider 在 registry 层明确报错；不依赖任何 SDK 全局状态 |
+| P1-4b | **结构化输出三路径**：`native_schema`（主）/ `json_mode` / `prompt_only` + Pydantic 二次校验 + 带错误信息重试 2 次 `[DP §9.4, R3]`；schema 扁平化约束                                                  | P1-4, P1-1        | ⬜   | 三条路径各有单测；故意返回坏 JSON 能被修正                                                                |
+| P1-5  | `GET /v1/models` + Next `GET /api/models`：过滤无 key 的 provider 并给出禁用原因                                                                                                                       | P1-4              | ⬜   | 只配 1 个 key 时其余显示禁用                                                                              |
+| P1-6  | 事件总线 `observability/event_bus.py`：`asyncio.Queue` + seq 分配 + heartbeat 任务                                                                                                                     | P1-1              | ⬜   | 并发发事件时 seq 严格递增                                                                                 |
+| P1-7  | SDK 事件翻译层：`RunItemStreamEvent`/`AgentUpdatedStreamEvent` → 本协议事件 `[DP §12.1]`                                                                                                               | P1-6              | ⬜   | 用 FakeModel 验证翻译正确                                                                                 |
+| P1-8  | `FakeModel`（实现 SDK `Model` 协议，脚本化 tool call 与结构化输出）`[DP §18.2]`                                                                                                                        | P1-4              | ⬜   | 能驱动一次完整 run                                                                                        |
+| P1-9  | Research Manager Agent（planner）+ prompt + plan 代码校验（任务数上限/agent 合法/无环）                                                                                                                | P1-4, P1-1        | ⬜   | 真实模型能对 3 个样例问题产出合法 plan                                                                    |
+| P1-10 | Orchestrator 骨架：`state.py` / `executor.py`（分层 fan-out + 超时 + 失败降级）/ `pipeline.py`；接入执行上限 `[DP §7.2]`                                                                               | P1-9, P1-6        | ⬜   | FakeModel 下走完 planning→执行→完成                                                                       |
+| P1-11 | `POST /v1/research/stream` SSE 端点 + Next `POST /api/research`（消费/落库/转发，客户端断开仍落库）+ `lib/sse.ts` 解析器                                                                               | P1-10, P0-7       | ⬜   | 浏览器实时收到事件；断开后 DB 完整                                                                        |
+| P1-12 | 前端最小闭环：提问框 + 模型选择器 + Activity Panel 骨架（计划树 + 状态点亮）+ 事件 reducer + store                                                                                                     | P1-11, P1-5, P1-2 | ⬜   | 提问后能看到计划与逐节点点亮                                                                              |
+| P1-13 | **可观察性埋点**（`[DP §20.1]`）：`agent_runs` / `tool_calls` 写入 + prompt hash / token / 成本记录；SDK tracing 开关验证                                                                              | P1-11             | ⬜   | 一次研究后两张表数据完整，成本可核算；`/debug` 与 eval 的数据基础就绪                                     |
+
+**阶段验收**：输入任意问题 → 前端实时显示"理解问题 / 制定计划 / 任务树点亮 / 完成"，session 与 events 完整落库；至少 2 个不同 Provider 的模型都能跑通。
+
+---
+
+## Phase 2 — Web Research + Source / Citation
+
+**目标**：第一个有真实价值的能力——能搜、能读、能引用。
+
+| ID    | 任务                                                                                                                      | 依赖        | 状态 | 验收                                        |
+| ----- | ------------------------------------------------------------------------------------------------------------------------- | ----------- | ---- | ------------------------------------------- |
+| P2-1  | `providers/base.py`：httpx 客户端池 + 分级缓存（SQLite KV）+ 令牌桶限流 + 配额计数 + tenacity 重试 + 自动埋点 `[DP §8.3]` | P1-1        | ⬜   | 契约测试覆盖 429/5xx/超时/缓存命中          |
+| P2-2  | `SearchProvider` 抽象 + Tavily 实现（可切 Exa/Brave 的接口设计）                                                          | P2-1        | ⬜   | respx 契约测试通过                          |
+| P2-3  | `web_fetch` 抓取器：SSRF 防护（DNS→IP 校验、协议/重定向/大小/超时限制）+ trafilatura 正文提取                             | P2-1        | ⬜   | 内网 IP / 超大响应被正确拦截                |
+| P2-4  | `tools/web/`：`web_search` / `web_fetch` / `news_search`，全部返回 `ToolResult` + provenance                              | P2-2, P2-3  | ⬜   | `/v1/tools/{name}/invoke` 可单独调用        |
+| P2-5  | Prompt injection 隔离：`<untrusted_web_content>` 包裹 + instructions 声明 + 注入迹象 warning 事件 `[DP §17.1-5]`          | P2-4        | ⬜   | 含注入指令的样例页面不改变 Agent 行为       |
+| P2-6  | Web Research Agent + prompt（产出 `ResearchFinding`，含 claims / sources / data_gaps）                                    | P2-4, P1-10 | ⬜   | 对"HYPE 最近有什么新闻"产出带来源的 finding |
+| P2-7  | Source 归一化与去重：URL canonical、`reliability` 分级、`SOURCE_FOUND` 事件、引用重新编号 `[DP §15.1-15.2]`               | P2-6        | ⬜   | 同一 URL 不同参数被正确合并                 |
+| P2-8  | Report Writer Agent v1 + `ResearchReport` schema + `[n]` 引用生成                                                         | P2-7, P1-4  | ⬜   | 产出带引用的 Markdown                       |
+| P2-9  | 引用完整性确定性校验 + output guardrail + 一次修正重试 `[DP §15.4]`                                                       | P2-8        | ⬜   | 故意注入坏引用能被检出并修正                |
+| P2-10 | 前端：Report 渲染（sanitize + `[n]` 可点击）+ Source Panel（悬浮预览 excerpt/domain/时间）+ 认知类型徽标                  | P2-8, P1-12 | ⬜   | 点 `[1]` 高亮对应来源                       |
+
+**阶段验收**：提问「HYPE 最近有什么重要进展？」能产出带真实可点击引用、区分事实/分析的 Markdown 报告。
+
+---
+
+## Phase 3 — Crypto 数据能力
+
+**目标**：从"只会搜网页"升级为"有结构化金融数据"。
+
+| ID    | 任务                                                                                             | 依赖            | 状态 | 验收                                    |
+| ----- | ------------------------------------------------------------------------------------------------ | --------------- | ---- | --------------------------------------- |
+| P3-1  | CoinGecko provider（限流/缓存/错误映射）                                                         | P2-1            | ⬜   | 契约测试通过                            |
+| P3-2  | DefiLlama provider                                                                               | P2-1            | ⬜   | 契约测试通过                            |
+| P3-3  | `resolve_asset`：符号→coin id 消歧（含同名冲突处理，多候选时返回列表让 Agent 选）                | P3-1            | ⬜   | "HYPE" 正确解析到 Hyperliquid           |
+| P3-4  | `tools/crypto/`：`get_crypto_price` / `get_market_data` / `get_price_history`                    | P3-1, P3-3      | ⬜   | 结构化输出 + provenance 完整            |
+| P3-5  | `tools/system/compute_metrics`：涨跌幅 / CAGR / 波动率 / 百分位（纯 Python）`[DP §8.5]`          | P1-1            | ⬜   | 单元测试含边界值                        |
+| P3-6  | `tools/defi/`：`get_tvl` / `get_protocol_fees_revenue` / `get_dex_volume` / `get_chain_overview` | P3-2            | ⬜   | HYPE/Hyperliquid 数据正确               |
+| P3-7  | `tools/crypto/get_tokenomics`：供应量 / 分配 / 解锁（数据源覆盖度调研 + 缺失明确声明）           | P3-1            | ⬜   | 拿不到的字段进 `data_gaps`              |
+| P3-8  | 链上数据源选型调研 + 可行子集实现（`get_chain_activity` 等），受限项写入风险登记 `[DP §23 R4]`   | P3-2            | ⬜   | 输出实际覆盖度结论文档                  |
+| P3-9  | Crypto Research Agent + prompt（整合 crypto/defi/onchain/web tools）                             | P3-4~P3-8, P2-6 | ⬜   | 对 3 个样例 crypto 问题产出完整 finding |
+| P3-10 | 数值冲突检测：多源同指标差异 → `CONFLICT_DETECTED` + 报告并列展示 `[DP §23 R9]`                  | P3-9            | ⬜   | 注入冲突数据能被检出                    |
+| P3-11 | 前端：`METRIC_FOUND` 驱动的 Recharts 图表（价格 / TVL 走势）内嵌报告                             | P3-9, P2-10     | ⬜   | 报告中显示 30d TVL 曲线                 |
+
+**阶段验收**：「介绍一下 HYPE」「分析 HYPE 最近一个月上涨的原因」「查询 HYPE 的 TVL、交易量和资金变化」三个问题都能产出带数据、图表和引用的报告。
+
+---
+
+## Phase 4 — 美股数据能力
+
+**目标**：对称地补齐美股研究。**注意 FMP 250/day 额度**，优先用 SEC EDGAR。
+
+| ID    | 任务                                                                                                                       | 依赖         | 状态 | 验收                                |
+| ----- | -------------------------------------------------------------------------------------------------------------------------- | ------------ | ---- | ----------------------------------- |
+| P4-1  | FMP provider（含日配额计数 + `QUOTA_EXHAUSTED` 快速失败）                                                                  | P2-1         | ⬜   | 配额耗尽时优雅降级                  |
+| P4-2  | SEC EDGAR provider（`User-Agent` 合规、10 req/s 限流、`submissions` + `companyfacts`）                                     | P2-1         | ⬜   | 契约测试通过                        |
+| P4-3  | `resolve_ticker` + ticker↔CIK 映射（本地缓存 SEC company_tickers.json）                                                    | P4-2         | ⬜   | NVDA→CIK 正确                       |
+| P4-4  | `tools/stocks/`：`get_stock_quote` / `get_company_profile` / `get_price_history` / `get_peers` / `compare_to_index`        | P4-1, P4-3   | ⬜   | 结构化输出完整                      |
+| P4-5  | `tools/financials/` 三表：income / balance / cash flow（优先 XBRL，FMP 兜底）                                              | P4-2, P4-1   | ⬜   | 与官方财报数字一致                  |
+| P4-6  | `tools/financials/get_growth_metrics`：YoY / QoQ / CAGR / margin trend（**Python 计算**）                                  | P4-5, P3-5   | ⬜   | 与手算一致                          |
+| P4-7  | `tools/financials/get_valuation_metrics` + `get_valuation_history`（历史估值分位）                                         | P4-1         | ⬜   | "NVDA PE 处于 5 年 X 分位"可回答    |
+| P4-8  | `tools/sec/`：`list_sec_filings` / `get_filing_section`（10-K Item 1A/7、10-Q）/ `get_xbrl_facts` / `get_earnings_summary` | P4-2         | ⬜   | 能取出指定章节正文                  |
+| P4-9  | 大文件处理策略：10-K 全文分节 + 按需截取 + 永久缓存（避免爆上下文）                                                        | P4-8         | ⬜   | 单次注入上下文可控                  |
+| P4-10 | Stock Research Agent + prompt                                                                                              | P4-4~P4-9    | ⬜   | 对 4 个样例股票问题产出完整 finding |
+| P4-11 | 多标的对比支持：Plan 层生成依赖任务 + 报告对比表格                                                                         | P4-10, P1-10 | ⬜   | 「比较 NVDA/AMD/AVGO 基本面」可用   |
+
+**阶段验收**：「NVDA 是做什么的」「分析 NVDA 最近一季财报」「NVDA 估值贵不贵」「比较 NVDA、AMD、AVGO」四个问题都能产出带财务数据与 SEC 引用的报告。
+
+---
+
+## Phase 5 — Multi-Agent 完整编排
+
+**目标**：把 6 个 Agent 完整串成 `[DP §7.1]` 的流程，并验证多模型兼容性。
+
+| ID   | 任务                                                                                                       | 依赖              | 状态 | 验收                                        |
+| ---- | ---------------------------------------------------------------------------------------------------------- | ----------------- | ---- | ------------------------------------------- |
+| P5-1 | 意图分类层（词典/正则短路 + FAST 模型兜底）`[DP §25.1]`                                                    | P1-9              | ⬜   | 常见问题不走 LLM 也能正确分类               |
+| P5-2 | Agents-as-Tools 装配：Manager 通过工具调用子 Agent，结果回编排层 `[DP 决策 B]`                             | P3-9, P4-10, P2-6 | ⬜   | 单次研究可同时用到 crypto + web             |
+| P5-3 | 完整并行 fan-out：依赖分层 + `asyncio.gather` + 单任务超时 + 部分失败降级                                  | P5-2              | ⬜   | 1 个任务失败不影响整体出报告                |
+| P5-4 | Merge & Dedup 阶段：source 归一、claim 合并、冲突汇总                                                      | P5-3, P3-10       | ⬜   | 跨 Agent 的重复来源被合并                   |
+| P5-5 | Fact Checker Agent（干净上下文，只看 claims + sources，可复检索）+ 校验事件流                              | P5-4              | ⬜   | 能识别注入的错误声明                        |
+| P5-6 | Gap Check + 最多 1 轮补充研究（`PLAN_UPDATED`）                                                            | P5-5              | ⬜   | 缺关键数据时能补一轮                        |
+| P5-7 | Report Writer v2：动态 `report_sections`、Executive Summary、Bull/Bear Case、Risks、数据限制章节、免责声明 | P5-6, P2-8        | ⬜   | 不同问题类型报告结构不同                    |
+| P5-8 | 全流程 workflow 测试（FakeModel）：正常 / 工具失败 / 超时 / 冲突 / 引用缺失 / schema 解析失败 6 条路径     | P5-7, P1-8        | ⬜   | 全部确定性通过                              |
+| P5-9 | 多模型冒烟：6 个 provider 各跑一次完整研究，结果写入 catalog `verified` 字段 + `[DP §9.4]` 降级验证        | P5-8, P1-4        | ⬜   | 已配 key 的 provider 全部跑通或明确标注限制 |
+
+### P5.5 — MVP 验收 ⬜
+
+按 `[DP §21.1]` 的 Definition of Done 逐条核对，并跑完 `[DP §26]` 收尾清单。**通过后打 tag `v0.1.0-mvp`。**
+
+---
+
+## Phase 6 — 高级 UX + 历史 + 可观察性
+
+| ID    | 任务                                                                                                 | 依赖 | 状态 | 验收                            |
+| ----- | ---------------------------------------------------------------------------------------------------- | ---- | ---- | ------------------------------- |
+| P6-1  | Activity Panel 完善：tool 详情展开、耗时、缓存标记、自动折叠、失败保持展开                           | P5.5 | ⬜   | 符合 `[DP §13.2]`               |
+| P6-2  | Research Timeline / 阶段瀑布可视化                                                                   | P6-1 | ⬜   | 能看出各阶段耗时                |
+| P6-3  | 无障碍与状态播报（`aria-live`，不只依赖颜色）                                                        | P6-1 | ⬜   | 键盘可完整操作                  |
+| P6-4  | History 列表页 + 过滤（类型/模型/状态）+ 分页                                                        | P5.5 | ⬜   | 能翻看历史研究                  |
+| P6-5  | Session 详情页与实时页**复用同一组件**（事件源切换为 DB 回放）`[DP §14.3]`                           | P6-4 | ⬜   | 两种视图渲染一致                |
+| P6-6  | `GET /api/research/{id}/events?after={seq}` 重连回放（偿还 D4）                                      | P6-5 | ⬜   | 刷新页面能续上进行中的研究      |
+| P6-7  | 取消研究（前端按钮 → Next → Python cancel → 状态落库）                                               | P6-6 | ⬜   | 可中断长任务                    |
+| P6-8  | Settings 页：默认模型、按角色指定模型、执行上限、报告偏好                                            | P5.5 | ⬜   | 设置持久化并生效                |
+| P6-9  | `/debug` 可观察性页：阶段瀑布 / Agent 排行 / Tool 失败率 / 模型成本对比 / Provider 配额 `[DP §20.2]` | P5.5 | ⬜   | 能回答 `[DP §20.2]` 的 4 个问题 |
+| P6-10 | 成本与 token 实时显示 + 单 session 成本上限告警                                                      | P6-9 | ⬜   | 超限发 WARNING 事件             |
+| P6-11 | Playwright E2E（打桩 Python 服务，跑完整 UI 流程）                                                   | P6-5 | ⬜   | CI 中稳定通过                   |
+
+---
+
+## Phase 7 — Evaluation 系统
+
+| ID   | 任务                                                                                            | 依赖      | 状态 | 验收                       |
+| ---- | ----------------------------------------------------------------------------------------------- | --------- | ---- | -------------------------- |
+| P7-1 | `evals/` 骨架 + `runner.py` + 结果归档格式                                                      | P5.5      | ⬜   | 可跑并输出 JSON + Markdown |
+| P7-2 | `deterministic.py` grader：路由 / tool 选择 / 引用覆盖率 / 引用有效性 / 报告完整性 / 数值准确性 | P7-1      | ⬜   | 指标可复现                 |
+| P7-3 | `llm_judge.py` grader：幻觉率 / 认知类型正确率                                                  | P7-1      | ⬜   | 与人工抽检一致率 >80%      |
+| P7-4 | 数据集：`intent_routing` + `tool_selection`                                                     | P7-2      | ⬜   | 各 ≥30 条                  |
+| P7-5 | 数据集：`crypto_project` + `stock_analysis` + `financial_report`                                | P7-2      | ⬜   | 各 ≥15 条，带真值          |
+| P7-6 | 数据集：`fact_check`（注入错误声明）+ `epistemic_labeling` + prompt injection 用例              | P7-3      | ⬜   | 各 ≥20 条                  |
+| P7-7 | Fixture 化外部数据（eval 结果可跨时间比较）                                                     | P7-5      | ⬜   | 同一数据集重复跑分数稳定   |
+| P7-8 | 跨模型 eval 对比报告（回答"哪个模型效果最好"）                                                  | P7-1~P7-7 | ⬜   | 生成对比表并归档           |
+
+---
+
+## Phase 8 — 扩展能力（按需触发，非线性）
+
+| ID   | 任务                                                                                                               | 触发条件                                                  | 状态 |
+| ---- | ------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------- | ---- |
+| P8-1 | Watchlist + 资产详情页                                                                                             | 反复手动查同一批标的                                      | ⬜   |
+| P8-2 | 宏观模块（Fed / CPI / PCE / NFP / GDP / 国债收益率 / DXY / VIX，FRED API）+ Macro→Liquidity→Stocks→Crypto 联动分析 | 需要跨市场问题（如"为什么 BTC 和纳斯达克同时涨"）深度支持 | ⬜   |
+| P8-3 | PostgreSQL 迁移                                                                                                    | 需要 pgvector 或远程部署                                  | ⬜   |
+| P8-4 | pgvector + RAG 个人知识库（PDF / 研报 / 笔记）                                                                     | 需要存本地文档                                            | ⬜   |
+| P8-5 | 定时研究 + Alerts（价格 / 财报 / 解锁 / 巨鲸 / TVL），需任务队列 + Redis                                           | 需要"每天早上给我简报"                                    | ⬜   |
+| P8-6 | MCP Server（把自身 tools 暴露给 Claude / Cursor）                                                                  | 想在别处复用这些工具                                      | ⬜   |
+| P8-7 | LangGraph 迁移评估与实施                                                                                           | 满足 `[DP §4.1]` 决策清单任意两条                         | ⬜   |
+| P8-8 | 报告导出（PDF / Notion）+ 多轮追问对话                                                                             | 按需                                                      | ⬜   |
+
+---
+
+## 阶段小结
+
+> 每个阶段完成后在此追加小结：完成内容、遇到的问题、偏离计划之处、新增技术债、eval 分数变化。
+
+### 开发计划确认 ✅（2026-09-07）
+
+- 完成 `DEVELOPMENT_PLAN.md` v1.1 与本 Roadmap。
+- 确认：计划通过、Agent 减至 6 个、项目名沿用。
+- 模型选型经过一次修正：初版按"仅有国内模型 key"设计，后确认可申请 OpenAI key 并以 OpenAI 为首选，遂改为 OpenAI 优先。
+- 实测核实的两点（影响设计）：
+  - OpenAI 全系与 Kimi K3 支持 `json_schema` + `strict`，DeepSeek/GLM 仅 `json_object` → 结构化输出做三路径（P1-4b），schema 保持扁平。
+  - SDK tracing 依赖 `OPENAI_API_KEY` 上传，且**独立于业务模型**：有 OpenAI key 后，用国内模型的 run 也能上传 trace。
+- 当前 OpenAI 阵容（2026-09 核实）：`gpt-6-astra` $10/$50（1.05M ctx）、`gpt-5.6-sol` $4/$20、`terra` $2/$12、`luna` $0.20/$1.20。
+- 仍待确认：`[DP §27.2]` Q2、Q5、Q6、Q7（有默认方案，不阻塞）。
+
+### Phase 0 — 项目初始化 ✅（2026-09-07）
+
+**完成内容**：pnpm workspace（web + shared + Python 服务）、双服务启动脚本、10 张表的数据库 schema 与 migration、健康检查贯通、CI 三 job、secret 扫描钩子、类型生成链路。
+
+**检查结果**：Python 侧 ruff/format/basedpyright 全绿 + 7 个测试通过；前端 tsc/eslint/prettier 全绿 + 13 个测试通过；`next build` 通过；`drizzle-kit check` 通过。
+
+**实际落地的版本**（与计划一致，型号按实测确定）：
+
+| 组件                        | 版本                        |
+| --------------------------- | --------------------------- |
+| openai-agents               | 0.22.0（已锁 minor，见 R8） |
+| Python / FastAPI / Pydantic | 3.13.15 / 0.141.1 / 2.13.5  |
+| Next.js / React             | 16.3.4 / 19.2.8             |
+| TypeScript                  | **6.0.3**（见下方 D13）     |
+| Drizzle ORM / drizzle-kit   | 0.45.2 / 0.31.10            |
+| Tailwind CSS                | 4.3.3                       |
+
+**遇到的问题与处理**：
+
+1. **TypeScript 7 与 typescript-eslint 不兼容**：TS 7（Go 原生编译器）下 `tsc` 正常但 ESLint 直接崩溃（typescript-eslint 尚未支持）。降到 TS 6.0.3 → 记为技术债 D13。
+2. **eslint-plugin-react 在 ESLint 10 下崩溃**：`detectReactVersion` 依赖已移除的 `context.getFilename`。显式声明 `settings.react.version` 绕过自动探测，无需降级 ESLint。
+3. **eslint-config-next 16 已原生支持 flat config**：去掉了 `FlatCompat` 兼容层。
+4. **`no-restricted-imports` 规则写得过宽**：无法从导入路径区分服务端/客户端文件，把合法调用也拦了。收窄到只管 `components/**`；真正的防线是 `import "server-only"`（客户端引入会构建失败）。
+5. **构建期数据库副作用**：`db/client.ts` 模块级建连接会让 `next build` 创建数据库文件。改为 `getDb()` 懒初始化。
+6. **相对路径数据库位置歧义**：drizzle-kit 从 `apps/web` 运行、Python 从仓库根运行，同一个 `./data/app.db` 会指向两个文件。统一用 `findRepoRoot()`（查找 `pnpm-workspace.yaml`）作为基准。
+7. **`wait -n` 在 macOS bash 3.2 上不支持**：`dev.sh` 改用可移植的轮询监控循环。
+8. **structlog 中文被转义**：`JSONRenderer(ensure_ascii=False)`，并补了测试防回归。
+9. **pnpm 12 配置项变更**：构建脚本白名单从 `onlyBuiltDependencies` 改为 `allowBuilds` 映射。
+10. **慢网络下大二进制包超时**：`.npmrc` 放宽 fetch 重试与超时（`@next/swc` 约 31MB）。
+
+**新增技术债**：D13（TS 6 降级）、D14（CI 远端未验证）、D15（shadcn/ui 未初始化）。
+
+---
+
+## 技术债跟踪
+
+`[DP §24]` 登记的债务在此跟踪偿还状态：
+
+| ID  | 债务                                                                                                                                                                                        | 偿还阶段                           | 状态 |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | ---- |
+| D1  | 无用户系统                                                                                                                                                                                  | 按需                               | ⬜   |
+| D2  | SQLite 无备份                                                                                                                                                                               | P8-3                               | ⬜   |
+| D3  | 进程重启丢失进行中任务                                                                                                                                                                      | P8-7                               | ⬜   |
+| D4  | 断线不可恢复进行中的 run                                                                                                                                                                    | P6-6                               | ⬜   |
+| D5  | 缓存无主动失效                                                                                                                                                                              | 按需                               | ⬜   |
+| D6  | Fact Check 非全量                                                                                                                                                                           | 按需                               | ⬜   |
+| D7  | `data_gaps` 依赖 LLM 自觉                                                                                                                                                                   | P7 持续监控                        | ⬜   |
+| D8  | 补充研究仅 1 轮                                                                                                                                                                             | 按需                               | ⬜   |
+| D9  | 前端无虚拟滚动                                                                                                                                                                              | 按需                               | ⬜   |
+| D10 | Prompt 无版本管理                                                                                                                                                                           | P7                                 | ⬜   |
+| D11 | 报告仅中文                                                                                                                                                                                  | 按需                               | ⬜   |
+| D12 | 无跨任务 tool 配额协调                                                                                                                                                                      | 按需                               | ⬜   |
+| D13 | **TypeScript 固定在 6.x**：TS 7 下 typescript-eslint 崩溃（[typescript-eslint#10940](https://github.com/typescript-eslint/typescript-eslint/issues/10940)）。代价仅是编译慢一些，功能无影响 | typescript-eslint 支持 TS 7 后升级 | ⬜   |
+| D14 | CI 仅验证了本地等价命令，GitHub Actions 未实际跑过                                                                                                                                          | 首次 push 后                       | ⬜   |
+| D15 | shadcn/ui 未初始化（Phase 0 无组件需求，避免空目录）                                                                                                                                        | P1-12 需要组件时                   | ⬜   |

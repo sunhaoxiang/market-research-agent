@@ -1,0 +1,39 @@
+#!/usr/bin/env sh
+#
+# 提交前守门：
+#   1. secret 扫描（硬性拦截，见 DEVELOPMENT_PLAN.md §17.1）
+#   2. 暂存文件格式检查
+#
+# 跳过（仅在确知安全时）：git commit --no-verify
+
+set -e
+
+# ── 1. secret 扫描
+if command -v gitleaks >/dev/null 2>&1; then
+  echo "→ gitleaks 扫描暂存内容"
+  gitleaks protect --staged --config .gitleaks.toml --redact --no-banner
+else
+  echo "⚠️  未安装 gitleaks，跳过 secret 扫描。安装：brew install gitleaks"
+fi
+
+# ── 2. 阻止 .env 文件被提交（gitleaks 之外的第二道防线）
+staged_env=$(git diff --cached --name-only --diff-filter=ACM | grep -E '^\.env' | grep -v '^\.env\.example$' || true)
+if [ -n "$staged_env" ]; then
+  echo "✖ 拒绝提交环境变量文件："
+  echo "$staged_env" | sed 's/^/    /'
+  echo "  这些文件可能含 secret。只有 .env.example 允许提交。"
+  exit 1
+fi
+
+# ── 3. 格式检查
+staged=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(ts|tsx|css|mjs|json|ya?ml)$' || true)
+if [ -n "$staged" ]; then
+  echo "→ prettier 检查"
+  echo "$staged" | xargs pnpm exec prettier --check --ignore-unknown
+fi
+
+staged_py=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.py$' || true)
+if [ -n "$staged_py" ]; then
+  echo "→ ruff 检查"
+  (cd services/agent && uv run ruff check --force-exclude $(echo "$staged_py" | sed 's|^services/agent/||'))
+fi

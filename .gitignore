@@ -1,0 +1,60 @@
+# ── Secrets（严禁入库，见 DEVELOPMENT_PLAN.md §17.1）
+.env
+.env.*
+!.env.example
+
+# ── 数据与数据库
+data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
+# ── Node
+node_modules/
+.pnpm-store/
+.next/
+out/
+build/
+dist/
+*.tsbuildinfo
+.turbo/
+
+# ── Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.basedpyright/
+*.egg-info/
+.coverage
+htmlcov/
+
+# ── 生成产物（由 scripts/gen-types.sh 产生，但仍需提交以便 CI diff 检查）
+# packages/shared/src/generated/  ← 有意提交，不忽略
+.schema-cache/
+
+# ── 编辑器 / 系统
+.DS_Store
+.idea/
+*.swp
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+
+# ── 日志与临时
+*.log
+npm-debug.log*
+pnpm-debug.log*
+.tmp/
+coverage/
+playwright-report/
+test-results/
+
+# ── Eval 结果（本地跑的结果不入库，归档结果手动提交）
+evals/results/local/

@@ -1,0 +1,9 @@
+node_modules/
+.next/
+dist/
+build/
+pnpm-lock.yaml
+apps/web/db/migrations/
+packages/shared/src/generated/
+services/agent/.venv/
+data/
