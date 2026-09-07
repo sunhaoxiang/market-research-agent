@@ -400,7 +400,7 @@ P1-9 与 P1-10 两次 push 的 CI 都是红的，暴露两个本地检查覆盖�
 **同一个教训在 P1-13 又犯了一次**（本地闸门与 CI 不等价），于是把根因也修掉：
 
 - `pnpm check` 压根没跑 prettier，而 CI 跑 `prettier --check .`。已把 `format:check` 与 `ruff format --check` 都加进去——这个脚本的存在意义就是"提交前跑它等于跑 CI"，缺一项就等于没有。
-- pre-commit 钩子的 prettier 只匹配 `.ts/.tsx/.css/.mjs/.json/.ya?ml`，**不含 `.md`**，所以纯文档提交必然绕过。已补上 md/mdx/html 等；漏的那次就是手写 markdown 表格时中文列宽算错一格。
+- 触发这次失败的是 `docs/ROADMAP.md` 的表格列宽（手写时中文宽度算错一格）。但正确的修法不是让钩子也去查 `.md`，而是**让 prettier 完全不碰 markdown**：Phase 2 起每个子 Agent 都要加 prompt 模板，只要有人把 `.md` 放到 `prompts/` 之外，格式化就会静默重排它，缓存命中从 90%+ 掉到 0 且不报任何错——只体现在账单上。已在 `.prettierignore` 加 `*.md` / `*.mdx` 整类排除，代价仅是文档表格不再自动对齐。
 
 ### D15 偿还记录 — shadcn/ui（2026-09-07）
 

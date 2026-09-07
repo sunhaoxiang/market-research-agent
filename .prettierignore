@@ -8,7 +8,18 @@ packages/shared/src/generated/
 services/agent/.venv/
 data/
 
+# ── Markdown 一律不格式化
+#
 # Prompt 模板是发给 LLM 的输入，不是文档。Prettier 会重排列表缩进和表格，
 # 而 §9.8 的 prompt 缓存要求前缀字节完全稳定——一次无害的格式化就会让
-# 缓存命中率从 90%+ 掉到 0，且没有任何报错提示
+# 缓存命中率从 90%+ 掉到 0，且没有任何报错提示，只体现在账单上。
+#
+# 为什么整类排除而不只排 prompts/：Phase 2 起每个子 Agent 都要加 prompt，
+# 只要有人把模板放在 prompts/ 之外（或新开一个目录），格式化就会静默生效。
+# 这道防线的代价仅是文档表格不再自动对齐，而收益是"prompt 被改动"这件事
+# 不可能再意外发生。
+*.md
+*.mdx
+
+# 目录级兜底：这里的一切都不许动，无论扩展名（将来可能出现 .txt / .j2 模板）
 services/agent/src/agent_service/prompts/

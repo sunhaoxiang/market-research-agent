@@ -27,8 +27,9 @@ fi
 
 # ── 3. 格式检查
 # 扩展名列表必须覆盖 CI 里 `prettier --check .` 会扫到的一切，否则钩子放过的
-# 提交会在 CI 挂掉（漏掉 .md 就发生过一次）。宁可多列，--ignore-unknown 会兜住
-staged=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(ts|tsx|js|jsx|mjs|cjs|css|json|jsonc|ya?ml|md|mdx|html)$' || true)
+# 提交会在 CI 挂掉。不含 md/mdx：那是 .prettierignore 里刻意排除的（prompt
+# 模板必须字节稳定，见那里的说明）
+staged=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(ts|tsx|js|jsx|mjs|cjs|css|json|jsonc|ya?ml|html)$' || true)
 if [ -n "$staged" ]; then
   echo "→ prettier 检查"
   echo "$staged" | xargs pnpm exec prettier --check --ignore-unknown
