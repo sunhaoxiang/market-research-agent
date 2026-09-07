@@ -44,13 +44,19 @@ class PlannerAgent:
         return self.entry.id
 
 
-def build_research_manager(registry: ModelRegistry, limits: ExecutionLimits) -> PlannerAgent:
+def build_research_manager(
+    registry: ModelRegistry,
+    limits: ExecutionLimits,
+    *,
+    model_id: str | None = None,
+) -> PlannerAgent:
     """构造规划 Agent。
 
-    模型按角色解析（`ModelRole.PLANNER`），因此换模型只需改环境变量——
-    这正是 §9.5 模型抽象层想要的效果。
+    缺省按角色解析（`ModelRole.PLANNER`），因此换模型只需改环境变量——
+    这正是 §9.5 模型抽象层想要的效果。`model_id` 用于前端模型选择器
+    显式指定本次会话用哪个模型，此时跳过角色映射。
     """
-    resolved = registry.for_role(ModelRole.PLANNER)
+    resolved = registry.resolve(model_id) if model_id else registry.for_role(ModelRole.PLANNER)
 
     return PlannerAgent(
         agent=Agent[None](

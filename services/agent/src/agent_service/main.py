@@ -15,6 +15,7 @@ from pydantic import BaseModel
 
 from agent_service import __version__
 from agent_service.api import models as models_api
+from agent_service.api import research as research_api
 from agent_service.config import Settings, get_settings
 from agent_service.models.registry import ModelRegistry, bootstrap_sdk, tracing_status
 from agent_service.observability.logging import configure_logging, get_logger
@@ -127,6 +128,7 @@ def create_app() -> FastAPI:
         )
 
     app.include_router(models_api.router)
+    app.include_router(research_api.router)
     return app
 
 

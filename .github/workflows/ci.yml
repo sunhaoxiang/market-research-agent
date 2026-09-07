@@ -99,6 +99,21 @@ jobs:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
-      - uses: gitleaks/gitleaks-action@v2
+
+      # 不用 gitleaks-action：它按 push 的 commit 范围构造 --log-opts，git 往
+      # stderr 写任何东西（哪怕只是提示）都会被当成扫描失败。同一份配置在
+      # P1-9 的运行里挂了、P1-10 又过了——会随机误报的安全门等于没有门。
+      # 直接跑二进制、每次全量扫，结果是确定的
+      - name: Install gitleaks
         env:
-          GITLEAKS_CONFIG: .gitleaks.toml
+          GITLEAKS_VERSION: 8.30.1
+        run: |
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            | sudo tar -xz -C /usr/local/bin gitleaks
+          gitleaks version
+
+      # 扫全量 git 历史而非工作区：secret 一旦提交过，即使后续删掉也仍留在
+      # commit 对象里，只扫工作区会漏。--redact 保证真命中时 CI 日志里
+      # 不会再印一遍明文（日志本身可能是公开的）
+      - name: Scan git history
+        run: gitleaks git --config .gitleaks.toml --redact --no-banner --verbose .

@@ -7,3 +7,8 @@ apps/web/db/migrations/
 packages/shared/src/generated/
 services/agent/.venv/
 data/
+
+# Prompt 模板是发给 LLM 的输入，不是文档。Prettier 会重排列表缩进和表格，
+# 而 §9.8 的 prompt 缓存要求前缀字节完全稳定——一次无害的格式化就会让
+# 缓存命中率从 90%+ 掉到 0，且没有任何报错提示
+services/agent/src/agent_service/prompts/

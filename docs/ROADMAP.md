@@ -87,7 +87,7 @@
 | P1-8  | ~~自建 `FakeModel`~~ → **改用 SDK 自带 `agents.testing.ScriptedModel`**（自建版只实现 `get_response`，`run_streamed` 走 `stream_response`，P1-7 一跑就暴露）`[DP §18.2]`                               | P1-4              | ✅   | 能驱动一次完整 run                                                                                        |
 | P1-9  | Research Manager Agent（planner）+ prompt + plan 代码校验（任务数上限/agent 合法/无环）                                                                                                                | P1-4, P1-1        | ✅   | v4-pro 对 3 个样例问题 3/3 产出合法 plan，零修复                                                          |
 | P1-10 | Orchestrator 骨架：`state.py` / `executor.py`（分层 fan-out + 超时 + 失败降级）/ `pipeline.py`；接入执行上限 `[DP §7.2]`                                                                               | P1-9, P1-6        | ✅   | ScriptedModel 下走完 planning→执行→完成                                                                   |
-| P1-11 | `POST /v1/research/stream` SSE 端点 + Next `POST /api/research`（消费/落库/转发，客户端断开仍落库）+ `lib/sse.ts` 解析器                                                                               | P1-10, P0-7       | ⬜   | 浏览器实时收到事件；断开后 DB 完整                                                                        |
+| P1-11 | `POST /v1/research/stream` SSE 端点 + Next `POST /api/research`（消费/落库/转发，客户端断开仍落库）+ `lib/sse.ts` 解析器                                                                               | P1-10, P0-7       | ✅   | 真实 DeepSeek 跑通浏览器→DB 全链路；kill -9 断连后 19/19 事件仍落库                                       |
 | P1-12 | 前端最小闭环：提问框 + 模型选择器 + Activity Panel 骨架（计划树 + 状态点亮）+ 事件 reducer + store                                                                                                     | P1-11, P1-5, P1-2 | ⬜   | 提问后能看到计划与逐节点点亮                                                                              |
 | P1-13 | **可观察性埋点**（`[DP §20.1]`）：`agent_runs` / `tool_calls` 写入 + prompt hash / token / 成本记录；SDK tracing 开关验证                                                                              | P1-11             | ⬜   | 一次研究后两张表数据完整，成本可核算；`/debug` 与 eval 的数据基础就绪                                     |
 
@@ -318,6 +318,30 @@
 
 ---
 
+### P1-11 — SSE 端点与 BFF 全链路 ✅（2026-09-07）
+
+**完成内容**：Python 侧 `api/sse.py`（分帧）、`api/auth.py`（`X-Internal-Token`）、`api/research.py`（`POST /v1/research/stream`）、`agents/placeholder.py`（Phase 2 子 Agent 的占位 runner）；Web 侧 `lib/sse.ts`（解析器 + `streamResearch`）、`lib/ids.ts`（TS 版 UUIDv7）、`db/queries/events.ts`（攒批落库）、`app/api/research/route.ts`。测试 +18（Python）+27（Web），累计 Python 247 / Web 45。
+
+**端到端已在真实模型上验证**：浏览器 → Next → Python → DeepSeek v4-pro → 落库全链路跑通，一次会话 20 事件 / 30.5s / $0.0052。规划阶段的 45 秒空档由 3 个心跳事件撑住连接，正是心跳设计要解决的场景。
+
+**四个设计决策**：
+
+1. **落库循环与浏览器生命周期彻底解耦。** `startResearch()` 刻意不接受 `AbortSignal`，`ReadableStream` 的 `cancel()` 只置标志位而不中止上游。理由是钱已经花了：用户关掉标签页只该停止转发，读完上游并落库是"刷新页面还能看到完整结果"的唯一前提。验收用 `kill -9` 在第 2 个事件处掐断 curl，最终 DB 里 19/19 事件齐全、`plan` 完整、状态 `completed`。这条约束极易在重构中被破坏（顺手传个 signal 就退化了），因此有专门的测试盯着 `startResearch` 的入参里没有 `signal`。
+2. **模型解析发生在返回响应之前。** 模型 id 打错或没配 key 是请求错误，要用 400/503 + §16.3 的结构表达。塞进事件流的话，前端会在"已开始研究"的 UI 状态下收到失败事件，白白渲染一次任务树再撤掉。
+3. **占位 runner 刻意不假装成功。** 每个任务的 `data_gaps` 都写明"子 Agent 尚未实现"，这条缺口会一路走到报告的数据限制章节。返回编造的 summary 的话，Phase 2 接手前没人会发现研究流程其实是空的。
+4. **TS 侧自己实现 UUIDv7 而不用 `crypto.randomUUID()`。** 后者是 v4，纯随机，会推翻 §10.1 选 v7 的全部理由（字典序即时间序、主键顺序写入）。`research_events` 是每批 20 条写入的，v4 会让每批散落到 B-tree 各页。单调性有 5000 个 id 的排序测试兜底——一旦退化，`ORDER BY id` 会悄悄给出错误的事件顺序而不报任何错。
+
+**测试逮到的两个真 bug**：
+
+- `_pump` 里 `yield encode_comment(...)` 原本写在 `try` 外面。`aclose()` 是在当前挂起点抛 `GeneratorExit`，所以"客户端在首帧之后、第一个业务事件之前断开"这条路径根本不会执行 `finally`，pipeline 永远不会被取消——会一直烧 token 到研究自然结束。
+- 上游流截断的测试起初写成 `enqueue(); error();`，怎么都收不到那一帧。原因是规范要求 `error()` 清空队列。改用两次 `pull()` 才真实模拟出"已收到的数据不能丢"。
+
+**两个环境适配**：`server-only` 只在 `react-server` 导出条件下解析到空实现，vitest 拿到的是会主动 throw 的那份，因此加了 stub 别名（不给 vitest 加 `react-server` 条件——那会让 react 也解析到 server 版本，组件测试全挂）。`ReadableStream` 的异步迭代协议在浏览器里支持不全（Chrome 至今没实现），所以解析器用 `getReader()` 而非 `for await`。
+
+**顺带补上 §11.3**：Next 侧一直在发 `X-Internal-Token`，但 Python 从来没校验过。现在研究端点会校验（用 `compare_digest` 定长比较），未配置 token 时放行——强制要求会让"克隆仓库、填一个 key、直接 `pnpm dev`"这条路径卡在 401。
+
+---
+
 ## 技术债跟踪
 
 `[DP §24]` 登记的债务在此跟踪偿还状态：
@@ -337,5 +361,12 @@
 | D11 | 报告仅中文                                                                                                                                                                                  | 按需                               | ⬜   |
 | D12 | 无跨任务 tool 配额协调                                                                                                                                                                      | 按需                               | ⬜   |
 | D13 | **TypeScript 固定在 6.x**：TS 7 下 typescript-eslint 崩溃（[typescript-eslint#10940](https://github.com/typescript-eslint/typescript-eslint/issues/10940)）。代价仅是编译慢一些，功能无影响 | typescript-eslint 支持 TS 7 后升级 | ⬜   |
-| D14 | CI 仅验证了本地等价命令，GitHub Actions 未实际跑过                                                                                                                                          | 首次 push 后                       | ⬜   |
+| D14 | ~~CI 仅验证了本地等价命令，GitHub Actions 未实际跑过~~ → 首次远端运行暴露两个问题，均已修（见下）                                                                                           | 已偿还（2026-09-07）               | ✅   |
 | D15 | shadcn/ui 未初始化（Phase 0 无组件需求，避免空目录）                                                                                                                                        | P1-12 需要组件时                   | ⬜   |
+
+### D14 偿还记录 — GitHub Actions 首次远端运行（2026-09-07）
+
+P1-9 与 P1-10 两次 push 的 CI 都是红的，暴露两个本地检查覆盖不到的问题：
+
+1. **Prettier 想重排 prompt 模板。** `prompts/research_manager.md` 是发给 LLM 的输入而不是文档，一次"无害"的格式化就会让 §9.8 的 prompt 缓存前缀失效，命中率从 90%+ 掉到 0，且不报任何错。已把 `prompts/` 加进 `.prettierignore`。本地漏掉是因为我只跑了 Python 侧的检查，没跑 `pnpm check` 的前端部分。
+2. **gitleaks-action 会随机误报。** 它按 push 的 commit 范围构造 `--log-opts`，git 往 stderr 写任何东西都会被判为扫描失败（P1-9 挂、P1-10 同样配置又过了）。会随机误报的安全门等于没有门——很快就会被无视。已改为直接跑固定版本的二进制、每次全量扫历史，并加 `--redact` 避免真命中时把明文印进公开日志。本地也装上了 gitleaks，pre-commit 钩子不再静默跳过。

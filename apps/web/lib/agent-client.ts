@@ -2,7 +2,6 @@
  * Python Agent Service 客户端。
  *
  * 所有对 Agent 服务的调用都经过这里，统一附带内网校验 token（§11.3）。
- * Phase 1 起会在此增加 SSE 研究流的调用。
  */
 
 import "server-only";
@@ -22,7 +21,7 @@ export type AgentHealth = {
   data_sources: AgentProviderStatus[];
 };
 
-function internalHeaders(): HeadersInit {
+function internalHeaders(): Record<string, string> {
   const headers: Record<string, string> = { Accept: "application/json" };
   if (serverEnv.internalApiToken) {
     headers["X-Internal-Token"] = serverEnv.internalApiToken;
@@ -104,4 +103,37 @@ export function fetchAgentHealth(timeoutMs = 3000): Promise<AgentServiceResult<A
 
 export function fetchAgentModels(timeoutMs = 3000): Promise<AgentServiceResult<AgentModels>> {
   return callAgent<AgentModels>("/v1/models", timeoutMs);
+}
+
+export type StartResearchInput = {
+  sessionId: string;
+  question: string;
+  modelId?: string;
+};
+
+/**
+ * 启动一次研究，返回未消费的 SSE 响应（§16.2）。
+ *
+ * 刻意**不**接受 `AbortSignal`：调用方（Route Handler）在浏览器断开后仍要读完
+ * 这条流以完成落库（§11.2）。把客户端的 signal 传到这里就会一断连就中止上游，
+ * 用户刷新页面后只能看到半截数据。
+ *
+ * 也**不**设总超时：研究本身可能跑几分钟，超时由 Python 侧的
+ * `TOTAL_TIMEOUT_S` 统一管（§7.2），两边各设一套迟早不一致。
+ */
+export async function startResearch(input: StartResearchInput): Promise<Response> {
+  return fetch(`${serverEnv.agentServiceUrl}/v1/research/stream`, {
+    method: "POST",
+    headers: {
+      ...internalHeaders(),
+      Accept: "text/event-stream",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      session_id: input.sessionId,
+      question: input.question,
+      model_id: input.modelId ?? null,
+    }),
+    cache: "no-store",
+  });
 }

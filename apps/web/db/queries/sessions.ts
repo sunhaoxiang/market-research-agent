@@ -63,6 +63,21 @@ export function updateSessionStatus(
 }
 
 /**
+ * 更新研究过程中才知道的会话级字段。
+ *
+ * 与 `updateSessionStatus` 分开：状态机的推进和"补充元数据"是两件事，
+ * 混在一个函数里会让调用方为了写 plan 而必须传一个状态，进而出现
+ * 用当前状态覆盖当前状态这种无意义的写。
+ */
+export function patchSession(
+  db: Db,
+  id: string,
+  patch: Partial<Pick<ResearchSession, "questionType" | "plan" | "modelId" | "tokenUsage">>,
+): void {
+  db.update(researchSessions).set(patch).where(eq(researchSessions.id, id)).run();
+}
+
+/**
  * 批量写入事件。
  *
  * 单事务插入，避免逐条事务的 fsync 开销（§10.3）。事件流按 200ms 或 20 条触发。
