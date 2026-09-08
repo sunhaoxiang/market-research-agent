@@ -21,12 +21,20 @@ if TYPE_CHECKING:
         FeesRevenue,
         ProtocolTvl,
     )
-    from agent_service.providers.equity import StockHistory, StockPeers, StockProfile, StockQuote
+    from agent_service.providers.equity import (
+        BalanceSheets,
+        CashFlowStatements,
+        IncomeStatements,
+        StockHistory,
+        StockPeers,
+        StockProfile,
+        StockQuote,
+    )
     from agent_service.providers.fetch import PageFetcher
     from agent_service.providers.onchain import PerpMarketSnapshot
     from agent_service.providers.runtime import Clock
     from agent_service.providers.search import SearchProvider
-    from agent_service.providers.sec import TickerDirectory
+    from agent_service.providers.sec import CompanyFacts, TickerDirectory
     from agent_service.tools.web.collector import SourceCollector
 
 
@@ -65,13 +73,15 @@ class HyperliquidClient(Protocol):
 
 
 class SecEdgarClient(Protocol):
-    """SEC 在 ToolDeps 上的面。P4-3 用 ticker 目录；P4-5 / P4-8 再加 submissions / facts。"""
+    """SEC 在 ToolDeps 上的面。P4-3 用 ticker 目录；P4-5 用 companyfacts。"""
 
     async def get_ticker_directory(self) -> TickerDirectory: ...
 
+    async def get_company_facts(self, cik: str) -> CompanyFacts: ...
+
 
 class FmpClient(Protocol):
-    """FMP 在 ToolDeps 上的面。P4-4 行情；P4-7 再加 ratios。假客户端按需实现。"""
+    """FMP 在 ToolDeps 上的面。P4-4 行情；P4-5 三表兜底；P4-7 再加 ratios。"""
 
     async def get_quote(self, symbol: str) -> StockQuote: ...
 
@@ -80,6 +90,18 @@ class FmpClient(Protocol):
     async def get_historical_prices(self, symbol: str, *, days: int = 30) -> StockHistory: ...
 
     async def get_peers(self, symbol: str) -> StockPeers: ...
+
+    async def get_income_statements(
+        self, symbol: str, *, period: str = "annual", limit: int = 4
+    ) -> IncomeStatements: ...
+
+    async def get_balance_sheets(
+        self, symbol: str, *, period: str = "annual", limit: int = 4
+    ) -> BalanceSheets: ...
+
+    async def get_cash_flow_statements(
+        self, symbol: str, *, period: str = "annual", limit: int = 4
+    ) -> CashFlowStatements: ...
 
 
 @dataclass(frozen=True, slots=True)

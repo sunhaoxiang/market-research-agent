@@ -6,10 +6,12 @@
 key 走 `apikey` 请求头，**不放进 query**——放进 params 会进缓存键，
 换 key 写法就让命中率掉到 0，SQLite 里也会留下 secret 的哈希痕迹。
 
-五个方法是给后面任务用的原语，不要在 tool 层再包一遍 HTTP：
+方法是给后面任务用的原语，不要在 tool 层再包一遍 HTTP：
 
 - `get_quote` / `get_profile` / `get_historical_prices` / `get_peers` → **P4-4**
-- `get_ratios_ttm` → **P4-7** 估值。财报主路径是 SEC；FMP 只补比率。
+- `get_income_statements` / `get_balance_sheets` / `get_cash_flow_statements`
+  → **P4-5** 三表兜底。主路径是 SEC XBRL。
+- `get_ratios_ttm` → **P4-7** 估值。缺字段保持 None，不要当成 0。
 """
 
 from __future__ import annotations
@@ -35,6 +37,10 @@ _PROFILE_PATH = "/profile"
 _HISTORY_PATH = "/historical-price-eod/full"
 _PEERS_PATH = "/stock-peers"
 _RATIOS_PATH = "/ratios-ttm"
+_INCOME_PATH = "/income-statement"
+_BALANCE_PATH = "/balance-sheet-statement"
+_CASH_FLOW_PATH = "/cash-flow-statement"
+_MAX_STATEMENT_LIMIT = 20
 
 
 def stock_page_url(symbol: str) -> str:
@@ -140,6 +146,79 @@ class ValuationRatios:
     provenance: DataProvenance
 
 
+@dataclass(frozen=True, slots=True)
+class IncomeStatementRow:
+    period_end: date
+    fiscal_year: int | None
+    fiscal_period: str | None
+    revenue: float | None
+    cost_of_revenue: float | None
+    gross_profit: float | None
+    operating_income: float | None
+    net_income: float | None
+    eps_basic: float | None
+    eps_diluted: float | None
+    research_and_development: float | None
+    operating_expenses: float | None
+    income_tax: float | None
+    shares_diluted: float | None
+
+
+@dataclass(frozen=True, slots=True)
+class IncomeStatements:
+    symbol: str
+    period: str
+    rows: tuple[IncomeStatementRow, ...]
+    url: str
+    provenance: DataProvenance
+
+
+@dataclass(frozen=True, slots=True)
+class BalanceSheetRow:
+    period_end: date
+    fiscal_year: int | None
+    fiscal_period: str | None
+    cash: float | None
+    current_assets: float | None
+    total_assets: float | None
+    current_liabilities: float | None
+    total_liabilities: float | None
+    long_term_debt: float | None
+    stockholders_equity: float | None
+    inventory: float | None
+    accounts_receivable: float | None
+
+
+@dataclass(frozen=True, slots=True)
+class BalanceSheets:
+    symbol: str
+    period: str
+    rows: tuple[BalanceSheetRow, ...]
+    url: str
+    provenance: DataProvenance
+
+
+@dataclass(frozen=True, slots=True)
+class CashFlowRow:
+    period_end: date
+    fiscal_year: int | None
+    fiscal_period: str | None
+    operating: float | None
+    investing: float | None
+    financing: float | None
+    capex: float | None
+    depreciation: float | None
+
+
+@dataclass(frozen=True, slots=True)
+class CashFlowStatements:
+    symbol: str
+    period: str
+    rows: tuple[CashFlowRow, ...]
+    url: str
+    provenance: DataProvenance
+
+
 class FmpProvider(BaseProvider):
     def __init__(
         self,
@@ -204,6 +283,75 @@ class FmpProvider(BaseProvider):
         response = await self._get(_RATIOS_PATH, CacheTTL.MARKET, {"symbol": ticker})
         return _parse_ratios(response, symbol=ticker)
 
+    async def get_income_statements(
+        self, symbol: str, *, period: str = "annual", limit: int = 4
+    ) -> IncomeStatements:
+        ticker, period_key, limit_n = _require_statement(symbol, period, limit, _INCOME_PATH)
+        response = await self._get(
+            _INCOME_PATH,
+            CacheTTL.PROFILE,
+            {"symbol": ticker, "period": period_key, "limit": limit_n},
+        )
+        rows = _income_rows(
+            response.data,
+            endpoint=_INCOME_PATH,
+            missing=f"FMP 没有这只股票的利润表：{ticker}",
+            limit=limit_n,
+        )
+        return IncomeStatements(
+            symbol=ticker,
+            period="quarterly" if period_key == "quarter" else "annual",
+            rows=rows,
+            url=stock_page_url(ticker),
+            provenance=response.provenance(),
+        )
+
+    async def get_balance_sheets(
+        self, symbol: str, *, period: str = "annual", limit: int = 4
+    ) -> BalanceSheets:
+        ticker, period_key, limit_n = _require_statement(symbol, period, limit, _BALANCE_PATH)
+        response = await self._get(
+            _BALANCE_PATH,
+            CacheTTL.PROFILE,
+            {"symbol": ticker, "period": period_key, "limit": limit_n},
+        )
+        rows = _balance_rows(
+            response.data,
+            endpoint=_BALANCE_PATH,
+            missing=f"FMP 没有这只股票的资产负债表：{ticker}",
+            limit=limit_n,
+        )
+        return BalanceSheets(
+            symbol=ticker,
+            period="quarterly" if period_key == "quarter" else "annual",
+            rows=rows,
+            url=stock_page_url(ticker),
+            provenance=response.provenance(),
+        )
+
+    async def get_cash_flow_statements(
+        self, symbol: str, *, period: str = "annual", limit: int = 4
+    ) -> CashFlowStatements:
+        ticker, period_key, limit_n = _require_statement(symbol, period, limit, _CASH_FLOW_PATH)
+        response = await self._get(
+            _CASH_FLOW_PATH,
+            CacheTTL.PROFILE,
+            {"symbol": ticker, "period": period_key, "limit": limit_n},
+        )
+        rows = _cash_flow_rows(
+            response.data,
+            endpoint=_CASH_FLOW_PATH,
+            missing=f"FMP 没有这只股票的现金流量表：{ticker}",
+            limit=limit_n,
+        )
+        return CashFlowStatements(
+            symbol=ticker,
+            period="quarterly" if period_key == "quarter" else "annual",
+            rows=rows,
+            url=stock_page_url(ticker),
+            provenance=response.provenance(),
+        )
+
     async def _get(
         self,
         endpoint: str,
@@ -248,6 +396,174 @@ def _require_symbol(symbol: str, *, endpoint: str) -> str:
             endpoint=endpoint,
         )
     return ticker
+
+
+def _require_statement(symbol: str, period: str, limit: int, endpoint: str) -> tuple[str, str, int]:
+    ticker = _require_symbol(symbol, endpoint=endpoint)
+    raw = period.strip().lower()
+    if raw in {"annual", "fy", "year"}:
+        period_key = "annual"
+    elif raw in {"quarter", "quarterly", "q"}:
+        period_key = "quarter"
+    else:
+        raise ProviderError(
+            ToolErrorCode.INVALID_INPUT,
+            "period 只能是 annual 或 quarterly",
+            provider="fmp",
+            endpoint=endpoint,
+        )
+    if limit < 1 or limit > _MAX_STATEMENT_LIMIT:
+        raise ProviderError(
+            ToolErrorCode.INVALID_INPUT,
+            f"limit 必须在 1–{_MAX_STATEMENT_LIMIT}",
+            provider="fmp",
+            endpoint=endpoint,
+        )
+    return ticker, period_key, limit
+
+
+def _object_list(data: Any, *, endpoint: str, missing: str) -> list[dict[str, Any]]:
+    _raise_if_error_payload(data, endpoint=endpoint)
+    rows: list[Any]
+    if isinstance(data, list):
+        rows = data
+    elif isinstance(data, dict):
+        rows = [data]
+    else:
+        raise ProviderError(
+            ToolErrorCode.PARSE_ERROR,
+            "FMP 返回了非预期结构（财报不是列表）",
+            retryable=False,
+            provider="fmp",
+            endpoint=endpoint,
+        )
+    parsed = [item for item in rows if isinstance(item, dict)]
+    if not parsed:
+        raise ProviderError(
+            ToolErrorCode.NOT_FOUND,
+            missing,
+            retryable=False,
+            provider="fmp",
+            endpoint=endpoint,
+        )
+    return parsed
+
+
+def _income_rows(
+    data: Any, *, endpoint: str, missing: str, limit: int
+) -> tuple[IncomeStatementRow, ...]:
+    rows = tuple(
+        row
+        for item in _object_list(data, endpoint=endpoint, missing=missing)
+        if (row := _parse_income_row(item)) is not None
+    )
+    if not rows:
+        raise ProviderError(
+            ToolErrorCode.NOT_FOUND,
+            missing,
+            retryable=False,
+            provider="fmp",
+            endpoint=endpoint,
+        )
+    return rows[:limit]
+
+
+def _balance_rows(
+    data: Any, *, endpoint: str, missing: str, limit: int
+) -> tuple[BalanceSheetRow, ...]:
+    rows = tuple(
+        row
+        for item in _object_list(data, endpoint=endpoint, missing=missing)
+        if (row := _parse_balance_row(item)) is not None
+    )
+    if not rows:
+        raise ProviderError(
+            ToolErrorCode.NOT_FOUND,
+            missing,
+            retryable=False,
+            provider="fmp",
+            endpoint=endpoint,
+        )
+    return rows[:limit]
+
+
+def _cash_flow_rows(
+    data: Any, *, endpoint: str, missing: str, limit: int
+) -> tuple[CashFlowRow, ...]:
+    rows = tuple(
+        row
+        for item in _object_list(data, endpoint=endpoint, missing=missing)
+        if (row := _parse_cash_flow_row(item)) is not None
+    )
+    if not rows:
+        raise ProviderError(
+            ToolErrorCode.NOT_FOUND,
+            missing,
+            retryable=False,
+            provider="fmp",
+            endpoint=endpoint,
+        )
+    return rows[:limit]
+
+
+def _parse_income_row(row: dict[str, Any]) -> IncomeStatementRow | None:
+    period_end = _optional_date(row.get("date") or row.get("fillingDate") or row.get("filingDate"))
+    if period_end is None:
+        return None
+    return IncomeStatementRow(
+        period_end=period_end,
+        fiscal_year=_optional_int(row.get("fiscalYear") or row.get("calendarYear")),
+        fiscal_period=_optional_str(row.get("period")),
+        revenue=_first_float(row, "revenue"),
+        cost_of_revenue=_first_float(row, "costOfRevenue"),
+        gross_profit=_first_float(row, "grossProfit"),
+        operating_income=_first_float(row, "operatingIncome"),
+        net_income=_first_float(row, "netIncome"),
+        eps_basic=_first_float(row, "eps"),
+        eps_diluted=_first_float(row, "epsdiluted", "epsDiluted"),
+        research_and_development=_first_float(row, "researchAndDevelopmentExpenses"),
+        operating_expenses=_first_float(row, "operatingExpenses"),
+        income_tax=_first_float(row, "incomeTaxExpense"),
+        shares_diluted=_first_float(row, "weightedAverageShsOutDil"),
+    )
+
+
+def _parse_balance_row(row: dict[str, Any]) -> BalanceSheetRow | None:
+    period_end = _optional_date(row.get("date") or row.get("fillingDate") or row.get("filingDate"))
+    if period_end is None:
+        return None
+    return BalanceSheetRow(
+        period_end=period_end,
+        fiscal_year=_optional_int(row.get("fiscalYear") or row.get("calendarYear")),
+        fiscal_period=_optional_str(row.get("period")),
+        cash=_first_float(row, "cashAndCashEquivalents"),
+        current_assets=_first_float(row, "totalCurrentAssets"),
+        total_assets=_first_float(row, "totalAssets"),
+        current_liabilities=_first_float(row, "totalCurrentLiabilities"),
+        total_liabilities=_first_float(row, "totalLiabilities"),
+        long_term_debt=_first_float(row, "longTermDebt"),
+        stockholders_equity=_first_float(row, "totalStockholdersEquity", "totalEquity"),
+        inventory=_first_float(row, "inventory"),
+        accounts_receivable=_first_float(row, "netReceivables"),
+    )
+
+
+def _parse_cash_flow_row(row: dict[str, Any]) -> CashFlowRow | None:
+    period_end = _optional_date(row.get("date") or row.get("fillingDate") or row.get("filingDate"))
+    if period_end is None:
+        return None
+    return CashFlowRow(
+        period_end=period_end,
+        fiscal_year=_optional_int(row.get("fiscalYear") or row.get("calendarYear")),
+        fiscal_period=_optional_str(row.get("period")),
+        operating=_first_float(row, "netCashProvidedByOperatingActivities"),
+        investing=_first_float(
+            row, "netCashUsedForInvestingActivites", "netCashUsedForInvestingActivities"
+        ),
+        financing=_first_float(row, "netCashUsedProvidedByFinancingActivities"),
+        capex=_first_float(row, "capitalExpenditure", "investmentsInPropertyPlantAndEquipment"),
+        depreciation=_first_float(row, "depreciationAndAmortization"),
+    )
 
 
 def _raise_if_error_payload(data: Any, *, endpoint: str) -> None:

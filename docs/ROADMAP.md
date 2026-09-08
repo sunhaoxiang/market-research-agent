@@ -6,7 +6,7 @@
 > **每完成一个任务就更新此表的状态**；每完成一个阶段，跑 `[DP §26]` 的收尾清单并写阶段小结。
 
 - 最后更新：2026-09-08
-- 当前阶段：**P4-4 完成**。下一任务 P4-5 `tools/financials/` 三表。
+- 当前阶段：**P4-5 完成**。下一任务 P4-6 `get_growth_metrics`（YoY / QoQ / CAGR，Python 计算）。
 
 ### 已确认的前置决策（2026-09-07）
 
@@ -174,7 +174,7 @@ hash 跨会话稳定，说明 §9.8 的缓存前缀约束真的守住了；95.4%
 | P4-2  | SEC EDGAR provider（`User-Agent` 合规、10 req/s 限流、`submissions` + `companyfacts`）                                     | P2-1         | ✅   | 契约测试通过                        |
 | P4-3  | `resolve_ticker` + ticker↔CIK 映射（本地缓存 SEC company_tickers.json）                                                    | P4-2         | ✅   | NVDA→CIK 正确                       |
 | P4-4  | `tools/stocks/`：`get_stock_quote` / `get_company_profile` / `get_stock_price_history` / `get_peers` / `compare_to_index`  | P4-1, P4-3   | ✅   | 结构化输出完整                      |
-| P4-5  | `tools/financials/` 三表：income / balance / cash flow（优先 XBRL，FMP 兜底）                                              | P4-2, P4-1   | ⬜   | 与官方财报数字一致                  |
+| P4-5  | `tools/financials/` 三表：income / balance / cash flow（优先 XBRL，FMP 兜底）                                              | P4-2, P4-1   | ✅   | 与官方财报数字一致                  |
 | P4-6  | `tools/financials/get_growth_metrics`：YoY / QoQ / CAGR / margin trend（**Python 计算**）                                  | P4-5, P3-5   | ⬜   | 与手算一致                          |
 | P4-7  | `tools/financials/get_valuation_metrics` + `get_valuation_history`（历史估值分位）                                         | P4-1         | ⬜   | "NVDA PE 处于 5 年 X 分位"可回答    |
 | P4-8  | `tools/sec/`：`list_sec_filings` / `get_filing_section`（10-K Item 1A/7、10-Q）/ `get_xbrl_facts` / `get_earnings_summary` | P4-2         | ⬜   | 能取出指定章节正文                  |
@@ -765,6 +765,17 @@ Writer 的 user 消息带上冲突清单，prompt 要求并列写出；前端从
 - `compare_to_index` 没有单独的 FMP 接口：两次 `get_historical_prices`（标的 + 默认 `SPY`），在 Python 里按重叠交易日首尾收盘价算收益和超额收益（小数，不是百分数字符串）。对不齐或起点价格无效是 `NOT_FOUND`，不要编数字。对比会打 2 次 history（缓存可共享）。
 
 注入 `ToolDeps.fmp`。无 key 时 `fmp is None` → unavailable。P4-10 再接到 Stock Research Agent；不要提前塞进 Crypto / Web Research。不要在本项包 `get_ratios_ttm`（那是 P4-7）。
+
+### P4-5 — 三表（income / balance / cash flow）✅（2026-09-08）
+
+主路径是 SEC `companyfacts`（us-gaap tag），不是 FMP。`get_company_facts` 只收 CIK：tool 先用 P4-3 的代码表把 `NVDA` 解成 `0001045810`，再拼期间。缺 tag 保持 None，不要当成 0。给人点的 URL 是 SEC 公司页。
+
+- 利润表优先 `RevenueFromContractWithCustomerExcludingAssessedTax`，否则 `Revenues`。验收钉死 NVDA FY2025 营收 **130,497,000,000**（10-K）。
+- 季报丢掉 YTD 累计（时长约 180 天），只保留单季（约 90 天）。年报时长约 300–400 天。同一期末取更晚申报的点（修正报）。
+- FMP `/income-statement` 等只在 SEC 没有可用期间时才打，省 250/day 额度。混用同一行的 SEC 营收和 FMP 净利会对不上，所以是整表降级，不是逐字段拼接。
+- `period` 为 `annual` / `quarterly`，`limit` 默认 4。不要在本项算 YoY / CAGR（那是 P4-6）。
+
+`FINANCIALS_TOOLS` 已挂 `@function_tool` 和 invoke。P4-10 再接到 Stock Research Agent。
 
 ---
 

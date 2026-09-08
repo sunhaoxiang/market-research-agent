@@ -11,6 +11,9 @@ from datetime import UTC, date, datetime
 import pytest
 
 from agent_service.providers.equity import (
+    BalanceSheets,
+    CashFlowStatements,
+    IncomeStatements,
     PriceBar,
     StockHistory,
     StockPeer,
@@ -213,6 +216,24 @@ class FakeFmp:
             raise self.error
         assert self.peers is not None
         return self.peers
+
+    async def get_income_statements(
+        self, symbol: str, *, period: str = "annual", limit: int = 4
+    ) -> IncomeStatements:
+        del symbol, period, limit
+        raise AssertionError("P4-4 不应拉三表")
+
+    async def get_balance_sheets(
+        self, symbol: str, *, period: str = "annual", limit: int = 4
+    ) -> BalanceSheets:
+        del symbol, period, limit
+        raise AssertionError("P4-4 不应拉三表")
+
+    async def get_cash_flow_statements(
+        self, symbol: str, *, period: str = "annual", limit: int = 4
+    ) -> CashFlowStatements:
+        del symbol, period, limit
+        raise AssertionError("P4-4 不应拉三表")
 
     async def get_ratios_ttm(self, symbol: str) -> object:
         raise AssertionError("P4-4 不应包估值比率")

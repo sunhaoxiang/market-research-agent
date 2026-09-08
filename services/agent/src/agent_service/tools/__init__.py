@@ -16,6 +16,12 @@ from agent_service.tools.defi.bindings import (
     get_tvl,
 )
 from agent_service.tools.deps import ToolDeps
+from agent_service.tools.financials.bindings import (
+    FINANCIALS_TOOLS,
+    get_balance_sheet,
+    get_cash_flow,
+    get_income_statement,
+)
 from agent_service.tools.onchain.bindings import (
     ONCHAIN_TOOLS,
     get_chain_activity,
@@ -39,6 +45,7 @@ from agent_service.tools.web.bindings import WEB_TOOLS, news_search, web_fetch, 
 __all__ = [
     "CRYPTO_TOOLS",
     "DEFI_TOOLS",
+    "FINANCIALS_TOOLS",
     "HANDLERS",
     "ONCHAIN_TOOLS",
     "STOCK_TOOLS",
@@ -47,12 +54,15 @@ __all__ = [
     "ToolDeps",
     "compare_to_index",
     "compute_metrics",
+    "get_balance_sheet",
+    "get_cash_flow",
     "get_chain_activity",
     "get_chain_overview",
     "get_company_profile",
     "get_crypto_price",
     "get_dex_volume",
     "get_exchange_flow",
+    "get_income_statement",
     "get_market_data",
     "get_peers",
     "get_price_history",

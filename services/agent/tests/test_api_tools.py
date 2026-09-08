@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from datetime import UTC, date, datetime
+from types import MappingProxyType
 
 import pytest
 from fastapi.testclient import TestClient
@@ -13,6 +14,9 @@ from agent_service.main import create_app
 from agent_service.providers.crypto import CoinMarket, CoinPrice, CoinSearchHit, CoinSearchPage
 from agent_service.providers.defi import ProtocolTvl, TvlPoint
 from agent_service.providers.equity import (
+    BalanceSheets,
+    CashFlowStatements,
+    IncomeStatements,
     PriceBar,
     StockHistory,
     StockPeer,
@@ -22,7 +26,14 @@ from agent_service.providers.equity import (
 )
 from agent_service.providers.onchain import PerpMarketSnapshot
 from agent_service.providers.search import SearchHit, SearchPage
-from agent_service.providers.sec import TickerDirectory, TickerEntry, company_page_url
+from agent_service.providers.sec import (
+    CompanyFacts,
+    FactConcept,
+    FactPoint,
+    TickerDirectory,
+    TickerEntry,
+    company_page_url,
+)
 from agent_service.schemas.tools import DataProvenance, ToolErrorCode
 
 _KEY_ENV_VARS = (
@@ -190,6 +201,79 @@ class _FakeSecEdgar:
             ),
         )
 
+    async def get_company_facts(self, cik: str) -> CompanyFacts:
+        del cik
+        revenue = FactPoint(
+            value=130_497_000_000.0,
+            unit="USD",
+            start=date(2024, 1, 29),
+            end=date(2025, 1, 26),
+            filed=date(2025, 2, 26),
+            form="10-K",
+            fy=2025,
+            fp="FY",
+            accession="0001045810-25-000031",
+            frame=None,
+        )
+        assets = FactPoint(
+            value=111_601_000_000.0,
+            unit="USD",
+            start=None,
+            end=date(2025, 1, 26),
+            filed=date(2025, 2, 26),
+            form="10-K",
+            fy=2025,
+            fp="FY",
+            accession="0001045810-25-000031",
+            frame=None,
+        )
+        operating = FactPoint(
+            value=64_089_000_000.0,
+            unit="USD",
+            start=date(2024, 1, 29),
+            end=date(2025, 1, 26),
+            filed=date(2025, 2, 26),
+            form="10-K",
+            fy=2025,
+            fp="FY",
+            accession="0001045810-25-000031",
+            frame=None,
+        )
+        concepts = {
+            ("us-gaap", "Revenues"): FactConcept(
+                taxonomy="us-gaap",
+                tag="Revenues",
+                label="Revenues",
+                description=None,
+                points=(revenue,),
+            ),
+            ("us-gaap", "Assets"): FactConcept(
+                taxonomy="us-gaap",
+                tag="Assets",
+                label="Assets",
+                description=None,
+                points=(assets,),
+            ),
+            ("us-gaap", "NetCashProvidedByUsedInOperatingActivities"): FactConcept(
+                taxonomy="us-gaap",
+                tag="NetCashProvidedByUsedInOperatingActivities",
+                label="Operating cash",
+                description=None,
+                points=(operating,),
+            ),
+        }
+        return CompanyFacts(
+            cik="0001045810",
+            name="NVIDIA CORP",
+            concepts=MappingProxyType(concepts),
+            url=company_page_url("1045810"),
+            provenance=DataProvenance(
+                provider="sec_edgar",
+                endpoint="/api/xbrl/companyfacts",
+                retrieved_at=datetime(2026, 9, 8, tzinfo=UTC),
+            ),
+        )
+
     async def aclose(self) -> None:
         return None
 
@@ -290,6 +374,21 @@ class _FakeFmp:
                 retrieved_at=datetime(2026, 9, 8, tzinfo=UTC),
             ),
         )
+
+    async def get_income_statements(
+        self, symbol: str, *, period: str = "annual", limit: int = 4
+    ) -> IncomeStatements:
+        raise AssertionError("invoke 三表应走 SEC XBRL")
+
+    async def get_balance_sheets(
+        self, symbol: str, *, period: str = "annual", limit: int = 4
+    ) -> BalanceSheets:
+        raise AssertionError("invoke 三表应走 SEC XBRL")
+
+    async def get_cash_flow_statements(
+        self, symbol: str, *, period: str = "annual", limit: int = 4
+    ) -> CashFlowStatements:
+        raise AssertionError("invoke 三表应走 SEC XBRL")
 
     async def aclose(self) -> None:
         return None
@@ -457,6 +556,41 @@ def test_invoke_compare_to_index(client: TestClient) -> None:
     assert body["data"]["ticker_return"] == pytest.approx(0.2)
     assert body["data"]["index_return"] == pytest.approx(0.1)
     assert body["data"]["excess_return"] == pytest.approx(0.1)
+
+
+def test_invoke_income_statement(client: TestClient) -> None:
+    response = client.post(
+        "/v1/tools/get_income_statement/invoke",
+        json={"arguments": {"ticker": "NVDA"}},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["data"]["source"] == "sec_xbrl"
+    assert body["data"]["rows"][0]["revenue"] == 130_497_000_000.0
+    assert body["provenance"]["source_url"] == "https://www.sec.gov/edgar/browse/?CIK=0001045810"
+
+
+def test_invoke_balance_sheet(client: TestClient) -> None:
+    response = client.post(
+        "/v1/tools/get_balance_sheet/invoke",
+        json={"arguments": {"ticker": "NVDA"}},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["data"]["rows"][0]["total_assets"] == 111_601_000_000.0
+
+
+def test_invoke_cash_flow(client: TestClient) -> None:
+    response = client.post(
+        "/v1/tools/get_cash_flow/invoke",
+        json={"arguments": {"ticker": "NVDA"}},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["data"]["rows"][0]["operating"] == 64_089_000_000.0
 
 
 def test_invoke_get_tvl(client: TestClient) -> None:

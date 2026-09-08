@@ -432,6 +432,46 @@ async def test_cache_hit_does_not_consume_quota(
     assert snap.daily_used == 1
 
 
+@respx.mock(base_url=_BASE)
+async def test_income_statement_maps_list(
+    respx_mock: respx.MockRouter, runtime: ProviderRuntime
+) -> None:
+    route = respx_mock.get("/income-statement").mock(
+        return_value=httpx.Response(
+            200,
+            json=[
+                {
+                    "date": "2025-01-26",
+                    "symbol": "NVDA",
+                    "fiscalYear": 2025,
+                    "period": "FY",
+                    "revenue": 130_497_000_000,
+                    "netIncome": 72_880_000_000,
+                    "epsDiluted": 2.94,
+                }
+            ],
+        )
+    )
+    async with fmp(runtime) as provider:
+        page = await provider.get_income_statements("nvda", period="annual", limit=4)
+    assert page.rows[0].revenue == pytest.approx(130_497_000_000)
+    assert page.rows[0].net_income == pytest.approx(72_880_000_000)
+    assert page.rows[0].eps_diluted == pytest.approx(2.94)
+    assert page.url == "https://financialmodelingprep.com/financial-summary/NVDA"
+    assert "apikey" not in str(route.calls[0].request.url)
+
+
+@respx.mock(base_url=_BASE)
+async def test_empty_income_statement_is_not_found(
+    respx_mock: respx.MockRouter, runtime: ProviderRuntime
+) -> None:
+    respx_mock.get("/income-statement").mock(return_value=httpx.Response(200, json=[]))
+    async with fmp(runtime) as provider:
+        with pytest.raises(ProviderError) as exc:
+            await provider.get_income_statements("NOPE")
+    assert exc.value.code is ToolErrorCode.NOT_FOUND
+
+
 def test_blank_key_is_rejected() -> None:
     with pytest.raises(ProviderError) as exc:
         FmpProvider(runtime=object(), api_key="  ")  # type: ignore[arg-type]

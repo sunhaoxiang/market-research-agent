@@ -1,7 +1,13 @@
 """美股数据源。FMP 是第一个实现；tool 层（P4-4 起）只依赖这些类型。"""
 
 from agent_service.providers.equity.fmp import (
+    BalanceSheetRow,
+    BalanceSheets,
+    CashFlowRow,
+    CashFlowStatements,
     FmpProvider,
+    IncomeStatementRow,
+    IncomeStatements,
     PriceBar,
     StockHistory,
     StockPeer,
@@ -13,7 +19,13 @@ from agent_service.providers.equity.fmp import (
 )
 
 __all__ = [
+    "BalanceSheetRow",
+    "BalanceSheets",
+    "CashFlowRow",
+    "CashFlowStatements",
     "FmpProvider",
+    "IncomeStatementRow",
+    "IncomeStatements",
     "PriceBar",
     "StockHistory",
     "StockPeer",

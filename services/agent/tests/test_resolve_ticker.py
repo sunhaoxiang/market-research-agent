@@ -9,7 +9,12 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from agent_service.providers.errors import ProviderError
-from agent_service.providers.sec import TickerDirectory, TickerEntry, company_page_url
+from agent_service.providers.sec import (
+    CompanyFacts,
+    TickerDirectory,
+    TickerEntry,
+    company_page_url,
+)
 from agent_service.schemas.tools import DataProvenance, ToolErrorCode
 from agent_service.tools.deps import ToolDeps
 from agent_service.tools.registry import invoke_tool
@@ -74,6 +79,10 @@ class FakeSecEdgar:
             raise self.error
         assert self.directory is not None
         return self.directory
+
+    async def get_company_facts(self, cik: str) -> CompanyFacts:
+        del cik
+        raise AssertionError("resolve_ticker 不应拉 companyfacts")
 
 
 def test_nvda_ticker_maps_to_cik() -> None:

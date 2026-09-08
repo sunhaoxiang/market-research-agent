@@ -36,6 +36,16 @@ from agent_service.tools.defi.models import (
     TvlData,
 )
 from agent_service.tools.deps import ToolDeps
+from agent_service.tools.financials.models import (
+    BalanceSheetData,
+    CashFlowData,
+    IncomeStatementData,
+)
+from agent_service.tools.financials.statements import (
+    run_get_balance_sheet,
+    run_get_cash_flow,
+    run_get_income_statement,
+)
 from agent_service.tools.onchain.activity import run_get_chain_activity
 from agent_service.tools.onchain.gaps import (
     run_get_exchange_flow,
@@ -106,6 +116,12 @@ class CompareToIndexArgs(BaseModel):
     ticker: str
     index: str = "SPY"
     days: int = 30
+
+
+class StatementArgs(BaseModel):
+    ticker: str
+    period: str = "annual"
+    limit: int = 4
 
 
 class CryptoPriceArgs(BaseModel):
@@ -258,6 +274,38 @@ async def _compare_to_index(
     return await run_compare_to_index(deps, ticker=args.ticker, index=args.index, days=args.days)
 
 
+async def _get_income_statement(
+    deps: ToolDeps, arguments: dict[str, Any]
+) -> ToolResult[IncomeStatementData]:
+    try:
+        args = StatementArgs.model_validate(arguments)
+    except ValidationError as exc:
+        return fail_validation("get_income_statement", exc)
+    return await run_get_income_statement(
+        deps, ticker=args.ticker, period=args.period, limit=args.limit
+    )
+
+
+async def _get_balance_sheet(
+    deps: ToolDeps, arguments: dict[str, Any]
+) -> ToolResult[BalanceSheetData]:
+    try:
+        args = StatementArgs.model_validate(arguments)
+    except ValidationError as exc:
+        return fail_validation("get_balance_sheet", exc)
+    return await run_get_balance_sheet(
+        deps, ticker=args.ticker, period=args.period, limit=args.limit
+    )
+
+
+async def _get_cash_flow(deps: ToolDeps, arguments: dict[str, Any]) -> ToolResult[CashFlowData]:
+    try:
+        args = StatementArgs.model_validate(arguments)
+    except ValidationError as exc:
+        return fail_validation("get_cash_flow", exc)
+    return await run_get_cash_flow(deps, ticker=args.ticker, period=args.period, limit=args.limit)
+
+
 async def _get_crypto_price(
     deps: ToolDeps, arguments: dict[str, Any]
 ) -> ToolResult[CryptoPriceData]:
@@ -387,12 +435,15 @@ async def _get_exchange_flow(deps: ToolDeps, arguments: dict[str, Any]) -> ToolR
 HANDLERS: dict[str, ToolHandler] = {
     "compare_to_index": _compare_to_index,
     "compute_metrics": _compute_metrics,
+    "get_balance_sheet": _get_balance_sheet,
+    "get_cash_flow": _get_cash_flow,
     "get_chain_activity": _get_chain_activity,
     "get_chain_overview": _get_chain_overview,
     "get_company_profile": _get_company_profile,
     "get_crypto_price": _get_crypto_price,
     "get_dex_volume": _get_dex_volume,
     "get_exchange_flow": _get_exchange_flow,
+    "get_income_statement": _get_income_statement,
     "get_market_data": _get_market_data,
     "get_peers": _get_peers,
     "get_price_history": _get_price_history,
