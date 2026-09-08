@@ -212,6 +212,36 @@ async def test_write_report_passes_without_retry() -> None:
     completed = next(event for event in events if event.type is EventType.REPORT_COMPLETED)
     assert isinstance(completed.payload, ReportCompletedPayload)
     assert completed.payload.claims[0].text == state.findings[0].claims[0].text
+
+
+async def test_write_report_backfills_claim_ids() -> None:
+    """章节徽标靠代码回填，不信模型抄的 claim id。"""
+    invented = json.dumps(
+        {
+            "title": "HYPE 近况",
+            "executive_summary": "Hyperliquid 正在讨论手续费分享。[1]",
+            "sections": [
+                {
+                    "id": "Overview",
+                    "title": "概述",
+                    "markdown": "Hyperliquid 正在讨论把部分交易手续费分享给 HYPE 持有人。[1]",
+                    "claim_ids": ["llm-invented-id"],
+                }
+            ],
+            "data_gaps": ["未找到官方解锁时间表"],
+        },
+        ensure_ascii=False,
+    )
+    state, events = await _write(invented)
+    claim_id = state.findings[0].claims[0].id
+    assert state.report is not None
+    assert state.report.sections[0].claim_ids == [claim_id]
+    completed = next(event for event in events if event.type is EventType.REPORT_COMPLETED)
+    assert isinstance(completed.payload, ReportCompletedPayload)
+    assert completed.payload.report.sections[0].claim_ids == [claim_id]
+
+
+async def test_write_report_retries_on_bad_citation() -> None:
     """验收：故意注入坏引用能被检出并修正。"""
     source = _source()
     finding = _finding(source)

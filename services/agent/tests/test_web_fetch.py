@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import time
 from collections.abc import AsyncIterator
 from pathlib import Path
 
@@ -212,3 +214,20 @@ async def test_pdf_is_unsupported(respx_mock: respx.MockRouter, runtime: Provide
         await fetcher.fetch("https://example.test/a.pdf")
     await fetcher._client.aclose()
     assert exc.value.code is ToolErrorCode.UNSUPPORTED
+
+
+async def test_dns_timeout_does_not_hang(runtime: ProviderRuntime) -> None:
+    async def slow(_host: str) -> list[str]:
+        await asyncio.sleep(30)
+        return [_PUBLIC]
+
+    client = httpx.AsyncClient(follow_redirects=False, trust_env=False)
+    fetcher = WebFetcher(runtime, client=client, resolver=slow, dns_timeout_s=0.05)
+    started = time.monotonic()
+    with pytest.raises(ProviderError) as exc:
+        await fetcher.fetch("https://example.test/hype")
+    elapsed = time.monotonic() - started
+    await fetcher._client.aclose()
+    assert exc.value.code is ToolErrorCode.TIMEOUT
+    assert "DNS" in exc.value.message
+    assert elapsed < 2

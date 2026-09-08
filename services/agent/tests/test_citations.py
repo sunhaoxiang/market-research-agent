@@ -4,8 +4,13 @@ from datetime import UTC, datetime
 
 from agent_service.schemas.claims import Claim
 from agent_service.schemas.common import ConfidenceLevel, EpistemicType, SourceType
+from agent_service.schemas.report import ReportSection, ResearchReport
 from agent_service.schemas.sources import Source
-from agent_service.sources.citations import assign_citation_indices, bibliography
+from agent_service.sources.citations import (
+    assign_citation_indices,
+    attach_section_claims,
+    bibliography,
+)
 
 _NOW = datetime(2026, 9, 8, tzinfo=UTC)
 
@@ -56,3 +61,53 @@ def test_discovery_order_becomes_citation_order() -> None:
     ]
     numbered = assign_citation_indices([first, second], claims)
     assert [item.citation_index for item in numbered] == [1, 2]
+
+
+def test_attach_section_claims_overrides_model_ids() -> None:
+    used = _source("s1", "https://theblock.co/a")
+    claim = Claim(
+        text="手续费分享在讨论中。",
+        epistemic_type=EpistemicType.SOURCE_BACKED_FACT,
+        confidence=ConfidenceLevel.MEDIUM,
+        source_ids=[used.id],
+    )
+    numbered = assign_citation_indices([used], [claim])
+    report = ResearchReport(
+        title="T",
+        executive_summary="x",
+        sections=[
+            ReportSection(
+                id="Overview",
+                title="概述",
+                markdown="手续费分享在讨论中。[1]",
+                claim_ids=["llm-invented-id"],
+            )
+        ],
+    )
+    filled = attach_section_claims(report, numbered, [claim])
+    assert filled.sections[0].claim_ids == [claim.id]
+
+
+def test_attach_section_claims_matches_claim_text() -> None:
+    used = _source("s1", "https://theblock.co/a")
+    claim = Claim(
+        text="手续费分享在讨论中。",
+        epistemic_type=EpistemicType.ANALYSIS,
+        confidence=ConfidenceLevel.MEDIUM,
+        source_ids=[used.id],
+    )
+    numbered = assign_citation_indices([used], [claim])
+    report = ResearchReport(
+        title="T",
+        executive_summary="x",
+        sections=[
+            ReportSection(
+                id="Overview",
+                title="概述",
+                markdown="分析：手续费分享在讨论中。",
+                claim_ids=[],
+            )
+        ],
+    )
+    filled = attach_section_claims(report, numbered, [claim])
+    assert filled.sections[0].claim_ids == [claim.id]

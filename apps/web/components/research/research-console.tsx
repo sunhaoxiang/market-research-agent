@@ -1,6 +1,8 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+
+import type { ResearchEvent } from "@mra/shared";
 
 import { ReportViewer } from "@/components/report/report-viewer";
 import { SourcePanel } from "@/components/sources/source-panel";
@@ -29,6 +31,23 @@ export function ResearchConsole({ models }: { models: ModelOption[] }) {
 
   const running = state.status === "running";
 
+  useEffect(() => {
+    const sessionId = new URLSearchParams(window.location.search).get("session");
+    if (!sessionId) return;
+    let cancelled = false;
+    void (async () => {
+      const response = await fetch(`/api/research/${encodeURIComponent(sessionId)}/events`);
+      if (!response.ok || cancelled) return;
+      const body = (await response.json()) as { events?: ResearchEvent[] };
+      if (cancelled || !Array.isArray(body.events)) return;
+      store.reset();
+      for (const event of body.events) store.apply(event);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [store]);
+
   async function submit() {
     const trimmed = question.trim();
     if (!trimmed || running) return;
@@ -41,7 +60,7 @@ export function ResearchConsole({ models }: { models: ModelOption[] }) {
     try {
       for await (const event of streamResearch(
         { question: trimmed, modelId: modelId || undefined },
-        { signal: controller.signal },
+        { signal: controller.signal, onSessionId: rememberSession },
       )) {
         store.apply(event);
       }
@@ -198,4 +217,10 @@ export function ResearchConsole({ models }: { models: ModelOption[] }) {
       )}
     </div>
   );
+}
+
+function rememberSession(sessionId: string): void {
+  const url = new URL(window.location.href);
+  url.searchParams.set("session", sessionId);
+  window.history.replaceState(null, "", url);
 }

@@ -6,7 +6,7 @@
 > **每完成一个任务就更新此表的状态**；每完成一个阶段，跑 `[DP §26]` 的收尾清单并写阶段小结。
 
 - 最后更新：2026-09-08
-- 当前阶段：**Phase 2 阶段验收已通过**；下一阶段 P3
+- 当前阶段：**Phase 2 验收遗留已修**；下一阶段 P3。P6 历史/重连不要另起炉灶，见 Phase 6「已提前落地」。
 
 ### 已确认的前置决策（2026-09-07）
 
@@ -198,7 +198,7 @@ hash 跨会话稳定，说明 §9.8 的缓存前缀约束真的守住了；95.4%
 | P5-4 | Merge & Dedup 阶段：source 归一、claim 合并、冲突汇总                                                      | P5-3, P3-10       | ⬜   | 跨 Agent 的重复来源被合并                   |
 | P5-5 | Fact Checker Agent（干净上下文，只看 claims + sources，可复检索）+ 校验事件流                              | P5-4              | ⬜   | 能识别注入的错误声明                        |
 | P5-6 | Gap Check + 最多 1 轮补充研究（`PLAN_UPDATED`）                                                            | P5-5              | ⬜   | 缺关键数据时能补一轮                        |
-| P5-7 | Report Writer v2：动态 `report_sections`、Executive Summary、Bull/Bear Case、Risks、数据限制章节、免责声明 | P5-6, P2-8        | ⬜   | 不同问题类型报告结构不同                    |
+| P5-7 | Report Writer v2：动态 `report_sections`、Executive Summary、Bull/Bear Case、Risks、数据限制章节、免责声明。**`claim_ids` 继续由 `attach_section_claims` 代码回填**，不要改回让模型抄 id | P5-6, P2-8        | ⬜   | 不同问题类型报告结构不同                        |
 | P5-8 | 全流程 workflow 测试（ScriptedModel）：正常 / 工具失败 / 超时 / 冲突 / 引用缺失 / schema 解析失败 6 条路径 | P5-7, P1-8        | ⬜   | 全部确定性通过                              |
 | P5-9 | 多模型冒烟：6 个 provider 各跑一次完整研究，结果写入 catalog `verified` 字段 + `[DP §9.4]` 降级验证        | P5-8, P1-4        | ⬜   | 已配 key 的 provider 全部跑通或明确标注限制 |
 
@@ -215,14 +215,26 @@ hash 跨会话稳定，说明 §9.8 的缓存前缀约束真的守住了；95.4%
 | P6-1  | Activity Panel 完善：tool 详情展开、耗时、缓存标记、自动折叠、失败保持展开                           | P5.5 | ⬜   | 符合 `[DP §13.2]`               |
 | P6-2  | Research Timeline / 阶段瀑布可视化                                                                   | P6-1 | ⬜   | 能看出各阶段耗时                |
 | P6-3  | 无障碍与状态播报（`aria-live`，不只依赖颜色）                                                        | P6-1 | ⬜   | 键盘可完整操作                  |
-| P6-4  | History 列表页 + 过滤（类型/模型/状态）+ 分页                                                        | P5.5 | ⬜   | 能翻看历史研究                  |
-| P6-5  | Session 详情页与实时页**复用同一组件**（事件源切换为 DB 回放）`[DP §14.3]`                           | P6-4 | ⬜   | 两种视图渲染一致                |
-| P6-6  | `GET /api/research/{id}/events?after={seq}` 重连回放（偿还 D4）                                      | P6-5 | ⬜   | 刷新页面能续上进行中的研究      |
+| P6-4  | History 列表页 + 过滤（类型/模型/状态）+ 分页。点进一条走已有 `/?session={id}` 回放，**不要**另写一套从 `sources` 表拼 UI 的路径 | P5.5 | ⬜   | 能翻看历史研究                  |
+| P6-5  | Session 详情页与实时页**复用 `ResearchConsole`**（事件源切到 DB 回放）`[DP §14.3]`。回放入口已在：`GET /api/research/{id}/events` + `reduceAll` | P6-4 | ⬜   | 两种视图渲染一致                |
+| P6-6  | 进行中会话的 **live SSE 续订**（偿还 D4）。`GET .../events?after={seq}` 与首页快照回放已有；刷新后若 session 仍在跑，要从 `lastSeq` 接着收新事件，而不是只播已落库的快照 | P6-5 | ⬜   | 刷新页面能续上进行中的研究      |
 | P6-7  | 取消研究（前端按钮 → Next → Python cancel → 状态落库）                                               | P6-6 | ⬜   | 可中断长任务                    |
 | P6-8  | Settings 页：默认模型、按角色指定模型、执行上限、报告偏好                                            | P5.5 | ⬜   | 设置持久化并生效                |
 | P6-9  | `/debug` 可观察性页：阶段瀑布 / Agent 排行 / Tool 失败率 / 模型成本对比 / Provider 配额 `[DP §20.2]` | P5.5 | ⬜   | 能回答 `[DP §20.2]` 的 4 个问题 |
 | P6-10 | 成本与 token 实时显示 + 单 session 成本上限告警                                                      | P6-9 | ⬜   | 超限发 WARNING 事件             |
 | P6-11 | Playwright E2E（打桩 Python 服务，跑完整 UI 流程）                                                   | P6-5 | ⬜   | CI 中稳定通过                   |
+
+### 已提前落地、P6 / P5 不要重做（2026-09-08）
+
+Phase 2 真实验收后补的刷新恢复，把历史会话的数据面先做了一截。后面接 History / 重连 / Writer v2 时走这些接口，不要另起炉灶。
+
+| 已有 | 给谁用 | 还缺（仍按原阶段做） |
+| --- | --- | --- |
+| `GET /api/research/{id}/events`（已支持 `?after={seq}`） | P6-5 详情回放、P6-6 增量起点 | 进行中会话的 **live SSE 续订**：刷新后目前只看到已 flush 的快照，不会继续收新事件。这才是 D4 |
+| 首页 `?session=` + `ResearchConsole` 里 `store.reset()` 后逐条 `apply` | P6-4 点进一条历史、P6-5 复用组件 | 独立 History 路由；列表页的过滤/分页；进行中状态不要画成已结束 |
+| `projectArtifacts`：`source_found` / `report_completed` → `sources` / `claims` / `claim_sources` / `research_reports` | P6-4 列表「来源数」、P6-9 `/debug` 聚合 | UI **不要**改成只读这几张表来渲染报告。事件回放才是与实时页一致的真源；投影给查询 |
+| `attach_section_claims` 按正文 `[n]` 回填 `section.claim_ids` | P2-10 章节徽标、P5-7 Writer v2 | 改 `report_writer.md` 时继续让模型输出空 `claim_ids` |
+| `web_fetch` 对 DNS `getaddrinfo` 加 5s `wait_for`；Web Agent prompt 禁止对失败 URL 重试 | P3/P4 若复用 `WebFetcher` 自动带上 | 任务级 120s 超时仍在；这不是硬配额，只是失败后别空转 |
 
 ---
 
@@ -472,12 +484,12 @@ Agent / Tool 只依赖 `SearchProvider` 协议，Tavily 是第一个实现。换
 
 **通过的验收句**：真实网页来源、可点击 `[n]`、事实与分析在 claims 里分开了。Crypto 三个任务 0ms 空 finding 是 P3 未做，报告写进了「数据限制」，符合预期。
 
-**本次暴露、不挡验收的问题**（留给后续修，不重跑这次会话）：
+**本次暴露、不挡验收的问题**（2026-09-08 已修，不重跑那次会话）：
 
-1. **Writer 没填 `section.claim_ids`**。章节标题旁的认知类型徽标因此没亮——前端只按 `claim_ids` 取 claims，空数组就等于没徽标。正文里模型自己写了「分析：」前缀，事件里类型是对的，但徽标链路没接上。应改成代码回填，不要让 LLM 抄 claim id。
-2. **5 任务里 1 个 Web Research 超时**（`task_timeout` 120s）。Agent 对 SSRF 拦下的 URL 调了 `web_fetch`（`blocked`），任务没在失败后收束。另一路 Web Research 1:04 产出 15 条陈述 / 13 来源，报告仍写完。
-3. **开发态 hydration 告警**（`Button`）。Next overlay 挡住了第一次点击「开始研究」，`requestSubmit()` 仍能提交。生产 build 未必复现，但首页不该弹这个。
-4. **`sources` / `claims` 表仍是空的**。来源和陈述只在事件流与报告 JSON 里；刷新页面会丢 Source Panel。落库是 P6 历史会话的事，本次按事件流验收。
+1. **Writer 没填 `section.claim_ids`** → `attach_section_claims` 按正文 `[n]` 与 claim 原文回填，覆盖模型抄的 id。P5-7 改 Writer 时保持这条，见上表。
+2. **Web Research 对 SSRF 拦下的 URL 烧满 120s** → `web_fetch` DNS 5s 超时；prompt 要求失败 URL 写入 `data_gaps`、不要重试同一地址。
+3. **开发态 hydration 告警挡住第一次「开始研究」** → `useTicker` 在 idle 时与 server snapshot 一样返回 0。
+4. **`sources` / `claims` 表是空的，刷新丢 Source Panel** → BFF 投影进表；`GET /api/research/{id}/events` + 首页 `?session=` 回放。P6 历史/重连的配合面见 Phase 6「已提前落地」。
 
 ---
 
@@ -490,7 +502,7 @@ Agent / Tool 只依赖 `SearchProvider` 协议，Tavily 是第一个实现。换
 | D1  | 无用户系统                                                                                                                                                                                  | 按需                               | ⬜   |
 | D2  | SQLite 无备份                                                                                                                                                                               | P8-3                               | ⬜   |
 | D3  | 进程重启丢失进行中任务                                                                                                                                                                      | P8-7                               | ⬜   |
-| D4  | 断线不可恢复进行中的 run                                                                                                                                                                    | P6-6                               | ⬜   |
+| D4  | 断线不可恢复**进行中的** run。已完成会话刷新后可回放（`GET .../events` + `?session=`）；缺的是 live SSE 续订 | P6-6                               | ⬜   |
 | D5  | 缓存无主动失效                                                                                                                                                                              | 按需                               | ⬜   |
 | D6  | Fact Check 非全量                                                                                                                                                                           | 按需                               | ⬜   |
 | D7  | `data_gaps` 依赖 LLM 自觉                                                                                                                                                                   | P7 持续监控                        | ⬜   |
@@ -502,6 +514,10 @@ Agent / Tool 只依赖 `SearchProvider` 协议，Tavily 是第一个实现。换
 | D13 | **TypeScript 固定在 6.x**：TS 7 下 typescript-eslint 崩溃（[typescript-eslint#10940](https://github.com/typescript-eslint/typescript-eslint/issues/10940)）。代价仅是编译慢一些，功能无影响 | typescript-eslint 支持 TS 7 后升级 | ⬜   |
 | D14 | ~~CI 仅验证了本地等价命令，GitHub Actions 未实际跑过~~ → 首次远端运行暴露两个问题，均已修（见下）                                                                                           | 已偿还（2026-09-07）               | ✅   |
 | D15 | ~~shadcn/ui 未初始化~~ → P1-12 按其"复制式、非依赖"的定位手写了所需原语，未跑 `init`（见下）                                                                                                | 已偿还（2026-09-07）               | ✅   |
+| D16 | ~~Writer 不填 `section.claim_ids`，章节徽标不亮~~ → 代码按 `[n]` 回填，不让 LLM 抄 id                                                                                                       | 已偿还（2026-09-08）               | ✅   |
+| D17 | ~~`web_fetch` DNS 无超时，Web Agent 对失败 URL 空转到任务超时~~ → resolver 5s 超时 + prompt 禁止重试同一失败地址                                                                             | 已偿还（2026-09-08）               | ✅   |
+| D18 | ~~开发态 `useTicker` hydration 不一致，挡住第一次「开始研究」~~ → idle 与 server snapshot 同为 0                                                                                           | 已偿还（2026-09-08）               | ✅   |
+| D19 | ~~`sources` / `claims` 只在事件流里，刷新丢 Source Panel~~ → BFF 投影 + `GET .../events` 回放。进行中会话续订仍是 D4/P6-6                                                                  | 已偿还（2026-09-08）               | ✅   |
 
 ### D14 偿还记录 — GitHub Actions 首次远端运行（2026-09-07）
 

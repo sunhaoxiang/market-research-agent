@@ -16,7 +16,12 @@ import type { ResearchEvent } from "@mra/shared";
 import type { Db } from "@/db/client";
 import { ToolCallCorrelator, toAgentRun } from "@/db/queries/metrics";
 import { appendEventsWithMetrics } from "@/db/queries/sessions";
-import type { NewAgentRun, NewResearchEvent, NewToolCall } from "@/db/schema";
+import type {
+  NewAgentRun,
+  NewResearchEvent,
+  NewToolCall,
+  ResearchEvent as EventRow,
+} from "@/db/schema";
 import { newId } from "@/lib/ids";
 
 export const FLUSH_EVERY_EVENTS = 20;
@@ -45,6 +50,18 @@ export function toRow(sessionId: string, event: ResearchEvent): NewResearchEvent
     createdAt: Date.parse(event.ts),
     ...denormalize(event),
   };
+}
+
+/** 把落库行还原成前端 reducer 认识的事件信封。 */
+export function toClientEvent(row: EventRow): ResearchEvent {
+  return {
+    seq: row.seq,
+    session_id: row.sessionId,
+    ts: new Date(row.createdAt).toISOString(),
+    message: row.message,
+    type: row.type,
+    payload: row.payload ?? null,
+  } as ResearchEvent;
 }
 
 /**

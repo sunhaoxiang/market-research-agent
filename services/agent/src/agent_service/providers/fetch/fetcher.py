@@ -37,6 +37,7 @@ type Resolver = Callable[[str], Awaitable[list[str]]]
 _USER_AGENT = "market-research-agent/0.0.1 (+https://github.com/sunhaoxiang/market-research-agent)"
 _MAX_BYTES = 2 * 1024 * 1024
 _MAX_REDIRECTS = 5
+_DNS_TIMEOUT_S = 5.0
 _BINARY_PREFIXES = ("image/", "video/", "audio/")
 _BINARY_TYPES = frozenset(
     {
@@ -77,11 +78,13 @@ class WebFetcher:
         resolver: Resolver | None = None,
         max_bytes: int = _MAX_BYTES,
         max_redirects: int = _MAX_REDIRECTS,
+        dns_timeout_s: float = _DNS_TIMEOUT_S,
     ) -> None:
         self.runtime = runtime
         self.name = "web_fetch"
         self._max_bytes = max_bytes
         self._max_redirects = max_redirects
+        self._dns_timeout_s = dns_timeout_s
         self._resolver = resolver or _default_resolve
         profile = profile_for(self.name)
         self._limiter = runtime.limiter(self.name, profile)
@@ -155,7 +158,15 @@ class WebFetcher:
             ips = literal_ips(host)
             if ips is None:
                 try:
-                    ips = await self._resolver(host)
+                    ips = await asyncio.wait_for(self._resolver(host), timeout=self._dns_timeout_s)
+                except TimeoutError as exc:
+                    raise ProviderError(
+                        ToolErrorCode.TIMEOUT,
+                        "DNS 解析超时",
+                        retryable=True,
+                        provider=self.name,
+                        endpoint=current,
+                    ) from exc
                 except OSError as exc:
                     raise ProviderError(
                         ToolErrorCode.NOT_FOUND,

@@ -14,6 +14,7 @@
 import type { ResearchEvent } from "@mra/shared";
 
 import { getDb } from "@/db/client";
+import { projectArtifacts } from "@/db/queries/artifacts";
 import { EventBuffer } from "@/db/queries/events";
 import { createSession, patchSession, updateSessionStatus } from "@/db/queries/sessions";
 import type { QuestionType, SessionStatus, TokenUsage } from "@/db/schema";
@@ -152,6 +153,12 @@ function frame(event: ResearchEvent): string {
 
 /** 事件驱动 session 的状态机与元数据（§11.1：Session 生命周期归 Next 管）。 */
 function applyStatus(db: ReturnType<typeof getDb>, sessionId: string, event: ResearchEvent): void {
+  try {
+    projectArtifacts(db, sessionId, event);
+  } catch (error) {
+    console.error("[research] 投影来源/陈述失败", { sessionId, type: event.type, error });
+  }
+
   const payload = (event.payload ?? {}) as Record<string, unknown>;
 
   switch (event.type) {

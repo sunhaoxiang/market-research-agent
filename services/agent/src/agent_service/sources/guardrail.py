@@ -15,12 +15,10 @@ from urllib.parse import urlsplit
 from agent_service.schemas.claims import Claim
 from agent_service.schemas.report import ResearchReport
 from agent_service.schemas.sources import Source
-from agent_service.sources.citations import bibliography
+from agent_service.sources.citations import CITATION_RE, bibliography, extract_citation_numbers
 
 CITATION_WARNING_CODE = "citation.integrity"
 
-# `[n]` 且后面不是 markdown 链接的 `(url)`
-_CITATION_RE = re.compile(r"\[(\d+)\](?!\()")
 _ADVICE_RE = re.compile(
     r"(建议|应当|应该)(立即)?(买入|卖出|加仓|减仓|建仓|清仓)(?!价)"
     r"|强烈(买入|卖出)(?!价)"
@@ -32,16 +30,6 @@ _ADVICE_RE = re.compile(
 class CitationIssue:
     code: str
     message: str
-
-
-def extract_citation_numbers(text: str) -> tuple[int, ...]:
-    """按出现顺序去重，保留正文里的 `[n]`。"""
-    seen: list[int] = []
-    for match in _CITATION_RE.finditer(text):
-        number = int(match.group(1))
-        if number not in seen:
-            seen.append(number)
-    return tuple(seen)
 
 
 def check_report(
@@ -129,7 +117,7 @@ def strip_unknown_citations(text: str, valid: set[int]) -> str:
         number = int(match.group(1))
         return match.group(0) if number in valid else ""
 
-    return _CITATION_RE.sub(keep, text)
+    return CITATION_RE.sub(keep, text)
 
 
 def apply_degradation(

@@ -25,6 +25,7 @@ vi.mock("@/lib/agent-client", () => ({ startResearch }));
 vi.mock("@/db/client", () => ({ getDb }));
 
 const { POST } = await import("@/app/api/research/route");
+const { GET } = await import("@/app/api/research/[id]/events/route");
 
 type Db = ReturnType<typeof drizzle<typeof schema>>;
 
@@ -429,5 +430,115 @@ describe("上游故障", () => {
     expect(sessions()[0]!.error?.code).toBe("UPSTREAM_STREAM_BROKEN");
     // 断裂前收到的事件不能丢
     expect(events()).toHaveLength(1);
+  });
+});
+
+describe("来源与陈述投影", () => {
+  it("SOURCE_FOUND / REPORT_COMPLETED 写入 sources 与 claims", async () => {
+    const source = {
+      id: "src-1",
+      ref: "s1",
+      url: "https://theblock.co/a",
+      url_canonical: "https://theblock.co/a",
+      title: "Fee share",
+      domain: "theblock.co",
+      source_type: "news",
+      provider: "tavily",
+      reliability: "secondary",
+      published_at: null,
+      retrieved_at: "2026-09-08T12:00:00.000Z",
+      excerpt: "holders",
+      citation_index: null,
+      http_status: 200,
+    };
+    startResearch.mockResolvedValue(
+      upstreamOf([
+        event(1, "session_started", { question: "Q", model_id: "m" }),
+        event(2, "source_found", { source }),
+        event(3, "report_completed", {
+          report: {
+            title: "近况",
+            executive_summary: "讨论。[1]",
+            sections: [{ id: "Overview", title: "概述", markdown: "讨论。[1]", claim_ids: ["c1"] }],
+            data_gaps: [],
+          },
+          sources: [{ ...source, citation_index: 1 }],
+          claims: [
+            {
+              id: "c1",
+              text: "讨论。",
+              epistemic_type: "source_backed_fact",
+              confidence: "medium",
+              source_ids: ["src-1"],
+              as_of: null,
+              task_id: "t1",
+              agent: "web_research",
+              verification: "unverified",
+              verification_note: null,
+              citation_index: null,
+            },
+          ],
+          citation_count: 1,
+        }),
+        event(4, "session_completed", { duration_ms: 1, cost_usd: 0, usage: {} }),
+      ]),
+    );
+
+    await drain(await ask({ question: "Q" }));
+
+    expect(db.select().from(schema.sources).all()).toMatchObject([
+      { id: "src-1", citationIndex: 1, urlCanonical: "https://theblock.co/a" },
+    ]);
+    expect(db.select().from(schema.claims).all()).toMatchObject([{ id: "c1" }]);
+    expect(db.select().from(schema.claimSources).all()).toEqual([
+      { claimId: "c1", sourceId: "src-1" },
+    ]);
+  });
+});
+
+describe("事件回放 GET /api/research/{id}/events", () => {
+  it("把已落库事件还原成前端信封", async () => {
+    startResearch.mockResolvedValue(upstreamOf(HAPPY_PATH));
+    const posted = await ask({ question: "Q" });
+    const sessionId = posted.headers.get("X-Session-Id")!;
+    await drain(posted);
+
+    const response = await GET(new Request(`http://localhost/api/research/${sessionId}/events`), {
+      params: Promise.resolve({ id: sessionId }),
+    });
+    const body = (await response.json()) as { events: Array<{ type: string; seq: number }> };
+
+    expect(response.status).toBe(200);
+    expect(body.events.map((item) => item.type)).toEqual([
+      "session_started",
+      "stage_changed",
+      "intent_classified",
+      "plan_created",
+      "agent_started",
+      "agent_run_metrics",
+      "session_completed",
+    ]);
+  });
+
+  it("after=seq 只返回后续事件（P6-6 增量入口）", async () => {
+    startResearch.mockResolvedValue(upstreamOf(HAPPY_PATH));
+    const posted = await ask({ question: "Q" });
+    const sessionId = posted.headers.get("X-Session-Id")!;
+    await drain(posted);
+
+    const response = await GET(
+      new Request(`http://localhost/api/research/${sessionId}/events?after=3`),
+      { params: Promise.resolve({ id: sessionId }) },
+    );
+    const body = (await response.json()) as { events: Array<{ seq: number }> };
+
+    expect(body.events.map((item) => item.seq)).toEqual([4, 5, 6, 7]);
+  });
+
+  it("未知 session 返回 404", async () => {
+    const response = await GET(new Request("http://localhost/api/research/missing/events"), {
+      params: Promise.resolve({ id: "missing" }),
+    });
+    expect(response.status).toBe(404);
   });
 });

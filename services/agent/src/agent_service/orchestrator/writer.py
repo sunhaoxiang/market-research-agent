@@ -27,7 +27,11 @@ from agent_service.schemas.events import (
     WarningEvent,
     WarningPayload,
 )
-from agent_service.sources.citations import assign_citation_indices, bibliography
+from agent_service.sources.citations import (
+    assign_citation_indices,
+    attach_section_claims,
+    bibliography,
+)
 from agent_service.sources.guardrail import (
     CITATION_WARNING_CODE,
     apply_degradation,
@@ -103,6 +107,7 @@ async def write_report(
         report = apply_degradation(report, numbered, leftover)
         _warn_citations(state, leftover)
 
+    report = attach_section_claims(report, numbered, claims)
     state.report = report
     _record(state, writer, started, usage=usage, at=moment)
     state.bus.emit(

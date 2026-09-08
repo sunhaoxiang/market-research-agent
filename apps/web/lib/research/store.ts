@@ -89,8 +89,9 @@ export function useTicker(active: boolean): number {
 
   return useSyncExternalStore(
     subscribe,
-    () => Math.floor(Date.now() / 1000) * 1000,
-    // 服务端渲染时没有"现在"可言，给 0 让耗时显示为 --
+    // idle 时必须和 server snapshot 一样返回 0：否则首屏 hydration 对不上，
+    // Next overlay 会挡住第一次点「开始研究」（看起来像 Button 的错）
+    () => (active ? Math.floor(Date.now() / 1000) * 1000 : 0),
     () => 0,
   );
 }

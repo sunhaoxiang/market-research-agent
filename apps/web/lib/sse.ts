@@ -128,6 +128,11 @@ export type StreamResearchInput = {
   modelId?: string;
 };
 
+export type StreamResearchOptions = {
+  signal?: AbortSignal;
+  onSessionId?: (sessionId: string) => void;
+};
+
 /**
  * 浏览器侧入口：发起研究并逐个产出事件。
  *
@@ -136,7 +141,7 @@ export type StreamResearchInput = {
  */
 export async function* streamResearch(
   input: StreamResearchInput,
-  options: { signal?: AbortSignal } = {},
+  options: StreamResearchOptions = {},
 ): AsyncGenerator<ResearchEvent> {
   const response = await fetch("/api/research", {
     method: "POST",
@@ -151,6 +156,9 @@ export async function* streamResearch(
     const detail: unknown = await response.json().catch(() => null);
     throw new ResearchStreamError(response.status, detail);
   }
+
+  const sessionId = response.headers.get("X-Session-Id");
+  if (sessionId) options.onSessionId?.(sessionId);
 
   yield* toResearchEvents(parseFrames(response.body));
 }
