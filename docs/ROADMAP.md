@@ -6,7 +6,7 @@
 > **每完成一个任务就更新此表的状态**；每完成一个阶段，跑 `[DP §26]` 的收尾清单并写阶段小结。
 
 - 最后更新：2026-09-08
-- 当前阶段：**P5-3 已完成**；下一任务 P5-4。
+- 当前阶段：**P5-4 已完成**；下一任务 P5-5。
 
 ### 已确认的前置决策（2026-09-07）
 
@@ -195,7 +195,7 @@ hash 跨会话稳定，说明 §9.8 的缓存前缀约束真的守住了；95.4%
 | P5-1 | 意图分类层（词典/正则短路 + FAST 模型兜底）`[DP §25.1]`                                                    | P1-9              | ✅   | 常见问题不走 LLM 也能正确分类               |
 | P5-2 | Agents-as-Tools 装配：Manager 通过工具调用子 Agent，结果回编排层 `[DP 决策 B]`                             | P3-9, P4-10, P2-6 | ✅   | 单次研究可同时用到 crypto + web             |
 | P5-3 | 完整并行 fan-out：依赖分层 + `asyncio.gather` + 单任务超时 + 部分失败降级。**开工先带 D22**：超时 salvage 已拉到的 SEC 三表/季报要进对比表 `metrics` | P5-2              | ✅   | 1 个任务失败不影响整体出报告；salvage 数字能进对比表 |
-| P5-4 | Merge & Dedup 阶段：source 归一、claim 合并、冲突汇总                                                      | P5-3, P3-10       | ⬜   | 跨 Agent 的重复来源被合并                   |
+| P5-4 | Merge & Dedup 阶段：source 归一、claim 合并、冲突汇总                                                      | P5-3, P3-10       | ✅   | 跨 Agent 的重复来源被合并                   |
 | P5-5 | Fact Checker Agent（干净上下文，只看 claims + sources，可复检索）+ 校验事件流                              | P5-4              | ⬜   | 能识别注入的错误声明                        |
 | P5-6 | Gap Check + 最多 1 轮补充研究（`PLAN_UPDATED`）                                                            | P5-5              | ⬜   | 缺关键数据时能补一轮                        |
 | P5-7 | Report Writer v2：动态 `report_sections`、Executive Summary、Bull/Bear Case、Risks、数据限制章节、免责声明。**`claim_ids` 继续由 `attach_section_claims` 代码回填**，不要改回让模型抄 id | P5-6, P2-8        | ⬜   | 不同问题类型报告结构不同                        |
@@ -227,6 +227,14 @@ ticker 只匹配原文大写独立词，避免 `sol` / `meta` / `hype` 误伤。
 不要只改 `TASK_TIMEOUT_S`。数字对齐仍是代码的事，不让模型在 salvage 里补。执行器仍是：一层内并行、一层失败不影响其它任务、超时 finding 留给 Writer、会话照常出报告。`fact_checker` 仍占位（P5-5）。
 
 验收是 ScriptedModel / 替身 runner：三只股票一层 fan-out，一只超时 salvage 仍有营收，对比表三列都在；另一只任务直接失败时会话仍 `SESSION_COMPLETED`。不是真跑 DeepSeek，也没有重跑 Phase 4 四问。
+
+### P5-4 — Merge & Dedup ✅（2026-09-08）
+
+执行结束、撰写之前跑纯代码的步骤 5。会话内 `SourceRegistry` 在 tool 登记时已经按 canonical URL 去重（P2-7）；Merge 处理 findings 里带着的重复副本——两个 Agent 各自 `Source()` 同一篇文章（跟踪参数不同、id 不同）会收成一条，claim 的 `source_ids` 改指向幸存者，缺的 title / 更长摘录补上。
+
+字面重复的陈述（空白/大小写）折到先出现的那条，来源并集；FACT 有来源则升成 `source_backed_fact`。分析/推测不和事实对折。数值冲突检测仍是 P3-10 的 1% 相对差，**不取平均**，写进 `state.conflicts` 给 Writer。不进入 `checking` 阶段——那是 Fact Checker（P5-5）。
+
+验收：crypto + web 各带同一 TheBlock 链接的 Scripted 替身 runner，账本只剩一条来源；注入的 TVL 冲突仍发 `CONFLICT_DETECTED`。
 
 ### P5.5 — MVP 验收 ⬜
 
@@ -631,7 +639,7 @@ tool 只包已有 `get_market`，不另打 HTTP、不解析 JSON。`allocations`
 
 Merge 阶段的纯代码检测，不让 LLM 判断两个数字算不算冲突。同一指标（`name` + 标的 + 单位 + UTC 数据日）相对差超过 1% → `CONFLICT_DETECTED`，`values` 列出各源 `provider` 与原值，**不取平均**。不同日期是时间序列，不是冲突。
 
-Writer 的 user 消息带上冲突清单，prompt 要求并列写出；前端从事件归约出 `conflicts`，报告在摘要后用黄色警示条展示。Claim 合并与 Fact Checker 仍是 P5-4 / P5-5。
+Writer 的 user 消息带上冲突清单，prompt 要求并列写出；前端从事件归约出 `conflicts`，报告在摘要后用黄色警示条展示。Claim 合并见 P5-4；Fact Checker 仍是 P5-5。
 
 验收：注入 CoinGecko 12 亿 / DefiLlama 18 亿 TVL，事件与警示条都能检出，平均值不会出现。
 

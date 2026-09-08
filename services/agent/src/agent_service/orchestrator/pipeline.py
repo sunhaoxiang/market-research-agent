@@ -1,8 +1,9 @@
-"""研究会话全流程（§7.1，P1-10 / P2-8）。
+"""研究会话全流程（§7.1，P1-10 / P2-8 / P5-4）。
 
-当前覆盖 §7.1 的步骤 1-5 与步骤 8（意图/规划/校验/执行/数值冲突/撰写）。
-Source 按 url_canonical 去重已在执行中由 `SourceRegistry` 完成（P2-7）。
-步骤 5 的 claim 合并仍属 P5-4；本阶段只做多源同指标的数值冲突（P3-10）。
+当前覆盖 §7.1 的步骤 1-5 与步骤 8（意图/规划/校验/执行/Merge & Dedup/撰写）。
+步骤 5 在执行之后跑：按 url_canonical 合并跨 Agent 来源、折叠重复陈述、
+汇总数值冲突。会话内 SourceRegistry 仍在 tool 登记时去重（P2-7）；Merge
+负责 findings 里漏进来的重复副本。
 步骤 6-7、9（事实核查、补充研究、输出护栏）在后续阶段接入。
 `Stage` 枚举已经为 `checking` 留好位置。
 
@@ -23,9 +24,9 @@ from typing import TYPE_CHECKING
 import structlog
 
 from agent_service.models.structured_output import StructuredOutputError
-from agent_service.orchestrator.conflicts import record_metric_conflicts
 from agent_service.orchestrator.executor import execute_plan
 from agent_service.orchestrator.intent import Intent, IntentClassifier, classify_intent
+from agent_service.orchestrator.merge import merge_research
 from agent_service.orchestrator.plan_validation import PlanRejectedError
 from agent_service.orchestrator.planner import PlanningResult, create_plan
 from agent_service.orchestrator.state import AgentRun, ResearchState
@@ -171,7 +172,7 @@ async def _plan_and_execute(
         # 规划已经花掉的时间要从预算里扣掉，否则总耗时会超出 total_timeout_s
         deadline_s=state.remaining_s(limits.total_timeout_s),
     )
-    record_metric_conflicts(state)
+    merge_research(state)
 
     state.advance_to(Stage.WRITING)
     await write_report(state, writer, now=now)

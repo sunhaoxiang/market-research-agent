@@ -25,7 +25,16 @@ from agent_service.observability.event_bus import EventBus
 from agent_service.orchestrator.executor import TaskContext
 from agent_service.orchestrator.pipeline import run_research
 from agent_service.orchestrator.state import ResearchState
-from agent_service.schemas.common import AgentName, QuestionType, SourceType, Stage, TaskStatus
+from agent_service.schemas.claims import Claim
+from agent_service.schemas.common import (
+    AgentName,
+    ConfidenceLevel,
+    EpistemicType,
+    QuestionType,
+    SourceType,
+    Stage,
+    TaskStatus,
+)
 from agent_service.schemas.entities import MetricPoint
 from agent_service.schemas.events import (
     TERMINAL_EVENT_TYPES,
@@ -766,3 +775,88 @@ async def test_injected_metric_conflict_emits_conflict_detected() -> None:
         and _payload(event, StageChangedPayload).stage is Stage.WRITING
     )
     assert types.index(EventType.CONFLICT_DETECTED) < writing
+
+
+async def test_duplicate_sources_across_agents_are_merged() -> None:
+    """验收：跨 Agent 的重复来源被合并（P5-4）。"""
+    crypto_src = Source(
+        ref="s1",
+        url="https://www.theblock.co/hyperliquid-fee-share?utm_source=x",
+        url_canonical="https://theblock.co/hyperliquid-fee-share",
+        title=None,
+        domain="theblock.co",
+        source_type=SourceType.NEWS,
+        provider="tavily",
+        retrieved_at=_NOW,
+    )
+    web_src = Source(
+        ref="s1",
+        url="https://www.theblock.co/hyperliquid-fee-share/",
+        url_canonical="https://theblock.co/hyperliquid-fee-share",
+        title="Fee share",
+        domain="theblock.co",
+        source_type=SourceType.NEWS,
+        provider="tavily",
+        retrieved_at=_NOW,
+        excerpt="讨论手续费分成。",
+    )
+    text = "HYPE 正在讨论手续费分成。"
+
+    @dataclass
+    class OverlapRunner:
+        def model_id_for(self, agent: AgentName) -> str:
+            del agent
+            return "deepseek:deepseek-v4-flash"
+
+        async def run(self, context: TaskContext, state: ResearchState) -> ResearchFinding:
+            del state
+            if context.task.id == "t1":
+                return ResearchFinding(
+                    task_id="t1",
+                    agent=context.task.agent,
+                    summary="链上侧看到手续费分成讨论。",
+                    sources=[crypto_src],
+                    claims=[
+                        Claim(
+                            text=text,
+                            epistemic_type=EpistemicType.SOURCE_BACKED_FACT,
+                            confidence=ConfidenceLevel.MEDIUM,
+                            source_ids=[crypto_src.id],
+                        )
+                    ],
+                )
+            return ResearchFinding(
+                task_id=context.task.id,
+                agent=context.task.agent,
+                summary="网页侧也报道了手续费分成。",
+                sources=[web_src],
+                claims=[
+                    Claim(
+                        text=text,
+                        epistemic_type=EpistemicType.SOURCE_BACKED_FACT,
+                        confidence=ConfidenceLevel.HIGH,
+                        source_ids=[web_src.id],
+                    )
+                ],
+            )
+
+    outcome = await run_research(
+        "Hyperliquid 怎么样？",
+        planner=_planner(_plan_json()),
+        runner=OverlapRunner(),
+        writer=_writer(),
+        limits=_limits(),
+        bus=_bus(),
+        now=_NOW,
+    )
+
+    assert outcome.succeeded
+    catalog = outcome.state.source_registry.sources()
+    assert len(catalog) == 1
+    assert catalog[0].title == "Fee share"
+    survivor = catalog[0].id
+    by_task = {item.task_id: item for item in outcome.findings}
+    assert by_task["t1"].claims[0].source_ids == [survivor]
+    assert by_task["t1"].claims[0].confidence is ConfidenceLevel.HIGH
+    assert by_task["t2"].claims == []
+    assert {item.id for finding in outcome.findings for item in finding.sources} == {survivor}
