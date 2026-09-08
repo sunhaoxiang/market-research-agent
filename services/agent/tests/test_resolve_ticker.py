@@ -11,6 +11,8 @@ from datetime import UTC, datetime
 from agent_service.providers.errors import ProviderError
 from agent_service.providers.sec import (
     CompanyFacts,
+    CompanySubmissions,
+    FilingDocument,
     TickerDirectory,
     TickerEntry,
     company_page_url,
@@ -83,6 +85,16 @@ class FakeSecEdgar:
     async def get_company_facts(self, cik: str) -> CompanyFacts:
         del cik
         raise AssertionError("resolve_ticker 不应拉 companyfacts")
+
+    async def get_submissions(self, cik: str) -> CompanySubmissions:
+        del cik
+        raise AssertionError("resolve_ticker 不应拉 submissions")
+
+    async def get_filing_document(
+        self, *, cik: str, accession: str, primary_document: str
+    ) -> FilingDocument:
+        del cik, accession, primary_document
+        raise AssertionError("resolve_ticker 不应拉 filing HTML")
 
 
 def test_nvda_ticker_maps_to_cik() -> None:

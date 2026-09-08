@@ -31,11 +31,15 @@ from agent_service.providers.onchain import PerpMarketSnapshot
 from agent_service.providers.search import SearchHit, SearchPage
 from agent_service.providers.sec import (
     CompanyFacts,
+    CompanySubmissions,
     FactConcept,
     FactPoint,
+    FilingDocument,
+    FilingRef,
     TickerDirectory,
     TickerEntry,
     company_page_url,
+    filing_document_url,
 )
 from agent_service.schemas.tools import DataProvenance, ToolErrorCode
 
@@ -309,6 +313,103 @@ class _FakeSecEdgar:
             provenance=DataProvenance(
                 provider="sec_edgar",
                 endpoint="/api/xbrl/companyfacts",
+                retrieved_at=datetime(2026, 9, 8, tzinfo=UTC),
+            ),
+        )
+
+    async def get_submissions(self, cik: str) -> CompanySubmissions:
+        del cik
+        ten_k = "0001045810-25-000031"
+        ten_q = "0001045810-25-000012"
+        eight_k = "0001045810-25-000040"
+        now = datetime(2026, 9, 8, tzinfo=UTC)
+        prov = DataProvenance(
+            provider="sec_edgar",
+            endpoint="/submissions",
+            retrieved_at=now,
+        )
+        return CompanySubmissions(
+            cik="0001045810",
+            name="NVIDIA CORP",
+            tickers=("NVDA",),
+            exchanges=("Nasdaq",),
+            sic="3674",
+            sic_description=None,
+            fiscal_year_end="0126",
+            state_of_incorporation="DE",
+            filings=(
+                FilingRef(
+                    accession=ten_k,
+                    form="10-K",
+                    filed=date(2025, 2, 26),
+                    report_date=date(2025, 1, 26),
+                    accepted=None,
+                    primary_document="nvda-20250126.htm",
+                    description="10-K",
+                    is_xbrl=True,
+                    url=filing_document_url(
+                        cik="1045810",
+                        accession=ten_k,
+                        primary_document="nvda-20250126.htm",
+                    ),
+                ),
+                FilingRef(
+                    accession=ten_q,
+                    form="10-Q",
+                    filed=date(2025, 5, 28),
+                    report_date=date(2025, 4, 27),
+                    accepted=None,
+                    primary_document="nvda-20250427.htm",
+                    description="10-Q",
+                    is_xbrl=True,
+                    url=filing_document_url(
+                        cik="1045810",
+                        accession=ten_q,
+                        primary_document="nvda-20250427.htm",
+                    ),
+                ),
+                FilingRef(
+                    accession=eight_k,
+                    form="8-K",
+                    filed=date(2025, 8, 27),
+                    report_date=date(2025, 8, 27),
+                    accepted=None,
+                    primary_document="nvda-8k.htm",
+                    description="8-K",
+                    is_xbrl=False,
+                    url=filing_document_url(
+                        cik="1045810",
+                        accession=eight_k,
+                        primary_document="nvda-8k.htm",
+                    ),
+                ),
+            ),
+            url=company_page_url("1045810"),
+            provenance=prov,
+        )
+
+    async def get_filing_document(
+        self, *, cik: str, accession: str, primary_document: str
+    ) -> FilingDocument:
+        url = filing_document_url(cik=cik, accession=accession, primary_document=primary_document)
+        return FilingDocument(
+            cik="0001045810",
+            accession=accession,
+            primary_document=primary_document,
+            html=(
+                "<html><body>"
+                "<div>ITEM 1A. RISK FACTORS</div>"
+                "<p>Competition may harm our business.</p>"
+                "<div>ITEM 7. MANAGEMENT'S DISCUSSION AND ANALYSIS</div>"
+                "<p>Revenue was $130.5 billion in fiscal 2025.</p>"
+                "<div>ITEM 8. FINANCIAL STATEMENTS</div>"
+                "<p>See the notes.</p>"
+                "</body></html>"
+            ),
+            url=url,
+            provenance=DataProvenance(
+                provider="sec_edgar",
+                endpoint=f"/archives/{accession}",
                 retrieved_at=datetime(2026, 9, 8, tzinfo=UTC),
             ),
         )
@@ -720,6 +821,57 @@ def test_invoke_valuation_history(client: TestClient) -> None:
     assert body["data"]["pe"] == 30.0
     assert body["data"]["pe_percentile"] == pytest.approx(50.0)
     assert len(body["data"]["points"]) == 5
+
+
+def test_invoke_list_sec_filings(client: TestClient) -> None:
+    response = client.post(
+        "/v1/tools/list_sec_filings/invoke",
+        json={"arguments": {"ticker": "NVDA"}},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["data"]["cik"] == "0001045810"
+    assert body["data"]["filings"][0]["form"] == "10-K"
+    assert body["data"]["filings"][0]["accession"] == "0001045810-25-000031"
+
+
+def test_invoke_filing_section(client: TestClient) -> None:
+    response = client.post(
+        "/v1/tools/get_filing_section/invoke",
+        json={"arguments": {"accession": "0001045810-25-000031", "section": "1A"}},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["data"]["section"] == "1A"
+    assert "Competition" in body["data"]["text"]
+    assert "ITEM 7" not in body["data"]["text"]
+
+
+def test_invoke_xbrl_facts(client: TestClient) -> None:
+    response = client.post(
+        "/v1/tools/get_xbrl_facts/invoke",
+        json={"arguments": {"ticker": "NVDA", "concepts": ["Revenues"]}},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    latest = body["data"]["concepts"][0]["latest"]
+    assert latest["value"] == 46_743_000_000.0
+    assert latest["form"] == "10-Q"
+
+
+def test_invoke_earnings_summary(client: TestClient) -> None:
+    response = client.post(
+        "/v1/tools/get_earnings_summary/invoke",
+        json={"arguments": {"ticker": "NVDA"}},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["data"]["revenue"] == 46_743_000_000.0
+    assert body["data"]["latest_8k"]["form"] == "8-K"
 
 
 def test_invoke_get_tvl(client: TestClient) -> None:

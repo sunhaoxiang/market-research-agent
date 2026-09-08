@@ -9,8 +9,9 @@
 - `get_ticker_directory` → **P4-3** `resolve_ticker`（本地缓存 `company_tickers.json`）
 - `get_submissions` → **P4-8** `list_sec_filings`（以及归档 URL）
 - `get_company_facts` → **P4-5** 三表 XBRL / **P4-8** `get_xbrl_facts`
+- `get_filing_document` → **P4-8** `get_filing_section`（HTML 按 accession 永久缓存）
 
-`get_submissions` / `get_company_facts` 只收 CIK。10-K 章节正文是 P4-8 / P4-9。
+`get_submissions` / `get_company_facts` / `get_filing_document` 只收 CIK。大文件分节是 P4-9。
 """
 
 from __future__ import annotations
@@ -153,6 +154,16 @@ class CompanyFacts:
 
 
 @dataclass(frozen=True, slots=True)
+class FilingDocument:
+    cik: str
+    accession: str
+    primary_document: str
+    html: str
+    url: str
+    provenance: DataProvenance
+
+
+@dataclass(frozen=True, slots=True)
 class TickerEntry:
     cik: str
     ticker: str
@@ -203,6 +214,51 @@ class SecEdgarProvider(BaseProvider):
         response = await self._get(path, CacheTTL.PROFILE)
         return _parse_facts(response, cik10=cik10)
 
+    async def get_filing_document(
+        self, *, cik: str, accession: str, primary_document: str
+    ) -> FilingDocument:
+        cik10 = padded_cik(cik, endpoint="/archives")
+        doc = primary_document.strip()
+        accn = accession.strip()
+        if not accn or not doc:
+            raise ProviderError(
+                ToolErrorCode.INVALID_INPUT,
+                "accession 与 primary_document 不能为空",
+                provider=_PROVIDER,
+                endpoint="/archives",
+            )
+        url = filing_document_url(cik=cik10, accession=accn, primary_document=doc)
+        endpoint = f"/archives/{accn.replace('-', '')}/{doc}"
+        try:
+            response = await self.request(
+                ProviderRequest(
+                    endpoint=endpoint,
+                    path=url,
+                    ttl=CacheTTL.PERMANENT,
+                    as_text=True,
+                    headers={"Accept": "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8"},
+                )
+            )
+        except ProviderError as exc:
+            raise _map_http_error(exc, endpoint=endpoint) from exc
+        html = response.data if isinstance(response.data, str) else ""
+        if not html.strip():
+            raise ProviderError(
+                ToolErrorCode.NOT_FOUND,
+                f"SEC 没有这份文档：{accn}",
+                retryable=False,
+                provider=_PROVIDER,
+                endpoint=endpoint,
+            )
+        return FilingDocument(
+            cik=cik10,
+            accession=accn,
+            primary_document=doc,
+            html=html,
+            url=url,
+            provenance=response.provenance(),
+        )
+
     async def get_ticker_directory(self) -> TickerDirectory:
         response = await self._get(_TICKERS_ENDPOINT, CacheTTL.PROFILE, path=_TICKERS_URL)
         return _parse_tickers(response)
@@ -220,9 +276,10 @@ class SecEdgarProvider(BaseProvider):
 
 def _map_http_error(exc: ProviderError, *, endpoint: str) -> ProviderError:
     if exc.status_code == httpx.codes.NOT_FOUND:
+        missing = "SEC 没有这份文档" if endpoint.startswith("/archives") else "SEC 没有这个 CIK"
         return ProviderError(
             ToolErrorCode.NOT_FOUND,
-            "SEC 没有这个 CIK",
+            missing,
             retryable=False,
             status_code=exc.status_code,
             provider=_PROVIDER,

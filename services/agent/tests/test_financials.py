@@ -21,8 +21,10 @@ from agent_service.providers.equity import (
 )
 from agent_service.providers.sec import (
     CompanyFacts,
+    CompanySubmissions,
     FactConcept,
     FactPoint,
+    FilingDocument,
     TickerDirectory,
     TickerEntry,
     company_page_url,
@@ -119,6 +121,16 @@ class FakeSecEdgar:
     async def get_company_facts(self, cik: str) -> CompanyFacts:
         self.facts_calls.append(cik)
         return self.facts
+
+    async def get_submissions(self, cik: str) -> CompanySubmissions:
+        del cik
+        raise AssertionError("三表不应拉 submissions")
+
+    async def get_filing_document(
+        self, *, cik: str, accession: str, primary_document: str
+    ) -> FilingDocument:
+        del cik, accession, primary_document
+        raise AssertionError("三表不应拉 filing HTML")
 
 
 class FakeFmp:

@@ -36,7 +36,12 @@ if TYPE_CHECKING:
     from agent_service.providers.onchain import PerpMarketSnapshot
     from agent_service.providers.runtime import Clock
     from agent_service.providers.search import SearchProvider
-    from agent_service.providers.sec import CompanyFacts, TickerDirectory
+    from agent_service.providers.sec import (
+        CompanyFacts,
+        CompanySubmissions,
+        FilingDocument,
+        TickerDirectory,
+    )
     from agent_service.tools.web.collector import SourceCollector
 
 
@@ -75,11 +80,17 @@ class HyperliquidClient(Protocol):
 
 
 class SecEdgarClient(Protocol):
-    """SEC 在 ToolDeps 上的面。P4-3 用 ticker 目录；P4-5 用 companyfacts。"""
+    """SEC 在 ToolDeps 上的面。P4-3 ticker 目录；P4-5 companyfacts；P4-8 submissions / HTML。"""
 
     async def get_ticker_directory(self) -> TickerDirectory: ...
 
     async def get_company_facts(self, cik: str) -> CompanyFacts: ...
+
+    async def get_submissions(self, cik: str) -> CompanySubmissions: ...
+
+    async def get_filing_document(
+        self, *, cik: str, accession: str, primary_document: str
+    ) -> FilingDocument: ...
 
 
 class FmpClient(Protocol):

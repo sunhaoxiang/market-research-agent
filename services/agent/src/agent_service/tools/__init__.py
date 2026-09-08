@@ -33,6 +33,13 @@ from agent_service.tools.onchain.bindings import (
     get_whale_activity,
 )
 from agent_service.tools.registry import HANDLERS, invoke_tool
+from agent_service.tools.sec.bindings import (
+    SEC_TOOLS,
+    get_earnings_summary,
+    get_filing_section,
+    get_xbrl_facts,
+    list_sec_filings,
+)
 from agent_service.tools.stocks.bindings import (
     STOCK_TOOLS,
     compare_to_index,
@@ -51,6 +58,7 @@ __all__ = [
     "FINANCIALS_TOOLS",
     "HANDLERS",
     "ONCHAIN_TOOLS",
+    "SEC_TOOLS",
     "STOCK_TOOLS",
     "SYSTEM_TOOLS",
     "WEB_TOOLS",
@@ -64,7 +72,9 @@ __all__ = [
     "get_company_profile",
     "get_crypto_price",
     "get_dex_volume",
+    "get_earnings_summary",
     "get_exchange_flow",
+    "get_filing_section",
     "get_growth_metrics",
     "get_income_statement",
     "get_market_data",
@@ -79,7 +89,9 @@ __all__ = [
     "get_valuation_history",
     "get_valuation_metrics",
     "get_whale_activity",
+    "get_xbrl_facts",
     "invoke_tool",
+    "list_sec_filings",
     "news_search",
     "resolve_asset",
     "resolve_ticker",

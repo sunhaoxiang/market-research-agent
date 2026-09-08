@@ -61,6 +61,16 @@ from agent_service.tools.onchain.gaps import (
     run_get_whale_activity,
 )
 from agent_service.tools.onchain.models import ChainActivityData
+from agent_service.tools.sec.earnings import run_get_earnings_summary
+from agent_service.tools.sec.facts import run_get_xbrl_facts
+from agent_service.tools.sec.filings import run_list_sec_filings
+from agent_service.tools.sec.models import (
+    EarningsSummaryData,
+    FilingSectionData,
+    SecFilingsData,
+    XbrlFactsData,
+)
+from agent_service.tools.sec.sections import run_get_filing_section
 from agent_service.tools.stocks.market import (
     run_compare_to_index,
     run_get_company_profile,
@@ -140,6 +150,26 @@ class GrowthArgs(BaseModel):
 class ValuationHistoryArgs(BaseModel):
     ticker: str
     years: int = 5
+
+
+class ListSecFilingsArgs(BaseModel):
+    ticker: str
+    form_types: list[str] = Field(default_factory=list)
+    limit: int = 10
+
+
+class FilingSectionArgs(BaseModel):
+    accession: str
+    section: str
+
+
+class XbrlFactsArgs(BaseModel):
+    ticker: str
+    concepts: list[str]
+
+
+class EarningsSummaryArgs(BaseModel):
+    ticker: str
 
 
 class CryptoPriceArgs(BaseModel):
@@ -354,6 +384,46 @@ async def _get_valuation_history(
     return await run_get_valuation_history(deps, ticker=args.ticker, years=args.years)
 
 
+async def _list_sec_filings(
+    deps: ToolDeps, arguments: dict[str, Any]
+) -> ToolResult[SecFilingsData]:
+    try:
+        args = ListSecFilingsArgs.model_validate(arguments)
+    except ValidationError as exc:
+        return fail_validation("list_sec_filings", exc)
+    return await run_list_sec_filings(
+        deps, ticker=args.ticker, form_types=args.form_types, limit=args.limit
+    )
+
+
+async def _get_filing_section(
+    deps: ToolDeps, arguments: dict[str, Any]
+) -> ToolResult[FilingSectionData]:
+    try:
+        args = FilingSectionArgs.model_validate(arguments)
+    except ValidationError as exc:
+        return fail_validation("get_filing_section", exc)
+    return await run_get_filing_section(deps, accession=args.accession, section=args.section)
+
+
+async def _get_xbrl_facts(deps: ToolDeps, arguments: dict[str, Any]) -> ToolResult[XbrlFactsData]:
+    try:
+        args = XbrlFactsArgs.model_validate(arguments)
+    except ValidationError as exc:
+        return fail_validation("get_xbrl_facts", exc)
+    return await run_get_xbrl_facts(deps, ticker=args.ticker, concepts=args.concepts)
+
+
+async def _get_earnings_summary(
+    deps: ToolDeps, arguments: dict[str, Any]
+) -> ToolResult[EarningsSummaryData]:
+    try:
+        args = EarningsSummaryArgs.model_validate(arguments)
+    except ValidationError as exc:
+        return fail_validation("get_earnings_summary", exc)
+    return await run_get_earnings_summary(deps, ticker=args.ticker)
+
+
 async def _get_crypto_price(
     deps: ToolDeps, arguments: dict[str, Any]
 ) -> ToolResult[CryptoPriceData]:
@@ -490,7 +560,9 @@ HANDLERS: dict[str, ToolHandler] = {
     "get_company_profile": _get_company_profile,
     "get_crypto_price": _get_crypto_price,
     "get_dex_volume": _get_dex_volume,
+    "get_earnings_summary": _get_earnings_summary,
     "get_exchange_flow": _get_exchange_flow,
+    "get_filing_section": _get_filing_section,
     "get_growth_metrics": _get_growth_metrics,
     "get_income_statement": _get_income_statement,
     "get_market_data": _get_market_data,
@@ -505,6 +577,8 @@ HANDLERS: dict[str, ToolHandler] = {
     "get_valuation_history": _get_valuation_history,
     "get_valuation_metrics": _get_valuation_metrics,
     "get_whale_activity": _get_whale_activity,
+    "get_xbrl_facts": _get_xbrl_facts,
+    "list_sec_filings": _list_sec_filings,
     "news_search": _news_search,
     "resolve_asset": _resolve_asset,
     "resolve_ticker": _resolve_ticker,

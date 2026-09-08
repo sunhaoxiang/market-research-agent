@@ -422,3 +422,70 @@ async def test_empty_ticker_directory_is_not_found(
         with pytest.raises(ProviderError) as exc:
             await provider.get_ticker_directory()
     assert exc.value.code is ToolErrorCode.NOT_FOUND
+
+
+_FILING_HTML = """<html><body>
+<div>ITEM 1A. RISK FACTORS</div>
+<p>Competition may harm our business.</p>
+</body></html>"""
+_ARCHIVES = "https://www.sec.gov/Archives/edgar/data/1045810/000104581025000031/nvda-20250126.htm"
+
+
+@respx.mock
+async def test_filing_document_fetches_html_with_user_agent(
+    respx_mock: respx.MockRouter, runtime: ProviderRuntime
+) -> None:
+    route = respx_mock.get(_ARCHIVES).mock(
+        return_value=httpx.Response(200, text=_FILING_HTML, headers={"content-type": "text/html"})
+    )
+    async with edgar(runtime) as provider:
+        doc = await provider.get_filing_document(
+            cik="1045810",
+            accession="0001045810-25-000031",
+            primary_document="nvda-20250126.htm",
+        )
+        cached = await provider.get_filing_document(
+            cik="1045810",
+            accession="0001045810-25-000031",
+            primary_document="nvda-20250126.htm",
+        )
+
+    assert route.call_count == 1
+    sent = route.calls[0].request
+    assert sent.headers["user-agent"] == _UA
+    assert "text/html" in sent.headers["accept"]
+    assert "ITEM 1A" in doc.html
+    assert doc.url == _ARCHIVES
+    assert cached.provenance.is_cached is True
+    assert cached.html == doc.html
+
+
+@respx.mock
+async def test_filing_document_404_is_not_found(
+    respx_mock: respx.MockRouter, runtime: ProviderRuntime
+) -> None:
+    respx_mock.get(_ARCHIVES).mock(return_value=httpx.Response(404, text="Not Found"))
+    async with edgar(runtime) as provider:
+        with pytest.raises(ProviderError) as exc:
+            await provider.get_filing_document(
+                cik="1045810",
+                accession="0001045810-25-000031",
+                primary_document="nvda-20250126.htm",
+            )
+    assert exc.value.code is ToolErrorCode.NOT_FOUND
+    assert "文档" in exc.value.message
+
+
+@respx.mock
+async def test_empty_filing_document_is_not_found(
+    respx_mock: respx.MockRouter, runtime: ProviderRuntime
+) -> None:
+    respx_mock.get(_ARCHIVES).mock(return_value=httpx.Response(200, text="   "))
+    async with edgar(runtime) as provider:
+        with pytest.raises(ProviderError) as exc:
+            await provider.get_filing_document(
+                cik="1045810",
+                accession="0001045810-25-000031",
+                primary_document="nvda-20250126.htm",
+            )
+    assert exc.value.code is ToolErrorCode.NOT_FOUND

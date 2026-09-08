@@ -52,6 +52,7 @@ class ProviderRequest:
     json_body: Mapping[str, object] | None = None
     headers: Mapping[str, str] | None = None
     bypass_cache: bool = False
+    as_text: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -206,7 +207,11 @@ class BaseProvider:
 
             response, attempts = await self._send_with_retries(req)
             status = response.status_code
-            data = _parse_json(response, provider=self.name, endpoint=req.endpoint)
+            data = (
+                response.text
+                if req.as_text
+                else _parse_json(response, provider=self.name, endpoint=req.endpoint)
+            )
             url = str(response.url)
             await self.runtime.cache.set(
                 key,

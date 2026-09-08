@@ -1,4 +1,4 @@
-"""美股三表、增长率与估值。P4-8 再加 SEC 文本。"""
+"""美股三表、增长率与估值。SEC 文本与 XBRL facts 在 `tools/sec/`。"""
 
 from agent_service.tools.financials.bindings import (
     FINANCIALS_TOOLS,
