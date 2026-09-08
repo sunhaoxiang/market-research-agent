@@ -1,12 +1,10 @@
-"""子 Agent 的临时占位（P1-11 → Phase 2 移除）。
+"""尚未实现的子 Agent 占位（crypto / stock / fact_checker / report_writer）。
 
-真正的 `crypto_research` / `stock_research` / `web_research` 依赖 Phase 2-4 的
-工具层，现在还不存在。但 P1-11 要打通「浏览器 → Next → Python → 事件流」这条
-链路，需要执行阶段真的产生 agent_started / agent_completed 事件。
+`web_research` 已在 P2-6 接上真工具。其余任务仍走这里，好让编排层在
+Phase 3-5 接手前就能发出 agent_started / agent_completed。
 
-**它刻意不假装成功。** 每个任务的 `data_gaps` 都写明「子 Agent 尚未实现」，
-于是这条缺口会一路走到报告的「数据限制」章节。相比返回一段编造的 summary，
-这样做在 Phase 2 接手前不会有任何人（包括我自己）误以为研究流程已经能出结果。
+**它刻意不假装成功。** `data_gaps` 写明尚未实现，缺口会走进报告的
+「数据限制」章节，而不是一段编造的 summary。
 """
 
 from __future__ import annotations

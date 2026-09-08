@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from agent_service.providers.fetch import PageFetcher
     from agent_service.providers.runtime import Clock
     from agent_service.providers.search import SearchProvider
+    from agent_service.tools.web.collector import SourceCollector
 
 
 @dataclass(frozen=True, slots=True)
@@ -24,6 +25,7 @@ class ToolDeps:
     fetcher: PageFetcher | None = None
     clock: Clock | None = None
     bus: EventBus | None = None
+    sources: SourceCollector | None = None
 
     def now(self) -> datetime:
         if self.clock is not None:

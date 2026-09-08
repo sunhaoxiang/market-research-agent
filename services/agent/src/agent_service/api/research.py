@@ -20,8 +20,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from agent_service.agents.placeholder import PlaceholderRunner
 from agent_service.agents.research_manager import build_research_manager
+from agent_service.agents.runner import SubAgentRunner
 from agent_service.api.auth import require_internal_token
 from agent_service.api.sse import SSE_HEADERS, encode_comment, encode_event
 from agent_service.config import get_settings
@@ -85,7 +85,15 @@ async def stream_research(request: ResearchRequest, http_request: Request) -> St
         ) from error
 
     bus = EventBus(session_id)
-    runner = PlaceholderRunner(planner.model_id)
+    runtime = getattr(http_request.app.state, "provider_runtime", None)
+    runner = SubAgentRunner(
+        registry,
+        limits=limits,
+        search=getattr(http_request.app.state, "search_provider", None),
+        fetcher=getattr(http_request.app.state, "web_fetcher", None),
+        clock=None if runtime is None else runtime.clock,
+        fallback_model_id=planner.model_id,
+    )
 
     log.info(
         "research.stream_started",

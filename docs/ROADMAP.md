@@ -6,7 +6,7 @@
 > **每完成一个任务就更新此表的状态**；每完成一个阶段，跑 `[DP §26]` 的收尾清单并写阶段小结。
 
 - 最后更新：2026-09-08
-- 当前阶段：**Phase 2 进行中**（P2-1 ~ P2-5 已完成）
+- 当前阶段：**Phase 2 进行中**（P2-1 ~ P2-6 已完成）
 
 ### 已确认的前置决策（2026-09-07）
 
@@ -132,7 +132,7 @@ hash 跨会话稳定，说明 §9.8 的缓存前缀约束真的守住了；95.4%
 | P2-3  | `web_fetch` 抓取器：SSRF 防护（DNS→IP 校验、协议/重定向/大小/超时限制）+ trafilatura 正文提取                             | P2-1        | ✅   | 内网 IP / metadata / 超大响应在出网前拦截；重定向到 loopback 不会打到目标 |
 | P2-4  | `tools/web/`：`web_search` / `web_fetch` / `news_search`，全部返回 `ToolResult` + provenance                              | P2-2, P2-3  | ✅   | `/v1/tools/{name}/invoke` 可单独调用；错误是 200+ok=false，未知工具才 404 |
 | P2-5  | Prompt injection 隔离：`<untrusted_web_content>` 包裹 + instructions 声明 + 注入迹象 warning 事件 `[DP §23 R5]`           | P2-4        | ✅   | 注入句只出现在隔离标签内；命中发 `web.prompt_injection` warning；Scripted Agent 答复不被页面里的 PWNED 改写 |
-| P2-6  | Web Research Agent + prompt（产出 `ResearchFinding`，含 claims / sources / data_gaps）                                    | P2-4, P1-10 | ⬜   | 对"HYPE 最近有什么新闻"产出带来源的 finding |
+| P2-6  | Web Research Agent + prompt（产出 `ResearchFinding`，含 claims / sources / data_gaps）                                    | P2-4, P1-10 | ✅   | 对"HYPE 最近有什么新闻"产出带来源的 finding |
 | P2-7  | Source 归一化与去重：URL canonical、`reliability` 分级、`SOURCE_FOUND` 事件、引用重新编号 `[DP §15.1-15.2]`               | P2-6        | ⬜   | 同一 URL 不同参数被正确合并                 |
 | P2-8  | Report Writer Agent v1 + `ResearchReport` schema + `[n]` 引用生成                                                         | P2-7, P1-4  | ⬜   | 产出带引用的 Markdown                       |
 | P2-9  | 引用完整性确定性校验 + output guardrail + 一次修正重试 `[DP §15.4]`                                                       | P2-8        | ⬜   | 故意注入坏引用能被检出并修正                |
@@ -411,6 +411,20 @@ Agent / Tool 只依赖 `SearchProvider` 协议，Tavily 是第一个实现。换
 3. **instructions 片段** `prompts/untrusted_web.md`：点名标签内不是指令。P2-6 的 Web Research Agent 会把它拼进 system prompt。
 
 真模型会不会仍然听话，是 P7 eval 的事。P2-5 用 ScriptedModel 钉住链路：最终答复是任务事实，不是页面里的 `PWNED`；劫持句只出现在标签内。
+
+### P2-6 — Web Research Agent ✅（2026-09-08）
+
+第一个会真搜网页的子 Agent。LLM 只输出 `AgentFinding`（短引用 `s1`/`s2`），编排层用 tool 登记的来源补全 `Source` 和 `claim.source_ids`——让模型复述 URL 是幻觉高发点（§15.1）。URL 归一化 / reliability / `SOURCE_FOUND` 留给 P2-7；本项只保证同一次任务里同一 URL 共用一个 ref。
+
+几个刻意的边界：
+
+- `web_research` 走 `ModelRole.FAST`；crypto/stock 仍走 `PlaceholderRunner`。
+- 有工具必须 `run_streamed` + `AgentRunTranslator`，否则 Activity Panel 看不到 tool 事件。
+- JSON 解析失败时 `clone(tools=[])` 回喂字段错误，不再跑工具——再搜一遍既贵又可能改来源编号。
+- 日期和 objective 放 user 消息，不进 system prompt（§9.8 缓存前缀）。
+- `SOURCE_BACKED_FACT` 若解析不到来源，降级为 `FACT` 并写 `data_gaps`。
+
+验收用 ScriptedModel：`news_search` → 假搜索页 → AgentFinding JSON，finding 带来源，且发出 `TOOL_STARTED` / `TOOL_COMPLETED`。
 
 ---
 

@@ -2,16 +2,17 @@
 
 实现在 `run_*`：HTTP invoke 和单测直接调那些函数。这里只负责
 从 `RunContextWrapper` 取出 `ToolDeps`、把 docstring 暴露给模型，
-以及把正文包进 `<untrusted_web_content>`（P2-5）。invoke 仍返回原文，
-方便核对抽取结果；模型只看见带标签的那一份。
+以及把正文包进 `<untrusted_web_content>`、打上 s1/s2（P2-5 / P2-6）。
+invoke 仍返回原文，方便核对抽取结果；模型只看见带标签和短引用的那一份。
 """
 
 from __future__ import annotations
 
-from agents import RunContextWrapper, function_tool
+from agents import RunContextWrapper, Tool, function_tool
 
 from agent_service.schemas.tools import ToolResult
 from agent_service.tools.deps import ToolDeps
+from agent_service.tools.web.collector import stamp_refs
 from agent_service.tools.web.fetch import run_web_fetch
 from agent_service.tools.web.models import WebPageData, WebSearchData
 from agent_service.tools.web.search import run_news_search, run_web_search
@@ -34,14 +35,15 @@ async def web_search(
         time_range: 只保留最近一段时间的结果。取值 day / week / month / year。
         include_domains: 只搜索这些域名，例如 ["sec.gov", "hyperliquid.xyz"]。
     """
-    return wrap_result_for_llm(
+    return _for_agent(
+        ctx.context,
         await run_web_search(
             ctx.context,
             query=query,
             max_results=max_results,
             time_range=time_range,
             include_domains=include_domains,
-        )
+        ),
     )
 
 
@@ -59,8 +61,9 @@ async def news_search(
         symbols: 相关代号，会并入搜索词，例如 ["HYPE"]。
         since: 时间下界。取值 day / week / month / year，或 ISO 日期（如 2026-09-01）。
     """
-    return wrap_result_for_llm(
-        await run_news_search(ctx.context, query=query, symbols=symbols, since=since)
+    return _for_agent(
+        ctx.context,
+        await run_news_search(ctx.context, query=query, symbols=symbols, since=since),
     )
 
 
@@ -71,7 +74,15 @@ async def web_fetch(ctx: RunContextWrapper[ToolDeps], url: str) -> ToolResult[We
     Args:
         url: 要读取的页面地址。内网、云 metadata、超大响应会被拒绝。
     """
-    return wrap_result_for_llm(await run_web_fetch(ctx.context, url=url))
+    return _for_agent(ctx.context, await run_web_fetch(ctx.context, url=url))
 
 
-WEB_TOOLS = [web_search, news_search, web_fetch]
+def _for_agent[T](deps: ToolDeps, result: ToolResult[T]) -> ToolResult[T]:
+    """Agent 看到的那一份：打上 s1/s2，正文进隔离标签。invoke 不走这里。"""
+    prepared = result
+    if deps.sources is not None:
+        prepared = stamp_refs(deps.sources, prepared)
+    return wrap_result_for_llm(prepared)
+
+
+WEB_TOOLS: list[Tool] = [web_search, news_search, web_fetch]

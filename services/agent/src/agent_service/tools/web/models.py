@@ -17,6 +17,10 @@ class WebSearchHit(Schema):
     score: float | None = None
     published_at: datetime | None = None
     domain: str | None = None
+    ref: str | None = Field(
+        default=None,
+        description="短引用编号，如 s1。claim.source_refs 只能填工具结果里出现过的 ref",
+    )
 
 
 class WebSearchData(Schema):
@@ -33,3 +37,7 @@ class WebPageData(Schema):
     text: str | None = None
     status_code: int
     content_type: str | None = None
+    ref: str | None = Field(
+        default=None,
+        description="短引用编号，如 s1。claim.source_refs 只能填工具结果里出现过的 ref",
+    )
