@@ -20,6 +20,7 @@ from agent_service.tools.financials.bindings import (
     FINANCIALS_TOOLS,
     get_balance_sheet,
     get_cash_flow,
+    get_growth_metrics,
     get_income_statement,
 )
 from agent_service.tools.onchain.bindings import (
@@ -62,6 +63,7 @@ __all__ = [
     "get_crypto_price",
     "get_dex_volume",
     "get_exchange_flow",
+    "get_growth_metrics",
     "get_income_statement",
     "get_market_data",
     "get_peers",

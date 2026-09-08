@@ -80,3 +80,36 @@ class CashFlowData(Schema):
     source: StatementSource
     rows: list[CashFlowPeriodData] = Field(default_factory=list)
     url: str
+
+
+class MarginPeriodData(Schema):
+    period_end: date
+    fiscal_year: int | None = None
+    fiscal_period: str | None = None
+    gross_margin: float | None = None
+    operating_margin: float | None = None
+    net_margin: float | None = None
+
+
+class GrowthMetricsData(Schema):
+    ticker: str
+    cik: str | None = None
+    source: StatementSource
+    url: str
+    as_of: date | None = None
+    cagr_years: float | None = None
+    revenue_yoy: float | None = None
+    net_income_yoy: float | None = None
+    operating_income_yoy: float | None = None
+    eps_yoy: float | None = None
+    revenue_qoq: float | None = None
+    net_income_qoq: float | None = None
+    revenue_cagr: float | None = None
+    net_income_cagr: float | None = None
+    gross_margin: float | None = None
+    operating_margin: float | None = None
+    net_margin: float | None = None
+    gross_margin_yoy: float | None = None
+    operating_margin_yoy: float | None = None
+    net_margin_yoy: float | None = None
+    margins: list[MarginPeriodData] = Field(default_factory=list)

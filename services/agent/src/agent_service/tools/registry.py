@@ -36,9 +36,11 @@ from agent_service.tools.defi.models import (
     TvlData,
 )
 from agent_service.tools.deps import ToolDeps
+from agent_service.tools.financials.growth import run_get_growth_metrics
 from agent_service.tools.financials.models import (
     BalanceSheetData,
     CashFlowData,
+    GrowthMetricsData,
     IncomeStatementData,
 )
 from agent_service.tools.financials.statements import (
@@ -122,6 +124,11 @@ class StatementArgs(BaseModel):
     ticker: str
     period: str = "annual"
     limit: int = 4
+
+
+class GrowthArgs(BaseModel):
+    ticker: str
+    years: int = 3
 
 
 class CryptoPriceArgs(BaseModel):
@@ -306,6 +313,16 @@ async def _get_cash_flow(deps: ToolDeps, arguments: dict[str, Any]) -> ToolResul
     return await run_get_cash_flow(deps, ticker=args.ticker, period=args.period, limit=args.limit)
 
 
+async def _get_growth_metrics(
+    deps: ToolDeps, arguments: dict[str, Any]
+) -> ToolResult[GrowthMetricsData]:
+    try:
+        args = GrowthArgs.model_validate(arguments)
+    except ValidationError as exc:
+        return fail_validation("get_growth_metrics", exc)
+    return await run_get_growth_metrics(deps, ticker=args.ticker, years=args.years)
+
+
 async def _get_crypto_price(
     deps: ToolDeps, arguments: dict[str, Any]
 ) -> ToolResult[CryptoPriceData]:
@@ -443,6 +460,7 @@ HANDLERS: dict[str, ToolHandler] = {
     "get_crypto_price": _get_crypto_price,
     "get_dex_volume": _get_dex_volume,
     "get_exchange_flow": _get_exchange_flow,
+    "get_growth_metrics": _get_growth_metrics,
     "get_income_statement": _get_income_statement,
     "get_market_data": _get_market_data,
     "get_peers": _get_peers,

@@ -332,4 +332,5 @@ def test_function_tool_names_are_stable() -> None:
         "get_income_statement",
         "get_balance_sheet",
         "get_cash_flow",
+        "get_growth_metrics",
     ]

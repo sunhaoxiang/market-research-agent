@@ -215,6 +215,42 @@ class _FakeSecEdgar:
             accession="0001045810-25-000031",
             frame=None,
         )
+        prior_revenue = FactPoint(
+            value=60_922_000_000.0,
+            unit="USD",
+            start=date(2023, 1, 30),
+            end=date(2024, 1, 28),
+            filed=date(2024, 2, 21),
+            form="10-K",
+            fy=2024,
+            fp="FY",
+            accession="0001045810-24-000031",
+            frame=None,
+        )
+        q2_revenue = FactPoint(
+            value=46_743_000_000.0,
+            unit="USD",
+            start=date(2025, 4, 28),
+            end=date(2025, 7, 27),
+            filed=date(2025, 8, 27),
+            form="10-Q",
+            fy=2026,
+            fp="Q2",
+            accession="0001045810-25-000014",
+            frame=None,
+        )
+        q1_revenue = FactPoint(
+            value=44_062_000_000.0,
+            unit="USD",
+            start=date(2025, 1, 27),
+            end=date(2025, 4, 27),
+            filed=date(2025, 5, 28),
+            form="10-Q",
+            fy=2026,
+            fp="Q1",
+            accession="0001045810-25-000009",
+            frame=None,
+        )
         assets = FactPoint(
             value=111_601_000_000.0,
             unit="USD",
@@ -245,7 +281,7 @@ class _FakeSecEdgar:
                 tag="Revenues",
                 label="Revenues",
                 description=None,
-                points=(revenue,),
+                points=(revenue, prior_revenue, q2_revenue, q1_revenue),
             ),
             ("us-gaap", "Assets"): FactConcept(
                 taxonomy="us-gaap",
@@ -591,6 +627,18 @@ def test_invoke_cash_flow(client: TestClient) -> None:
     body = response.json()
     assert body["ok"] is True
     assert body["data"]["rows"][0]["operating"] == 64_089_000_000.0
+
+
+def test_invoke_growth_metrics(client: TestClient) -> None:
+    response = client.post(
+        "/v1/tools/get_growth_metrics/invoke",
+        json={"arguments": {"ticker": "NVDA"}},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["data"]["revenue_yoy"] == pytest.approx(130_497_000_000.0 / 60_922_000_000.0 - 1.0)
+    assert body["data"]["source"] == "sec_xbrl"
 
 
 def test_invoke_get_tvl(client: TestClient) -> None:
