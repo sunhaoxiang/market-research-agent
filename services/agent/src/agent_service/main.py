@@ -22,6 +22,7 @@ from agent_service.models.registry import ModelRegistry, bootstrap_sdk, tracing_
 from agent_service.observability.logging import configure_logging, get_logger
 from agent_service.providers.crypto import CoinGeckoProvider
 from agent_service.providers.defi import DefiLlamaProvider
+from agent_service.providers.equity import FmpProvider
 from agent_service.providers.fetch import WebFetcher
 from agent_service.providers.onchain import HyperliquidProvider
 from agent_service.providers.runtime import ProviderRuntime
@@ -109,6 +110,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     )
     app.state.defillama = DefiLlamaProvider(runtime=runtime)
     app.state.hyperliquid = HyperliquidProvider(runtime=runtime)
+    # 必须有 key；250/day。tool 层（P4-4）再注入 ToolDeps
+    fmp_key = settings.fmp_api_key
+    app.state.fmp = (
+        None
+        if fmp_key is None
+        else FmpProvider(runtime=runtime, api_key=fmp_key.get_secret_value())
+    )
 
     configured = [p.provider for p in _llm_provider_status(settings) if p.configured]
     log.info(
@@ -141,6 +149,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     hyperliquid = getattr(app.state, "hyperliquid", None)
     if hyperliquid is not None:
         await hyperliquid.aclose()
+    fmp = getattr(app.state, "fmp", None)
+    if fmp is not None:
+        await fmp.aclose()
     await app.state.provider_runtime.aclose()
     await app.state.registry.aclose()
     log.info("agent_service.shutdown")
@@ -163,6 +174,7 @@ def create_app() -> FastAPI:
     app.state.coingecko = None
     app.state.defillama = None
     app.state.hyperliquid = None
+    app.state.fmp = None
 
     @app.get("/v1/health", response_model=HealthResponse, tags=["system"])
     async def health() -> HealthResponse:

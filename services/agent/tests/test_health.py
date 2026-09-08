@@ -6,7 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from agent_service.config import get_settings
-from agent_service.main import create_app
+from agent_service.main import _data_source_status, create_app
 from agent_service.testing import IsolatedProviderCredentials, IsolatedSettings
 
 _PROVIDER_ENV_VARS = (
@@ -54,6 +54,23 @@ def test_health_returns_expected_shape(client: TestClient) -> None:
     assert data_sources["hyperliquid"] is True
     assert data_sources["sec_edgar"] is True
     assert data_sources["coingecko"] is True
+    assert "fmp" in data_sources
+
+
+def test_fmp_health_requires_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("FMP_API_KEY", raising=False)
+    settings = IsolatedSettings()
+    sources = {p.provider: p.configured for p in _data_source_status(settings)}
+    assert sources["fmp"] is False
+
+
+def test_fmp_health_configured_when_key_present(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("FMP_API_KEY", "fmp-test-key")
+    settings = IsolatedSettings()
+    sources = {p.provider: p.configured for p in _data_source_status(settings)}
+    assert sources["fmp"] is True
+    raw = str(sources).lower()
+    assert "fmp-test-key" not in raw
 
 
 def test_health_never_leaks_secrets(client: TestClient) -> None:

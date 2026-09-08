@@ -6,7 +6,7 @@
 > **每完成一个任务就更新此表的状态**；每完成一个阶段，跑 `[DP §26]` 的收尾清单并写阶段小结。
 
 - 最后更新：2026-09-08
-- 当前阶段：**Phase 3 阶段验收已通过（D20 后重跑）**。下一任务 P4-1 FMP provider（未开始）。
+- 当前阶段：**P4-1 完成**。下一任务 P4-2 SEC EDGAR provider。
 
 ### 已确认的前置决策（2026-09-07）
 
@@ -170,7 +170,7 @@ hash 跨会话稳定，说明 §9.8 的缓存前缀约束真的守住了；95.4%
 
 | ID    | 任务                                                                                                                       | 依赖         | 状态 | 验收                                |
 | ----- | -------------------------------------------------------------------------------------------------------------------------- | ------------ | ---- | ----------------------------------- |
-| P4-1  | FMP provider（含日配额计数 + `QUOTA_EXHAUSTED` 快速失败）                                                                  | P2-1         | ⬜   | 配额耗尽时优雅降级                  |
+| P4-1  | FMP provider（含日配额计数 + `QUOTA_EXHAUSTED` 快速失败）                                                                  | P2-1         | ✅   | 配额耗尽时优雅降级                  |
 | P4-2  | SEC EDGAR provider（`User-Agent` 合规、10 req/s 限流、`submissions` + `companyfacts`）                                     | P2-1         | ⬜   | 契约测试通过                        |
 | P4-3  | `resolve_ticker` + ticker↔CIK 映射（本地缓存 SEC company_tickers.json）                                                    | P4-2         | ⬜   | NVDA→CIK 正确                       |
 | P4-4  | `tools/stocks/`：`get_stock_quote` / `get_company_profile` / `get_price_history` / `get_peers` / `compare_to_index`        | P4-1, P4-3   | ⬜   | 结构化输出完整                      |
@@ -716,6 +716,19 @@ Writer 的 user 消息带上冲突清单，prompt 要求并列写出；前端从
 三问真实验收已通过（D20 后重跑第一、三问）。不要把 ScriptedModel 绿当成端到端绿——第一次真跑暴露了 120s / 4 路并行的问题。
 
 美股能力是 Phase 4。Fact Checker 与跨 Agent merge 是 Phase 5。
+
+### P4-1 — FMP provider ✅（2026-09-08）
+
+继承 `BaseProvider`，不重复实现限流/缓存/429 重试。profile 已按免费档 250/day、2/s 钉死。必须有 key；走 `apikey` 请求头，**不放进 query**——放进 params 会进缓存键。
+
+五个方法是给后面任务用的原语，不要在 tool 层再包一遍 HTTP：
+
+- `get_quote` / `get_profile` / `get_historical_prices` / `get_peers` → **P4-4** 的股票 tools。历史价按 `days` 在本地算 `from`/`to`，含当日用 `HISTORY_TODAY`。
+- `get_ratios_ttm` → **P4-7** 估值。财报主路径是 SEC；FMP 只补 PE/PB/PS/EV·EBITDA。缺字段保持 None，不要当成 0。
+- 200 空列表、404 映射成 `NOT_FOUND`。FMP 常在 200 里塞 `Error Message`：额度用尽 → `QUOTA_EXHAUSTED`，无效 key → `UPSTREAM_ERROR`，付费档接口 → `UNSUPPORTED`。
+- 给人点的 URL 是 `financialmodelingprep.com/financial-summary/{symbol}`，不是 API 地址。
+
+日配额在 `QuotaTracker` 里预检：耗尽时 `QUOTA_EXHAUSTED` 快速失败、不打 HTTP；缓存命中不记账。本项只把客户端放进 `app.state.fmp`（无 key 则为 None）。注入 `ToolDeps` 从 **P4-4** 开始。
 
 ---
 
