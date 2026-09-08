@@ -1,9 +1,9 @@
-"""研究会话全流程（§7.1，P1-10 / P2-8 / P5-4 / P5-5）。
+"""研究会话全流程（§7.1，P1-10 / P2-8 / P5-4 / P5-5 / P5-6）。
 
-当前覆盖 §7.1 的步骤 1-6 与步骤 8（意图/规划/校验/执行/Merge & Dedup/
-事实核查/撰写）。步骤 6 在 Merge 之后跑：Fact Checker 只看 claims + sources，
-失败降级为 WARNING，不让整次研究失败。
-步骤 7、9（补充研究、输出护栏）在后续阶段接入。
+当前覆盖 §7.1 的步骤 1-8（意图/规划/校验/执行/Merge & Dedup/
+事实核查/Gap Check/撰写）。步骤 7 在核查之后跑：规则发现可补缺口则
+`PLAN_UPDATED` 再执行一轮，硬上限 `max_supplement_rounds`（D8）。
+步骤 9（输出护栏）在后续阶段接入。
 
 **这一层唯一的职责是「保证事件流一定终止」。** 无论正常完成、规划失败、
 被取消还是撞上未预期的异常，都必须恰好发出一个终态事件（§12 / §14.1）：
@@ -24,6 +24,7 @@ import structlog
 from agent_service.models.structured_output import StructuredOutputError
 from agent_service.orchestrator.checker import check_facts
 from agent_service.orchestrator.executor import execute_plan
+from agent_service.orchestrator.gaps import propose_supplement_tasks
 from agent_service.orchestrator.intent import Intent, IntentClassifier, classify_intent
 from agent_service.orchestrator.merge import merge_research
 from agent_service.orchestrator.plan_validation import PlanRejectedError
@@ -180,20 +181,28 @@ async def _plan_and_execute(
     state.attach_plan(planning.validated)
 
     state.advance_to(Stage.RESEARCHING)
-    await execute_plan(
+    await _execute_merge_and_check(
         state,
         runner=runner,
+        fact_checker=fact_checker,
         limits=limits,
-        # 规划已经花掉的时间要从预算里扣掉，否则总耗时会超出 total_timeout_s
-        deadline_s=state.remaining_s(limits.total_timeout_s),
+        search=search,
+        fetcher=fetcher,
+        clock=clock,
+        now=now,
     )
-    merge_research(state)
 
-    if fact_checker is not None:
-        state.advance_to(Stage.CHECKING)
-        await check_facts(
+    for _ in range(limits.max_supplement_rounds):
+        extra = propose_supplement_tasks(state, limits)
+        if not extra:
+            break
+        state.add_tasks(extra, reason="关键数据缺口")
+        if state.stage is not Stage.RESEARCHING:
+            state.advance_to(Stage.RESEARCHING)
+        await _execute_merge_and_check(
             state,
-            fact_checker,
+            runner=runner,
+            fact_checker=fact_checker,
             limits=limits,
             search=search,
             fetcher=fetcher,
@@ -203,6 +212,38 @@ async def _plan_and_execute(
 
     state.advance_to(Stage.WRITING)
     await write_report(state, writer, now=now)
+
+
+async def _execute_merge_and_check(
+    state: ResearchState,
+    *,
+    runner: TaskRunner,
+    fact_checker: FactCheckerAgent | None,
+    limits: ExecutionLimits,
+    search: SearchProvider | None,
+    fetcher: PageFetcher | None,
+    clock: Clock | None,
+    now: datetime | None,
+) -> None:
+    await execute_plan(
+        state,
+        runner=runner,
+        limits=limits,
+        deadline_s=state.remaining_s(limits.total_timeout_s),
+    )
+    merge_research(state)
+    if fact_checker is None:
+        return
+    state.advance_to(Stage.CHECKING)
+    await check_facts(
+        state,
+        fact_checker,
+        limits=limits,
+        search=search,
+        fetcher=fetcher,
+        clock=clock,
+        now=now,
+    )
 
 
 async def _plan(

@@ -94,7 +94,7 @@ async def execute_plan(
     """按依赖分层执行整个计划，结果写回 `state`。
 
     `deadline_s` 是留给执行阶段的秒数，由调用方从 `total_timeout_s` 里划出。
-    这样 Phase 5 想为报告撰写预留时间时，改的是流程编排而不是执行器。
+    已完成 / 失败 / 跳过的任务不再执行——补充研究把新任务并进计划后会再调一次。
     """
     if state.plan is None:
         msg = "execute_plan 需要先 attach_plan"
@@ -109,8 +109,18 @@ async def execute_plan(
             break
 
         log.info("executor.layer_started", layer=index, tasks=[task.id for task in layer])
+        pending = [
+            task
+            for task in layer
+            if state.task_status.get(task.id, TaskStatus.PENDING) is TaskStatus.PENDING
+        ]
+        if not pending:
+            continue
         await asyncio.gather(
-            *(_guarded(task, state, runner=runner, limits=limits, gate=semaphore) for task in layer)
+            *(
+                _guarded(task, state, runner=runner, limits=limits, gate=semaphore)
+                for task in pending
+            )
         )
 
 

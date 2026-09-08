@@ -382,6 +382,22 @@ async def test_skip_warning_is_aggregated_not_per_task() -> None:
     assert len([event for event in events if event.type is EventType.WARNING]) == 1
 
 
+async def test_execute_plan_skips_already_completed_tasks() -> None:
+    """补充研究只跑新任务，不能把第一轮已经完成的再打一遍。"""
+    state = _state(_task("t1"), _task("t2"))
+    first = RecordingRunner()
+    await execute_plan(state, runner=first, limits=_limits(), deadline_s=60.0)
+    assert first.started == ["t1", "t2"]
+
+    extra = _task("t3", depends_on=["t1"])
+    state.add_tasks([extra], reason="关键数据缺口")
+    second = RecordingRunner()
+    await execute_plan(state, runner=second, limits=_limits(), deadline_s=60.0)
+    assert second.started == ["t3"]
+    assert second.contexts["t3"].upstream[0].task_id == "t1"
+    assert "t3" in {finding.task_id for finding in state.findings}
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # 取消
 # ─────────────────────────────────────────────────────────────────────────────

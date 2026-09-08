@@ -6,7 +6,7 @@
 > **每完成一个任务就更新此表的状态**；每完成一个阶段，跑 `[DP §26]` 的收尾清单并写阶段小结。
 
 - 最后更新：2026-09-08
-- 当前阶段：**P5-5 已完成**；下一任务 P5-6。
+- 当前阶段：**P5-6 已完成**；下一任务 P5-7。
 
 ### 已确认的前置决策（2026-09-07）
 
@@ -197,7 +197,7 @@ hash 跨会话稳定，说明 §9.8 的缓存前缀约束真的守住了；95.4%
 | P5-3 | 完整并行 fan-out：依赖分层 + `asyncio.gather` + 单任务超时 + 部分失败降级。**开工先带 D22**：超时 salvage 已拉到的 SEC 三表/季报要进对比表 `metrics` | P5-2              | ✅   | 1 个任务失败不影响整体出报告；salvage 数字能进对比表 |
 | P5-4 | Merge & Dedup 阶段：source 归一、claim 合并、冲突汇总                                                      | P5-3, P3-10       | ✅   | 跨 Agent 的重复来源被合并                   |
 | P5-5 | Fact Checker Agent（干净上下文，只看 claims + sources，可复检索）+ 校验事件流                              | P5-4              | ✅   | 能识别注入的错误声明                        |
-| P5-6 | Gap Check + 最多 1 轮补充研究（`PLAN_UPDATED`）                                                            | P5-5              | ⬜   | 缺关键数据时能补一轮                        |
+| P5-6 | Gap Check + 最多 1 轮补充研究（`PLAN_UPDATED`）                                                            | P5-5              | ✅   | 缺关键数据时能补一轮                        |
 | P5-7 | Report Writer v2：动态 `report_sections`、Executive Summary、Bull/Bear Case、Risks、数据限制章节、免责声明。**`claim_ids` 继续由 `attach_section_claims` 代码回填**，不要改回让模型抄 id | P5-6, P2-8        | ⬜   | 不同问题类型报告结构不同                        |
 | P5-8 | 全流程 workflow 测试（ScriptedModel）：正常 / 工具失败 / 超时 / 冲突 / 引用缺失 / schema 解析失败 6 条路径 | P5-7, P1-8        | ⬜   | 全部确定性通过                              |
 | P5-9 | 多模型冒烟：6 个 provider 各跑一次完整研究，结果写入 catalog `verified` 字段 + `[DP §9.4]` 降级验证        | P5-8, P1-4        | ⬜   | 已配 key 的 provider 全部跑通或明确标注限制 |
@@ -247,6 +247,14 @@ D6：只核验 `FACT` / `SOURCE_BACKED_FACT`，跳过分析/推测/预测/观点
 复检索的来源 intern 进同一会话 `SourceRegistry`（s1/s2 连续），`additional_source_refs` 映射到 `source.id` 后并进 claim。Writer 的 user 消息带核查结果；`refuted` / `unsupported` 不得写成确定事实。
 
 验收是 ScriptedModel：注入「HYPE TVL 为 1 美元」的 `source_backed_fact` → `verification=refuted`，事件流有 `FACT_CHECK_STARTED` / `CLAIM_VERIFIED`。不是真跑 DeepSeek。
+
+### P5-6 — Gap Check ✅（2026-09-08）
+
+Merge / Fact Checker 之后、Writer 之前。**纯代码规则，不打模型。** Agent 在 `data_gaps` 里写了可再搜的缺口（「未能获取」「未找到」「搜索失败」「正文抽不出」）才补一轮；超时 salvage、尚未实现、没有免费 API、以及 assemble_finding 的「未获得任何来源」都不触发——后一类几乎每次空跑都会出现，拿它当条件会把已经成功的 crypto+web 再打一遍。
+
+补充任务换另一类 Agent（crypto/stock 缺口 → web；web 缺口 → 按问题类型走专职 Agent），避免同一套失败工具再打一遍。`depends_on` 指向声明缺口的原任务，新 Agent 能看到上游 summary。硬上限 `max_supplement_rounds`（默认 1，D8）；名额受 `max_tasks_per_plan` 剩余槽位约束。执行器跳过已完成任务，只跑新加的。
+
+验收是 ScriptedModel / 替身 runner：注入「未能获取 HYPE 的 TVL」→ `PLAN_UPDATED` 多一个 web 任务并跑完；补充结果仍有缺口也不开第二轮；`max_supplement_rounds=0` 不补。不是真跑 DeepSeek。
 
 ### P5.5 — MVP 验收 ⬜
 

@@ -44,6 +44,7 @@ from agent_service.schemas.events import (
     ConflictDetectedPayload,
     EventType,
     IntentClassifiedPayload,
+    PlanUpdatedPayload,
     ResearchEvent,
     SessionCompletedPayload,
     SessionFailedPayload,
@@ -860,3 +861,137 @@ async def test_duplicate_sources_across_agents_are_merged() -> None:
     assert by_task["t1"].claims[0].confidence is ConfidenceLevel.HIGH
     assert by_task["t2"].claims == []
     assert {item.id for finding in outcome.findings for item in finding.sources} == {survivor}
+
+
+async def test_fillable_gap_triggers_one_supplement_round() -> None:
+    """验收：缺关键数据时能补一轮，事件流有 PLAN_UPDATED。"""
+    tvl = MetricPoint(name="tvl", label="TVL", value=1.2e9, unit="USD", entity_symbol="HYPE")
+    bus = _bus()
+    runner = StubRunner(
+        results={
+            "t1": ResearchFinding(
+                task_id="t1",
+                agent=AgentName.CRYPTO_RESEARCH,
+                summary="缺 TVL",
+                data_gaps=["未能获取 HYPE 的 TVL"],
+            ),
+            "t3": ResearchFinding(
+                task_id="t3",
+                agent=AgentName.WEB_RESEARCH,
+                summary="补到了 TVL。",
+                metrics=[tvl],
+            ),
+        }
+    )
+    outcome = await run_research(
+        "查询 HYPE 的 TVL",
+        planner=_planner(_plan_json()),
+        runner=runner,
+        writer=_writer(),
+        limits=_limits(),
+        bus=bus,
+        now=_NOW,
+    )
+
+    assert outcome.succeeded
+    assert "t3" in runner.started
+    assert {finding.task_id for finding in outcome.findings} >= {"t1", "t2", "t3"}
+    by_id = {finding.task_id: finding for finding in outcome.findings}
+    assert by_id["t3"].metrics[0].value == 1.2e9
+
+    events = await _drain(bus)
+    updates = [event for event in events if event.type is EventType.PLAN_UPDATED]
+    assert len(updates) == 1
+    added = _payload(updates[0], PlanUpdatedPayload).added_tasks
+    assert added[0].id == "t3"
+    assert added[0].agent is AgentName.WEB_RESEARCH
+    started_ids = [
+        _payload(event, AgentStartedPayload).task_id
+        for event in events
+        if event.type is EventType.AGENT_STARTED
+    ]
+    assert started_ids.count("t3") == 1
+    assert started_ids.index("t3") > started_ids.index("t1")
+
+
+async def test_second_gap_does_not_start_another_round() -> None:
+    bus = _bus()
+    runner = StubRunner(
+        results={
+            "t1": ResearchFinding(
+                task_id="t1",
+                agent=AgentName.CRYPTO_RESEARCH,
+                summary="缺 TVL",
+                data_gaps=["未能获取 HYPE 的 TVL"],
+            ),
+            "t3": ResearchFinding(
+                task_id="t3",
+                agent=AgentName.WEB_RESEARCH,
+                summary="还是缺",
+                data_gaps=["未找到 DefiLlama 页面"],
+            ),
+        }
+    )
+    await run_research(
+        "查询 HYPE 的 TVL",
+        planner=_planner(_plan_json()),
+        runner=runner,
+        writer=_writer(),
+        limits=_limits(),
+        bus=bus,
+        now=_NOW,
+    )
+    events = await _drain(bus)
+    assert sum(1 for event in events if event.type is EventType.PLAN_UPDATED) == 1
+    assert runner.started.count("t3") == 1
+    assert "t4" not in runner.started
+
+
+async def test_unfillable_gap_does_not_supplement() -> None:
+    bus = _bus()
+    await run_research(
+        "查询 HYPE 的 TVL",
+        planner=_planner(_plan_json()),
+        runner=StubRunner(
+            results={
+                "t1": ResearchFinding(
+                    task_id="t1",
+                    agent=AgentName.CRYPTO_RESEARCH,
+                    summary="占位",
+                    data_gaps=["子 Agent 尚未实现（Phase 2-4），本任务未获取任何真实数据"],
+                )
+            }
+        ),
+        writer=_writer(),
+        limits=_limits(),
+        bus=bus,
+        now=_NOW,
+    )
+    events = await _drain(bus)
+    assert EventType.PLAN_UPDATED not in [event.type for event in events]
+
+
+async def test_max_supplement_rounds_zero_skips() -> None:
+    bus = _bus()
+    runner = StubRunner(
+        results={
+            "t1": ResearchFinding(
+                task_id="t1",
+                agent=AgentName.CRYPTO_RESEARCH,
+                summary="缺 TVL",
+                data_gaps=["未能获取 HYPE 的 TVL"],
+            )
+        }
+    )
+    await run_research(
+        "查询 HYPE 的 TVL",
+        planner=_planner(_plan_json()),
+        runner=runner,
+        writer=_writer(),
+        limits=_limits(max_supplement_rounds=0),
+        bus=bus,
+        now=_NOW,
+    )
+    assert "t3" not in runner.started
+    events = await _drain(bus)
+    assert EventType.PLAN_UPDATED not in [event.type for event in events]

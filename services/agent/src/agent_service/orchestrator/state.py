@@ -19,11 +19,14 @@ from typing import TYPE_CHECKING
 import structlog
 
 from agent_service.observability.cost import cost_usd, to_token_usage
+from agent_service.orchestrator.plan_validation import ValidatedPlan
 from agent_service.schemas.common import Stage, TaskStatus
 from agent_service.schemas.events import (
     AgentRunMetricsEvent,
     AgentRunMetricsPayload,
     ErrorInfo,
+    PlanUpdatedEvent,
+    PlanUpdatedPayload,
     PromptDigest,
     StageChangedEvent,
     StageChangedPayload,
@@ -32,14 +35,14 @@ from agent_service.schemas.events import (
 from agent_service.sources.registry import SourceRegistry
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Sequence
 
     from agent_service.models.catalog import ModelEntry
     from agent_service.observability.event_bus import EventBus
     from agent_service.observability.prompts import PromptFingerprint
-    from agent_service.orchestrator.plan_validation import ValidatedPlan
     from agent_service.schemas.common import AgentName
     from agent_service.schemas.findings import Conflict, FactCheckResult, ResearchFinding
+    from agent_service.schemas.plan import ResearchTask
     from agent_service.schemas.report import ResearchReport
 
 log = structlog.get_logger(__name__)
@@ -108,6 +111,8 @@ class ResearchState:
         self.findings: list[ResearchFinding] = []
         self.conflicts: list[Conflict] = []
         self.fact_check: FactCheckResult | None = None
+        self.supplement_rounds = 0
+        """已发出的补充研究轮数。Gap Check 用它配合 `max_supplement_rounds`。"""
         self.report: ResearchReport | None = None
         self.usage = TokenUsage()
         self.cost_usd: float | None = None
@@ -144,6 +149,27 @@ class ResearchState:
     def attach_plan(self, plan: ValidatedPlan) -> None:
         self.plan = plan
         self.task_status = {task.id: TaskStatus.PENDING for task in plan.plan.tasks}
+
+    def add_tasks(self, tasks: Sequence[ResearchTask], *, reason: str | None = None) -> None:
+        """把补充任务并进计划并发出 `PLAN_UPDATED`。"""
+        if self.plan is None:
+            msg = "add_tasks 需要先 attach_plan"
+            raise RuntimeError(msg)
+        if not tasks:
+            return
+        merged = [*self.plan.plan.tasks, *tasks]
+        self.plan = ValidatedPlan(
+            plan=self.plan.plan.model_copy(update={"tasks": merged}),
+            issues=self.plan.issues,
+        )
+        for task in tasks:
+            self.task_status[task.id] = TaskStatus.PENDING
+        self.supplement_rounds += 1
+        self.bus.emit(
+            PlanUpdatedEvent,
+            payload=PlanUpdatedPayload(added_tasks=list(tasks), reason=reason),
+            message=f"补充 {len(tasks)} 个研究任务",
+        )
 
     def mark(self, task_id: str, status: TaskStatus) -> None:
         self.task_status[task_id] = status
