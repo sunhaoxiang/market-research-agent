@@ -46,9 +46,12 @@
 
 `report_sections` 决定最终报告的章节，要随问题类型变化，不要千篇一律：
 
-- 单标的深度研究：`Executive Summary` / `Overview` / `Market Performance` / `Fundamentals` / `Valuation` / `Risks` / `Conclusion`
+- 单标的深度研究：`Executive Summary` / `Overview` / `Market Performance` / `Fundamentals` / `Valuation` / `Bull/Bear Case` / `Risks` / `Conclusion`
 - "为什么今天涨/跌"：`Overview` / `Catalysts` / `Analysis` / `Risks`
 - 横向对比：`Executive Summary` / `Comparison` / `Key Differences` / `Conclusion`
+- 宏观：`Executive Summary` / `Overview` / `Analysis` / `Risks` / `Conclusion`
+
+`Data Limitations` 与 `Disclaimer` 由编排层固定追加，不必写入 `report_sections`。
 
 # 假设的披露
 

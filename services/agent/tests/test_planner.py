@@ -192,6 +192,15 @@ def test_prompt_asks_for_crypto_and_web_together() -> None:
     assert "一次研究可以同时用" in prompt
 
 
+def test_prompt_varies_report_sections_by_question_type() -> None:
+    prompt = render_prompt(PROMPT_NAME, max_tasks=6)
+    assert "Bull/Bear Case" in prompt
+    assert "Catalysts" in prompt
+    assert "Comparison" in prompt
+    assert "Data Limitations" in prompt
+    assert "不必写入" in prompt
+
+
 def test_planner_temperature_is_low() -> None:
     """同一个问题两次得到完全不同的任务树会让人怀疑系统可靠性。"""
     built = build_research_manager(_registry(), _limits())

@@ -162,6 +162,36 @@ describe("sanitize 与徽标", () => {
     expect(screen.getByText("未找到官方解锁时间表")).toBeDefined();
   });
 
+  it("已有 Data Limitations 章节时不重复渲染数据缺口列表", () => {
+    render(
+      <Shell
+        report={{
+          ...REPORT,
+          sections: [
+            ...REPORT.sections,
+            {
+              id: "Data Limitations",
+              title: "数据限制",
+              markdown: "- 未找到官方解锁时间表",
+              claim_ids: [],
+            },
+            {
+              id: "Disclaimer",
+              title: "免责声明",
+              markdown: "本报告仅供参考，不构成投资建议。",
+              claim_ids: [],
+            },
+          ],
+        }}
+      />,
+    );
+
+    expect(screen.getAllByText("数据限制")).toHaveLength(1);
+    expect(screen.getAllByText("未找到官方解锁时间表")).toHaveLength(1);
+    expect(screen.getByText("免责声明")).toBeDefined();
+    expect(screen.getByText(/不构成投资建议/)).toBeDefined();
+  });
+
   it("数值冲突以黄色警示条并列展示各源数值", () => {
     render(
       <Shell

@@ -17,7 +17,7 @@
 
 # 认知类型
 
-事实段落只写有来源的客观信息。`analysis` / `inference` / `prediction` / `opinion` 必须出现在带标记的句子或独立小节（如「分析」「看多/看空」），不得与事实混排。
+事实段落只写有来源的客观信息。`analysis` / `inference` / `prediction` / `opinion` 必须出现在带标记的句子或独立小节，不得与事实混排。输入章节含 `Bull/Bear Case` 时，看多/看空与情景分析写进该章，不要散落到 Overview。
 
 # 事实核查
 
@@ -33,7 +33,11 @@
 
 # 章节
 
-`sections[].id` **必须**使用输入里给出的章节列表，不要自行改名或增删。每章 `markdown` 是完整正文，不是提纲。
+`sections[].id` **必须**使用输入里给出的章节列表，不要自行改名或增删。每章 `markdown` 是完整正文，不是提纲。列表已随问题类型变化：深研含 `Bull/Bear Case` 与 `Risks`，对比含 `Comparison`，催化剂问题含 `Catalysts`。
+
+`executive_summary` 写在字段里，不要再单开一节 `Executive Summary`。
+
+`Data Limitations` 与 `Disclaimer` 由代码覆盖写入，对应章节 markdown 可留空。
 
 `sections[].claim_ids` 由代码根据正文 `[n]` 回填，输出空数组即可，不要抄 claim id。
 
@@ -49,7 +53,7 @@ Key Differences 用文字解释表中差异，不要另造一套数字。
 
 # 数据限制
 
-各任务声明的 `data_gaps` 必须进入报告的 `data_gaps` 字段，不要用推测填上。占位任务（子 Agent 尚未实现）也是缺口，要写进去。
+各任务声明的 `data_gaps` 必须进入报告的 `data_gaps` 字段，不要用推测填上。占位任务（子 Agent 尚未实现）也是缺口，要写进去。对应章节正文由编排层生成。
 
 # 文风
 

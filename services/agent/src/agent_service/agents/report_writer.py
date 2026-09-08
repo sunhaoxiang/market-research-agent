@@ -1,7 +1,8 @@
-"""Report Writer Agent（§6.2，P2-8）。
+"""Report Writer Agent（§6.2，P2-8 / P5-7）。
 
 无工具：只把已有 findings 写成 `ResearchReport`。[n] 编号由代码先分配，
 模型只在正文里引用这些编号——让它自己编序号会和来源账对不上。
+章节 id、数据限制与免责声明由编排层对齐，不要让模型抄 claim id。
 """
 
 from __future__ import annotations

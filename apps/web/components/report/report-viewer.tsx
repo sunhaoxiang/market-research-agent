@@ -31,6 +31,9 @@ export function ReportViewer({
       .map((item) => [item.citation_index as number, item]),
   );
   const claimsById = new Map(claims.map((claim) => [claim.id, claim]));
+  const hasDataLimitations = report.sections.some(
+    (section) => section.id.toLowerCase() === "data limitations",
+  );
 
   return (
     <article className="space-y-5">
@@ -79,25 +82,44 @@ export function ReportViewer({
           .map((id) => claimsById.get(id))
           .filter((claim): claim is Claim => claim !== undefined);
         const marks = marksForClaims(sectionClaims);
+        const disclaimer = section.id.toLowerCase() === "disclaimer";
+        const limitations = section.id.toLowerCase() === "data limitations";
         return (
-          <section key={section.id} className="space-y-2">
+          <section
+            key={section.id}
+            className={
+              disclaimer || limitations
+                ? "space-y-2 border-t border-dashed border-zinc-200 pt-4 dark:border-zinc-800"
+                : "space-y-2"
+            }
+          >
             <div className="flex flex-wrap items-baseline gap-2">
-              <h4 className="text-sm font-semibold">{section.title}</h4>
+              <h4
+                className={
+                  disclaimer
+                    ? "text-xs font-medium tracking-wide text-zinc-500 uppercase"
+                    : "text-sm font-semibold"
+                }
+              >
+                {section.title}
+              </h4>
               {marks.map((mark) => (
                 <EpistemicBadge key={mark.type} mark={mark} />
               ))}
             </div>
-            <ReportMarkdown
-              markdown={section.markdown}
-              sourcesByIndex={sourcesByIndex}
-              activeIndex={activeIndex}
-              onCite={onCite}
-            />
+            <div className={disclaimer ? "text-xs text-zinc-500 dark:text-zinc-400" : undefined}>
+              <ReportMarkdown
+                markdown={section.markdown}
+                sourcesByIndex={sourcesByIndex}
+                activeIndex={activeIndex}
+                onCite={onCite}
+              />
+            </div>
           </section>
         );
       })}
 
-      {report.data_gaps.length > 0 && (
+      {!hasDataLimitations && report.data_gaps.length > 0 && (
         <section className="space-y-2 border-t border-dashed border-zinc-200 pt-4 dark:border-zinc-800">
           <h4 className="text-sm font-semibold">数据限制</h4>
           <ul className="list-disc space-y-1 pl-5 text-sm text-zinc-600 dark:text-zinc-400">

@@ -6,7 +6,7 @@
 > **每完成一个任务就更新此表的状态**；每完成一个阶段，跑 `[DP §26]` 的收尾清单并写阶段小结。
 
 - 最后更新：2026-09-08
-- 当前阶段：**P5-6 已完成**；下一任务 P5-7。
+- 当前阶段：**P5-7 已完成**；下一任务 P5-8。
 
 ### 已确认的前置决策（2026-09-07）
 
@@ -198,7 +198,7 @@ hash 跨会话稳定，说明 §9.8 的缓存前缀约束真的守住了；95.4%
 | P5-4 | Merge & Dedup 阶段：source 归一、claim 合并、冲突汇总                                                      | P5-3, P3-10       | ✅   | 跨 Agent 的重复来源被合并                   |
 | P5-5 | Fact Checker Agent（干净上下文，只看 claims + sources，可复检索）+ 校验事件流                              | P5-4              | ✅   | 能识别注入的错误声明                        |
 | P5-6 | Gap Check + 最多 1 轮补充研究（`PLAN_UPDATED`）                                                            | P5-5              | ✅   | 缺关键数据时能补一轮                        |
-| P5-7 | Report Writer v2：动态 `report_sections`、Executive Summary、Bull/Bear Case、Risks、数据限制章节、免责声明。**`claim_ids` 继续由 `attach_section_claims` 代码回填**，不要改回让模型抄 id | P5-6, P2-8        | ⬜   | 不同问题类型报告结构不同                        |
+| P5-7 | Report Writer v2：动态 `report_sections`、Executive Summary、Bull/Bear Case、Risks、数据限制章节、免责声明。**`claim_ids` 继续由 `attach_section_claims` 代码回填**，不要改回让模型抄 id | P5-6, P2-8        | ✅   | 不同问题类型报告结构不同                        |
 | P5-8 | 全流程 workflow 测试（ScriptedModel）：正常 / 工具失败 / 超时 / 冲突 / 引用缺失 / schema 解析失败 6 条路径 | P5-7, P1-8        | ⬜   | 全部确定性通过                              |
 | P5-9 | 多模型冒烟：6 个 provider 各跑一次完整研究，结果写入 catalog `verified` 字段 + `[DP §9.4]` 降级验证        | P5-8, P1-4        | ⬜   | 已配 key 的 provider 全部跑通或明确标注限制 |
 
@@ -256,6 +256,14 @@ Merge / Fact Checker 之后、Writer 之前。**纯代码规则，不打模型�
 
 验收是 ScriptedModel / 替身 runner：注入「未能获取 HYPE 的 TVL」→ `PLAN_UPDATED` 多一个 web 任务并跑完；补充结果仍有缺口也不开第二轮；`max_supplement_rounds=0` 不补。不是真跑 DeepSeek。
 
+### P5-7 — Report Writer v2 ✅（2026-09-08）
+
+章节结构由代码按问题类型定，模型只填正文。深研（crypto/stock）必有 Overview、Bull/Bear Case、Risks、Conclusion；「为什么今天涨 / 最近有什么」走 Catalysts 精简章；对比走 Comparison / Key Differences。`executive_summary` 仍是字段，不单开一节。Planner 的 `report_sections` 可以少写，编排层按形态补齐必有章。
+
+末两节固定、覆盖模型输出：`Data Limitations` 从各任务 `data_gaps` 生成；`Disclaimer` 是固定免责声明（R11），模型写「建议立即买入」也会被换成中性文本。`claim_ids` 继续由 `attach_section_claims` 按正文 `[n]` 回填，prompt 仍要求模型交空数组。前端已有 Data Limitations 节时不再重复渲染 `data_gaps` 列表。
+
+验收是 ScriptedModel：同一套 Writer，crypto 深研报告含 Bull/Bear、对比报告含 Comparison 且不含 Bull/Bear；免责声明与数据限制都在。不是真跑 DeepSeek。
+
 ### P5.5 — MVP 验收 ⬜
 
 按 `[DP §21.1]` 的 Definition of Done 逐条核对，并跑完 `[DP §26]` 收尾清单。**通过后打 tag `v0.1.0-mvp`。**
@@ -287,7 +295,7 @@ Phase 2 真实验收后补的刷新恢复，把历史会话的数据面先做了
 | `GET /api/research/{id}/events`（已支持 `?after={seq}`） | P6-5 详情回放、P6-6 增量起点 | 进行中会话的 **live SSE 续订**：刷新后目前只看到已 flush 的快照，不会继续收新事件。这才是 D4 |
 | 首页 `?session=` + `ResearchConsole` 里 `store.reset()` 后逐条 `apply` | P6-4 点进一条历史、P6-5 复用组件 | 独立 History 路由；列表页的过滤/分页；进行中状态不要画成已结束 |
 | `projectArtifacts`：`source_found` / `report_completed` → `sources` / `claims` / `claim_sources` / `research_reports` | P6-4 列表「来源数」、P6-9 `/debug` 聚合 | UI **不要**改成只读这几张表来渲染报告。事件回放才是与实时页一致的真源；投影给查询 |
-| `attach_section_claims` 按正文 `[n]` 回填 `section.claim_ids` | P2-10 章节徽标、P5-7 Writer v2 | 改 `report_writer.md` 时继续让模型输出空 `claim_ids` |
+| `attach_section_claims` 按正文 `[n]` 回填 `section.claim_ids` | P2-10 章节徽标、P5-7 Writer v2（已遵守：模型仍交空数组） | 不要改回让模型抄 id |
 | `web_fetch` 对 DNS `getaddrinfo` 加 5s `wait_for`；Web Agent prompt 禁止对失败 URL 重试 | P3/P4 若复用 `WebFetcher` 自动带上 | 任务级 120s 超时仍在；这不是硬配额，只是失败后别空转 |
 
 ---
@@ -540,7 +548,7 @@ Agent / Tool 只依赖 `SearchProvider` 协议，Tavily 是第一个实现。换
 
 **本次暴露、不挡验收的问题**（2026-09-08 已修，不重跑那次会话）：
 
-1. **Writer 没填 `section.claim_ids`** → `attach_section_claims` 按正文 `[n]` 与 claim 原文回填，覆盖模型抄的 id。P5-7 改 Writer 时保持这条，见上表。
+1. **Writer 没填 `section.claim_ids`** → `attach_section_claims` 按正文 `[n]` 与 claim 原文回填，覆盖模型抄的 id。P5-7 已保持这条。
 2. **Web Research 对 SSRF 拦下的 URL 烧满 120s** → `web_fetch` DNS 5s 超时；prompt 要求失败 URL 写入 `data_gaps`、不要重试同一地址。
 3. **开发态 hydration 告警挡住第一次「开始研究」** → `useTicker` 在 idle 时与 server snapshot 一样返回 0。
 4. **`sources` / `claims` 表是空的，刷新丢 Source Panel** → BFF 投影进表；`GET /api/research/{id}/events` + 首页 `?session=` 回放。P6 历史/重连的配合面见 Phase 6「已提前落地」。

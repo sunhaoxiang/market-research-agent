@@ -20,6 +20,7 @@ from agent_service.models.registry import ModelRegistry
 from agent_service.models.structured_output import StructuredOutputError, run_structured
 from agent_service.observability.event_bus import EventBus
 from agent_service.orchestrator.comparison import build_comparison_table
+from agent_service.orchestrator.plan_validation import validate_plan
 from agent_service.orchestrator.state import ResearchState
 from agent_service.orchestrator.writer import write_report
 from agent_service.schemas.claims import Claim
@@ -27,6 +28,7 @@ from agent_service.schemas.common import (
     AgentName,
     ConfidenceLevel,
     EpistemicType,
+    QuestionType,
     SourceType,
     VerificationStatus,
 )
@@ -45,11 +47,16 @@ from agent_service.schemas.findings import (
     FactCheckResult,
     ResearchFinding,
 )
+from agent_service.schemas.plan import ResearchPlan, ResearchTask
 from agent_service.schemas.report import ResearchReport
 from agent_service.schemas.sources import Source
 from agent_service.sources.citations import assign_citation_indices
 from agent_service.sources.guardrail import CITATION_WARNING_CODE
-from agent_service.testing import IsolatedProviderCredentials, IsolatedSettings
+from agent_service.testing import (
+    IsolatedExecutionLimits,
+    IsolatedProviderCredentials,
+    IsolatedSettings,
+)
 
 _NOW = datetime(2026, 9, 8, 12, 0, tzinfo=UTC)
 _URL = "https://theblock.co/hyperliquid-fee-share"
@@ -143,6 +150,11 @@ def test_report_writer_prompt_hash_is_stable() -> None:
     second = build_report_writer(_registry())
     assert first.prompt.hash == second.prompt.hash
     assert first.prompt.hash != ""
+    instructions = str(first.agent.instructions)
+    assert "Bull/Bear Case" in instructions
+    assert "不要抄 claim id" in instructions
+    assert "Data Limitations" in instructions
+    assert "Disclaimer" in instructions
 
 
 def test_merge_report_gaps_keeps_task_gaps() -> None:
@@ -461,3 +473,127 @@ async def test_write_report_injects_comparison_table_when_omitted() -> None:
     assert "| 指标 | NVDA | AMD | AVGO |" in markdown
     assert "46,743,000,000" in markdown
     assert "营收（USD）" in markdown
+    ids = [section.id for section in state.report.sections]
+    assert ids[0] == "Comparison"
+    assert ids[-1] == "Disclaimer"
+    assert "Bull/Bear Case" not in ids
+
+
+async def test_write_report_structures_differ_by_question_type() -> None:
+    """验收：不同问题类型报告结构不同；免责声明与数据限制由代码写入。"""
+    source = _source()
+    finding = _finding(source)
+    deep_payload = _report_payload(finding, "[1]")
+    crypto_state, _ = await _write_planned(
+        "分析 HYPE 的代币经济与估值",
+        QuestionType.CRYPTO,
+        ("Overview", "Fundamentals", "Risks"),
+        deep_payload,
+        findings=[finding],
+        source=source,
+    )
+    compare_payload = json.dumps(
+        {
+            "title": "NVDA / AMD 对比",
+            "executive_summary": "两家规模不同。[1]",
+            "sections": [
+                {
+                    "id": "Comparison",
+                    "title": "对比",
+                    "markdown": "营收量级不同。[1]",
+                    "claim_ids": [],
+                }
+            ],
+            "data_gaps": [],
+        },
+        ensure_ascii=False,
+    )
+    compare_state, _ = await _write_planned(
+        "比较 NVDA、AMD 基本面",
+        QuestionType.COMPARE,
+        ("Comparison", "Key Differences", "Conclusion"),
+        compare_payload,
+        findings=[finding],
+        source=source,
+        session_id="sess-w-cmp",
+    )
+    assert crypto_state.report is not None
+    assert compare_state.report is not None
+    crypto_ids = [section.id for section in crypto_state.report.sections]
+    compare_ids = [section.id for section in compare_state.report.sections]
+    assert "Bull/Bear Case" in crypto_ids
+    assert "Comparison" not in crypto_ids
+    assert "Comparison" in compare_ids
+    assert "Bull/Bear Case" not in compare_ids
+    assert crypto_ids != compare_ids
+    assert crypto_ids[-2:] == ["Data Limitations", "Disclaimer"]
+    assert compare_ids[-2:] == ["Data Limitations", "Disclaimer"]
+    assert "未找到官方解锁时间表" in crypto_state.report.sections[-2].markdown
+    assert "仅供参考" in crypto_state.report.sections[-1].markdown
+    assert crypto_state.report.sections[-1].markdown == compare_state.report.sections[-1].markdown
+
+
+async def test_write_report_overwrites_model_disclaimer() -> None:
+    invented = json.dumps(
+        {
+            "title": "HYPE 近况",
+            "executive_summary": "Hyperliquid 正在讨论手续费分享。[1]",
+            "sections": [
+                {
+                    "id": "Overview",
+                    "title": "概述",
+                    "markdown": "Hyperliquid 正在讨论把部分交易手续费分享给 HYPE 持有人。[1]",
+                    "claim_ids": ["llm-invented-id"],
+                },
+                {
+                    "id": "Disclaimer",
+                    "title": "免责声明",
+                    "markdown": "建议立即买入。",
+                    "claim_ids": [],
+                },
+            ],
+            "data_gaps": [],
+        },
+        ensure_ascii=False,
+    )
+    state, events = await _write(invented)
+    assert state.report is not None
+    assert state.report.sections[-1].id == "Disclaimer"
+    assert "建议立即买入" not in state.report.sections[-1].markdown
+    assert "不构成投资建议" in state.report.sections[-1].markdown
+    assert EventType.WARNING not in [event.type for event in events]
+
+
+async def _write_planned(
+    question: str,
+    question_type: QuestionType,
+    sections: tuple[str, ...],
+    reply: str,
+    *,
+    findings: list[ResearchFinding],
+    source: Source,
+    session_id: str = "sess-w-plan",
+) -> tuple[ResearchState, list[ResearchEvent]]:
+    bus = EventBus(session_id, heartbeat_interval_s=60.0)
+    state = ResearchState(session_id, question, bus=bus)
+    state.attach_plan(
+        validate_plan(
+            ResearchPlan(
+                question_type=question_type,
+                interpretation="测试用计划",
+                tasks=[
+                    ResearchTask(
+                        id="t1",
+                        agent=AgentName.WEB_RESEARCH,
+                        objective="测试任务",
+                    )
+                ],
+                report_sections=list(sections),
+            ),
+            IsolatedExecutionLimits(),
+        )
+    )
+    state.source_registry.replace_all([source])
+    state.findings = findings
+    await write_report(state, _writer(reply), now=_NOW)
+    return state, await _drain(bus)

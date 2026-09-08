@@ -1,6 +1,7 @@
-"""报告撰写阶段（§7.1 步骤 8，P2-8 / P2-9 / P5-5）。
+"""报告撰写阶段（§7.1 步骤 8，P2-8 / P2-9 / P5-5 / P5-7）。
 
 Fact Checker 的裁定已经写回 claims，并通过 `state.fact_check` 进入 user 消息。
+章节结构按问题类型由代码对齐；数据限制与免责声明不信模型。
 第一次拿不到合法 JSON：没有报告就等于没有交付物，会话失败（§7.2）。
 引用完整性不过：已有第一份报告，回喂改一次；再不过则降级标注，不让整次研究失败。
 """
@@ -20,6 +21,7 @@ from agent_service.orchestrator.comparison import (
     build_comparison_table,
     ensure_comparison_table,
 )
+from agent_service.orchestrator.outline import align_report_sections, resolve_section_ids
 from agent_service.orchestrator.state import AgentRun
 from agent_service.schemas.common import AgentName
 from agent_service.schemas.events import (
@@ -69,7 +71,9 @@ async def write_report(
     _refresh_finding_sources(state, numbered)
 
     cited = bibliography(numbered)
-    section_ids = tuple(state.plan.plan.report_sections) if state.plan is not None else ()
+    planned = state.plan.plan.report_sections if state.plan is not None else ()
+    question_type = state.plan.plan.question_type if state.plan is not None else None
+    section_ids = resolve_section_ids(question_type, planned, state.question)
     moment = now or datetime.now(UTC)
     table = build_comparison_table(state.findings)
     user_input = report_writer_user_message(
@@ -102,7 +106,7 @@ async def write_report(
         )
         raise
 
-    report = ensure_comparison_table(merge_report_gaps(structured.output, state.findings), table)
+    report = _finalize_draft(structured.output, state.findings, table, section_ids)
     report, usage, leftover = await _revise(
         writer,
         structured,
@@ -111,9 +115,11 @@ async def write_report(
         claims=claims,
         findings=state.findings,
         comparison_table=table,
+        section_ids=section_ids,
     )
     if leftover:
         report = apply_degradation(report, numbered, leftover)
+        report = align_report_sections(report, section_ids, data_gaps=report.data_gaps)
         _warn_citations(state, leftover)
 
     report = attach_section_claims(report, numbered, claims)
@@ -141,6 +147,7 @@ async def _revise(
     claims: Sequence[Claim],
     findings: Sequence[ResearchFinding],
     comparison_table: str | None,
+    section_ids: Sequence[str],
 ) -> tuple[ResearchReport, TokenUsage, list[CitationIssue]]:
     """第一次检查不过就回喂改一次。第二次仍不过：把问题交给调用方降级。"""
     issues = check_report(report, numbered, claims)
@@ -158,13 +165,21 @@ async def _revise(
         return report, usage + error.usage, issues
 
     usage = usage + retry.usage
-    candidate = ensure_comparison_table(
-        merge_report_gaps(retry.output, list(findings)), comparison_table
-    )
+    candidate = _finalize_draft(retry.output, findings, comparison_table, section_ids)
     retry_issues = check_report(candidate, numbered, claims)
     if retry_issues:
         return candidate, usage, retry_issues
     return candidate, usage, []
+
+
+def _finalize_draft(
+    draft: ResearchReport,
+    findings: Sequence[ResearchFinding],
+    comparison_table: str | None,
+    section_ids: Sequence[str],
+) -> ResearchReport:
+    merged = ensure_comparison_table(merge_report_gaps(draft, list(findings)), comparison_table)
+    return align_report_sections(merged, section_ids, data_gaps=merged.data_gaps)
 
 
 def _warn_citations(state: ResearchState, issues: Sequence[CitationIssue]) -> None:
