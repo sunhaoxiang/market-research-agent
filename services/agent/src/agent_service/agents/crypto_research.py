@@ -1,7 +1,7 @@
-"""Web Research Agent（§6.2，P2-6）。
+"""Crypto Research Agent（§6.2，P3-9）。
 
-LLM 只输出 `AgentFinding`（含 s1/s2 短引用）。真正的 Source / Claim.source_ids
-由 tool 层的 `SourceCollector` 补全——让模型复述 URL 是幻觉高发点（§15.1）。
+整合 crypto / defi / onchain / system / web 工具。LLM 只输出 `AgentFinding`；
+Source 与 claim.source_ids 由 `SourceCollector` 补全。
 """
 
 from __future__ import annotations
@@ -10,23 +10,18 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
-from agents import Agent, ModelSettings
+from agents import Agent, ModelSettings, Tool
 
-from agent_service.agents.findings import assemble_finding
 from agent_service.models.structured_output import build_strategy
 from agent_service.observability.prompts import PromptFingerprint, fingerprint
 from agent_service.prompts import load_prompt
 from agent_service.schemas.common import AgentName, ModelRole
 from agent_service.schemas.findings import AgentFinding
+from agent_service.tools.crypto.bindings import CRYPTO_TOOLS
+from agent_service.tools.defi.bindings import DEFI_TOOLS
+from agent_service.tools.onchain.bindings import ONCHAIN_TOOLS
+from agent_service.tools.system.bindings import SYSTEM_TOOLS
 from agent_service.tools.web.bindings import WEB_TOOLS
-
-__all__ = [
-    "PROMPT_NAME",
-    "WebResearchAgent",
-    "assemble_finding",
-    "build_web_research",
-    "web_research_user_message",
-]
 
 if TYPE_CHECKING:
     from agent_service.models.catalog import ModelEntry
@@ -34,12 +29,20 @@ if TYPE_CHECKING:
     from agent_service.models.structured_output import StructuredOutputStrategy
     from agent_service.schemas.plan import ResearchTask
 
-PROMPT_NAME = "web_research"
+PROMPT_NAME = "crypto_research"
 _UNTRUSTED_PROMPT = "untrusted_web"
+
+CRYPTO_RESEARCH_TOOLS: list[Tool] = [
+    *CRYPTO_TOOLS,
+    *DEFI_TOOLS,
+    *ONCHAIN_TOOLS,
+    *SYSTEM_TOOLS,
+    *WEB_TOOLS,
+]
 
 
 @dataclass(frozen=True)
-class WebResearchAgent:
+class CryptoResearchAgent:
     agent: Agent[Any]
     strategy: StructuredOutputStrategy[AgentFinding]
     entry: ModelEntry
@@ -50,16 +53,18 @@ class WebResearchAgent:
         return self.entry.id
 
 
-def build_web_research(registry: ModelRegistry, *, model_id: str | None = None) -> WebResearchAgent:
-    resolved = registry.resolve(model_id) if model_id else registry.for_role(ModelRole.FAST)
+def build_crypto_research(
+    registry: ModelRegistry, *, model_id: str | None = None
+) -> CryptoResearchAgent:
+    resolved = registry.resolve(model_id) if model_id else registry.for_role(ModelRole.BALANCED)
     instructions = load_prompt(_UNTRUSTED_PROMPT) + "\n\n" + load_prompt(PROMPT_NAME)
-    return WebResearchAgent(
+    return CryptoResearchAgent(
         agent=Agent(
-            name=AgentName.WEB_RESEARCH.value,
+            name=AgentName.CRYPTO_RESEARCH.value,
             instructions=instructions,
             model=resolved.model,
             model_settings=resolved.settings.resolve(ModelSettings(temperature=0.3)),
-            tools=WEB_TOOLS,
+            tools=CRYPTO_RESEARCH_TOOLS,
         ),
         strategy=build_strategy(AgentFinding, resolved.entry.capabilities),
         entry=resolved.entry,
@@ -67,7 +72,7 @@ def build_web_research(registry: ModelRegistry, *, model_id: str | None = None) 
     )
 
 
-def web_research_user_message(
+def crypto_research_user_message(
     task: ResearchTask,
     *,
     now: datetime | None = None,
@@ -94,5 +99,5 @@ def web_research_user_message(
             + ", ".join(missing_upstream)
             + " 失败，请在 data_gaps 中披露因此缺了什么。"
         )
-    parts.append("请检索公开网页并输出结构化发现。")
+    parts.append("请用结构化数据工具（必要时辅以网页检索）输出结构化发现。")
     return "\n\n".join(parts)

@@ -18,6 +18,7 @@ from agent_service.tools.defi.models import (
     TvlData,
 )
 from agent_service.tools.deps import ToolDeps
+from agent_service.tools.web.collector import stamp_for_agent
 
 
 @function_tool
@@ -34,7 +35,9 @@ async def get_tvl(
         chain: DefiLlama 链名，大小写需与官网一致，例如 "Hyperliquid"。
         days: 回看天数，1–365，默认 30。在本地裁切，不另打一枪。
     """
-    return await run_get_tvl(ctx.context, protocol=protocol, chain=chain, days=days)
+    return stamp_for_agent(
+        ctx.context, await run_get_tvl(ctx.context, protocol=protocol, chain=chain, days=days)
+    )
 
 
 @function_tool
@@ -46,7 +49,9 @@ async def get_protocol_fees_revenue(
     Args:
         protocol: DefiLlama 协议 slug，例如 "hyperliquid"。
     """
-    return await run_get_protocol_fees_revenue(ctx.context, protocol=protocol)
+    return stamp_for_agent(
+        ctx.context, await run_get_protocol_fees_revenue(ctx.context, protocol=protocol)
+    )
 
 
 @function_tool
@@ -58,7 +63,7 @@ async def get_dex_volume(
     Args:
         protocol: DefiLlama 协议 slug，例如 "hyperliquid"。
     """
-    return await run_get_dex_volume(ctx.context, protocol=protocol)
+    return stamp_for_agent(ctx.context, await run_get_dex_volume(ctx.context, protocol=protocol))
 
 
 @function_tool
@@ -70,7 +75,7 @@ async def get_chain_overview(
     Args:
         chain: DefiLlama 链名，例如 "Hyperliquid"。大小写不敏感。
     """
-    return await run_get_chain_overview(ctx.context, chain=chain)
+    return stamp_for_agent(ctx.context, await run_get_chain_overview(ctx.context, chain=chain))
 
 
 DEFI_TOOLS: list[Tool] = [

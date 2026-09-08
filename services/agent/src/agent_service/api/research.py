@@ -93,6 +93,9 @@ async def stream_research(request: ResearchRequest, http_request: Request) -> St
         limits=limits,
         search=getattr(http_request.app.state, "search_provider", None),
         fetcher=getattr(http_request.app.state, "web_fetcher", None),
+        coingecko=getattr(http_request.app.state, "coingecko", None),
+        defillama=getattr(http_request.app.state, "defillama", None),
+        hyperliquid=getattr(http_request.app.state, "hyperliquid", None),
         clock=None if runtime is None else runtime.clock,
         fallback_model_id=planner.model_id,
     )

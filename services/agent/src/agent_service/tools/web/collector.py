@@ -19,6 +19,7 @@ from agent_service.tools.web.untrusted import strip_isolation_tags
 
 if TYPE_CHECKING:
     from agent_service.schemas.sources import Source
+    from agent_service.tools.deps import ToolDeps
 
 
 @dataclass
@@ -104,4 +105,41 @@ def stamp_refs[T](collector: SourceCollector, result: ToolResult[T]) -> ToolResu
             http_status=data.status_code,
         )
         return result.model_copy(update={"data": data.model_copy(update={"ref": ref})})
-    return result
+    url = _structured_url(data)
+    if url is None:
+        return result
+    ref = collector.add(
+        url=url,
+        title=_structured_title(data),
+        excerpt=None,
+        provider=provider,
+        retrieved_at=retrieved,
+        source_type=SourceType.API,
+    )
+    return result.model_copy(update={"ref": ref})
+
+
+def stamp_for_agent[T](deps: ToolDeps, result: ToolResult[T]) -> ToolResult[T]:
+    """Agent 路径：登记来源。invoke 不走这里。"""
+    if deps.sources is None:
+        return result
+    return stamp_refs(deps.sources, result)
+
+
+def _structured_url(data: object) -> str | None:
+    url = getattr(data, "url", None)
+    if isinstance(url, str) and url.strip():
+        return url
+    resolved = getattr(data, "resolved", None)
+    nested = getattr(resolved, "url", None) if resolved is not None else None
+    if isinstance(nested, str) and nested.strip():
+        return nested
+    return None
+
+
+def _structured_title(data: object) -> str | None:
+    for attr in ("name", "title", "chain", "protocol", "coin_id", "query"):
+        value = getattr(data, attr, None)
+        if isinstance(value, str) and value.strip():
+            return value
+    return None

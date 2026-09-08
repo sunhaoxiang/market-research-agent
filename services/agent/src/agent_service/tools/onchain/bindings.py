@@ -13,6 +13,7 @@ from agent_service.tools.onchain.gaps import (
     run_get_whale_activity,
 )
 from agent_service.tools.onchain.models import ChainActivityData
+from agent_service.tools.web.collector import stamp_for_agent
 
 
 @function_tool
@@ -25,7 +26,9 @@ async def get_chain_activity(
         chain: 链名，例如 "Hyperliquid"。其它链会返回 unsupported。
         days: 回看天数，1–365。Hyperliquid 只有 24h 快照，大于 1 时不会当成历史序列。
     """
-    return await run_get_chain_activity(ctx.context, chain=chain, days=days)
+    return stamp_for_agent(
+        ctx.context, await run_get_chain_activity(ctx.context, chain=chain, days=days)
+    )
 
 
 @function_tool
@@ -35,7 +38,7 @@ async def get_token_holders(ctx: RunContextWrapper[ToolDeps], asset: str) -> Too
     Args:
         asset: 资产代号或 coin id，例如 "hyperliquid"。
     """
-    return await run_get_token_holders(ctx.context, asset=asset)
+    return stamp_for_agent(ctx.context, await run_get_token_holders(ctx.context, asset=asset))
 
 
 @function_tool
@@ -48,7 +51,9 @@ async def get_whale_activity(
         asset: 资产代号或 coin id，例如 "hyperliquid"。
         threshold: 金额门槛（USD）。当前无数据源，参数会被忽略。
     """
-    return await run_get_whale_activity(ctx.context, asset=asset, threshold=threshold)
+    return stamp_for_agent(
+        ctx.context, await run_get_whale_activity(ctx.context, asset=asset, threshold=threshold)
+    )
 
 
 @function_tool
@@ -61,7 +66,9 @@ async def get_exchange_flow(
         asset: 资产代号或 coin id，例如 "hyperliquid"。
         days: 回看天数。当前无数据源，参数会被忽略。
     """
-    return await run_get_exchange_flow(ctx.context, asset=asset, days=days)
+    return stamp_for_agent(
+        ctx.context, await run_get_exchange_flow(ctx.context, asset=asset, days=days)
+    )
 
 
 ONCHAIN_TOOLS: list[Tool] = [

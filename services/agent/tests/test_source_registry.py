@@ -9,6 +9,7 @@ from agent_service.schemas.common import SourceReliability, SourceType
 from agent_service.schemas.events import EventType, SourceFoundPayload
 from agent_service.schemas.tools import DataProvenance, ToolResult
 from agent_service.sources.registry import SourceRegistry
+from agent_service.tools.crypto.models import CryptoPriceData
 from agent_service.tools.web.collector import SourceCollector, stamp_refs
 from agent_service.tools.web.models import WebSearchData, WebSearchHit
 
@@ -114,3 +115,19 @@ def test_stamp_refs_collapses_tracking_variants() -> None:
     assert stamped.data is not None
     assert stamped.data.hits[0].ref == stamped.data.hits[1].ref == "s1"
     assert len(collector.sources()) == 1
+
+
+def test_stamp_refs_registers_structured_api_url() -> None:
+    collector = SourceCollector()
+    page = "https://www.coingecko.com/en/coins/hyperliquid"
+    result = ToolResult.success(
+        CryptoPriceData(coin_id="hyperliquid", vs_currency="usd", price=42.5, url=page),
+        provenance=DataProvenance(
+            provider="coingecko", endpoint="/simple/price", retrieved_at=_NOW
+        ),
+    )
+    stamped = stamp_refs(collector, result)
+    assert stamped.ref == "s1"
+    assert collector.sources()[0].url == page
+    assert collector.sources()[0].source_type is SourceType.API
+    assert collector.sources()[0].reliability is SourceReliability.AGGREGATOR

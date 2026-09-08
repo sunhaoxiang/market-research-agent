@@ -80,6 +80,10 @@ class ToolResult[T](BaseModel):
     error: ToolError | None = None
     provenance: DataProvenance | None = None
     quality: DataQuality | None = None
+    ref: str | None = Field(
+        default=None,
+        description="Agent 路径由 SourceCollector 填写的短引用（s1/s2），invoke 不填",
+    )
 
     @classmethod
     def success(

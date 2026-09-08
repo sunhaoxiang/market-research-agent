@@ -8,6 +8,7 @@ from agent_service.schemas.tools import ToolResult
 from agent_service.tools.deps import ToolDeps
 from agent_service.tools.system.compute import run_compute_metrics
 from agent_service.tools.system.models import ComputeMetricsData, SeriesPoint
+from agent_service.tools.web.collector import stamp_for_agent
 
 
 @function_tool
@@ -28,12 +29,15 @@ async def compute_metrics(
         years: 仅 CAGR。序列没有 timestamp 时必须提供，单位年。
         periods_per_year: 仅波动率年化。缺省时按时间戳间隔推断，再不行按 365。
     """
-    return run_compute_metrics(
+    return stamp_for_agent(
         ctx.context,
-        series=series,
-        ops=ops,
-        years=years,
-        periods_per_year=periods_per_year,
+        run_compute_metrics(
+            ctx.context,
+            series=series,
+            ops=ops,
+            years=years,
+            periods_per_year=periods_per_year,
+        ),
     )
 
 

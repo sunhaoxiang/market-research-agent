@@ -17,6 +17,7 @@ from agents.testing import ScriptedModel, assistant_message
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
 
+from agent_service.agents.crypto_research import CryptoResearchAgent, build_crypto_research
 from agent_service.agents.placeholder import NOT_IMPLEMENTED_GAP, PlaceholderRunner
 from agent_service.agents.report_writer import ReportWriterAgent, build_report_writer
 from agent_service.agents.research_manager import PlannerAgent, build_research_manager
@@ -106,6 +107,33 @@ def _report_json() -> str:
     )
 
 
+def _crypto_finding_json() -> str:
+    return json.dumps(
+        {
+            "summary": "脚本化 Crypto Agent 输出。",
+            "claims": [],
+            "metrics": [],
+            "data_gaps": ["脚本化测试未调用工具"],
+        },
+        ensure_ascii=False,
+    )
+
+
+def _scripted_crypto() -> CryptoResearchAgent:
+    registry = ModelRegistry(
+        IsolatedSettings(
+            providers=IsolatedProviderCredentials(deepseek_api_key=SecretStr("sk-test"))
+        )
+    )
+    built = build_crypto_research(registry)
+    return CryptoResearchAgent(
+        agent=built.agent.clone(model=ScriptedModel([[assistant_message(_crypto_finding_json())]])),
+        strategy=built.strategy,
+        entry=built.entry,
+        prompt=built.prompt,
+    )
+
+
 def _scripted_writer() -> ReportWriterAgent:
     registry = ModelRegistry(
         IsolatedSettings(
@@ -155,6 +183,10 @@ def client(only_deepseek: None, monkeypatch: pytest.MonkeyPatch) -> TestClient:
         research_api,
         "build_report_writer",
         lambda registry, model_id=None: _scripted_writer(),
+    )
+    monkeypatch.setattr(
+        "agent_service.agents.runner.build_crypto_research",
+        lambda registry, model_id=None: _scripted_crypto(),
     )
     return TestClient(create_app())
 
@@ -361,13 +393,38 @@ def test_session_id_from_the_caller_is_used(client: TestClient) -> None:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-def test_placeholder_still_drives_the_agent_lifecycle(client: TestClient) -> None:
+def test_placeholder_still_drives_the_agent_lifecycle(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """占位 runner 也要产生完整的 started/progress/completed。
 
     前端 Activity Panel（P1-12）要靠这三个事件验证渲染，缺一个就没法开工。
+    crypto_research 已在 P3-9 接真工具，这里用仍走占位的 stock_research。
     """
+    del client
+    monkeypatch.setattr(
+        research_api,
+        "build_research_manager",
+        lambda registry, limits, model_id=None: _scripted_planner(
+            _plan_json(
+                tasks=[
+                    {
+                        "id": "t1",
+                        "agent": "stock_research",
+                        "objective": "获取 NVDA 最近一季营收",
+                        "entities": [],
+                        "suggested_tools": [],
+                        "depends_on": [],
+                        "priority": 0,
+                    }
+                ]
+            )
+        ),
+    )
     events = parse_frames(
-        client.post("/v1/research/stream", json={"question": "Hyperliquid 怎么样？"}).text
+        TestClient(create_app())
+        .post("/v1/research/stream", json={"question": "NVDA 财报怎么样？"})
+        .text
     )
     types = [event["type"] for event in events]
 
@@ -383,7 +440,7 @@ async def test_placeholder_discloses_that_no_data_was_fetched() -> None:
     """
     bus = EventBus("sess-1", heartbeat_interval_s=60.0)
     state = ResearchState("sess-1", "问题", bus=bus)
-    task = ResearchTask(id="t1", agent=AgentName.CRYPTO_RESEARCH, objective="获取手续费收入")
+    task = ResearchTask(id="t1", agent=AgentName.STOCK_RESEARCH, objective="获取手续费收入")
 
     finding = await PlaceholderRunner("deepseek:deepseek-v4-pro").run(
         TaskContext(task=task, upstream=(), missing_upstream=()), state

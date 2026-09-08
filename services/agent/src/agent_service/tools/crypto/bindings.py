@@ -1,4 +1,4 @@
-"""给 Agents SDK 用的 `@function_tool` 包装。P3-9 再挂到 Crypto Research Agent。"""
+"""给 Agents SDK 用的 `@function_tool` 包装。"""
 
 from __future__ import annotations
 
@@ -20,6 +20,7 @@ from agent_service.tools.crypto.models import (
 from agent_service.tools.crypto.resolve import run_resolve_asset
 from agent_service.tools.crypto.tokenomics import run_get_tokenomics
 from agent_service.tools.deps import ToolDeps
+from agent_service.tools.web.collector import stamp_for_agent
 
 
 @function_tool
@@ -34,7 +35,7 @@ async def resolve_asset(
     Args:
         query: 代号、全名或 coin id，例如 "HYPE"、"Hyperliquid"、"hyperliquid"。
     """
-    return await run_resolve_asset(ctx.context, query=query)
+    return stamp_for_agent(ctx.context, await run_resolve_asset(ctx.context, query=query))
 
 
 @function_tool
@@ -47,7 +48,9 @@ async def get_crypto_price(
         asset: CoinGecko coin id，例如 "hyperliquid"。
         vs_currency: 计价货币，默认 usd。
     """
-    return await run_get_crypto_price(ctx.context, asset=asset, vs_currency=vs_currency)
+    return stamp_for_agent(
+        ctx.context, await run_get_crypto_price(ctx.context, asset=asset, vs_currency=vs_currency)
+    )
 
 
 @function_tool
@@ -60,7 +63,9 @@ async def get_market_data(
         asset: CoinGecko coin id，例如 "hyperliquid"。
         vs_currency: 计价货币，默认 usd。
     """
-    return await run_get_market_data(ctx.context, asset=asset, vs_currency=vs_currency)
+    return stamp_for_agent(
+        ctx.context, await run_get_market_data(ctx.context, asset=asset, vs_currency=vs_currency)
+    )
 
 
 @function_tool
@@ -77,7 +82,10 @@ async def get_price_history(
         days: 回看天数，1–365，默认 30。
         vs_currency: 计价货币，默认 usd。
     """
-    return await run_get_price_history(ctx.context, asset=asset, days=days, vs_currency=vs_currency)
+    return stamp_for_agent(
+        ctx.context,
+        await run_get_price_history(ctx.context, asset=asset, days=days, vs_currency=vs_currency),
+    )
 
 
 @function_tool
@@ -92,7 +100,9 @@ async def get_tokenomics(
         asset: CoinGecko coin id，例如 "hyperliquid"。
         vs_currency: 计价货币（影响 FDV），默认 usd。
     """
-    return await run_get_tokenomics(ctx.context, asset=asset, vs_currency=vs_currency)
+    return stamp_for_agent(
+        ctx.context, await run_get_tokenomics(ctx.context, asset=asset, vs_currency=vs_currency)
+    )
 
 
 CRYPTO_TOOLS: list[Tool] = [

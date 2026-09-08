@@ -1,7 +1,7 @@
 """带工具的子 Agent 运行：流式翻译事件 + 结构化输出（含一次 JSON 修正）。
 
-规划 Agent 没有工具，走 `run_structured`（`Runner.run`）即可。Web Research
-有工具循环，必须 `run_streamed`，否则 Activity Panel 看不到 tool 事件。
+规划 Agent 没有工具，走 `run_structured`（`Runner.run`）即可。带工具的子 Agent
+（Web / Crypto Research）必须 `run_streamed`，否则 Activity Panel 看不到 tool 事件。
 
 JSON 解析失败时不再跑工具：把对话历史加上字段错误回喂，让模型只改输出形状。
 再搜一遍既贵又可能改来源编号。

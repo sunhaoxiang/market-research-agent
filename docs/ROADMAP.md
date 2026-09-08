@@ -6,7 +6,7 @@
 > **每完成一个任务就更新此表的状态**；每完成一个阶段，跑 `[DP §26]` 的收尾清单并写阶段小结。
 
 - 最后更新：2026-09-08
-- 当前阶段：**P3-8 链上覆盖度已落地**；下一任务 P3-9 Crypto Research Agent（整合 crypto/defi/onchain/web）。
+- 当前阶段：**P3-9 Crypto Research Agent 已完成**；下一任务 P3-10 数值冲突检测。
 
 ### 已确认的前置决策（2026-09-07）
 
@@ -156,7 +156,7 @@ hash 跨会话稳定，说明 §9.8 的缓存前缀约束真的守住了；95.4%
 | P3-6  | `tools/defi/`：`get_tvl` / `get_protocol_fees_revenue` / `get_dex_volume` / `get_chain_overview`。包 `DefiLlamaProvider` 的现成类型，不要再解析一遍 JSON | P3-2            | ✅   | HYPE/Hyperliquid 数据正确               |
 | P3-7  | `tools/crypto/get_tokenomics`：供应量 / 分配 / 解锁（数据源覆盖度调研 + 缺失明确声明）           | P3-1            | ✅   | 拿不到的字段进 `data_gaps`              |
 | P3-8  | 链上数据源选型调研 + 可行子集实现（`get_chain_activity` 等），受限项写入风险登记 `[DP §23 R4]`   | P3-2            | ✅   | 覆盖度结论见 [`docs/onchain-coverage.md`](./onchain-coverage.md) |
-| P3-9  | Crypto Research Agent + prompt（整合 crypto/defi/onchain/web tools）                             | P3-4~P3-8, P2-6 | ⬜   | 对 3 个样例 crypto 问题产出完整 finding |
+| P3-9  | Crypto Research Agent + prompt（整合 crypto/defi/onchain/web tools）                             | P3-4~P3-8, P2-6 | ✅   | 对 3 个样例 crypto 问题产出完整 finding |
 | P3-10 | 数值冲突检测：多源同指标差异 → `CONFLICT_DETECTED` + 报告并列展示 `[DP §23 R9]`                  | P3-9            | ⬜   | 注入冲突数据能被检出                    |
 | P3-11 | 前端：`METRIC_FOUND` 驱动的 Recharts 图表（价格 / TVL 走势）内嵌报告                             | P3-9, P2-10     | ⬜   | 报告中显示 30d TVL 曲线                 |
 
@@ -586,6 +586,20 @@ tool 只包已有 `get_market`，不另打 HTTP、不解析 JSON。`allocations`
 | 其它链的 chain activity | — | **UNSUPPORTED**，不要假装成 Ethereum |
 
 `get_chain_activity` 包 `HyperliquidProvider.get_perp_snapshot()`，不解析 JSON。成功永远是 `partial`（`active_addresses` / `tx_count` 始终缺失）。`days != 1` 仍返回 24h 快照并写 caveat。三个缺口 tool 不接 HTTP，空 `asset` 才 `INVALID_INPUT`。TVL/fees/volume 已在 P3-6。付费源留作后续开关。`ONCHAIN_TOOLS` 已挂 `@function_tool` 和 invoke；P3-9 再挂到 Crypto Research Agent。R4 已补上本次结论。
+
+### P3-9 — Crypto Research Agent ✅（2026-09-08）
+
+第一个会打结构化金融数据的子 Agent。工具集是 crypto + defi + onchain + `compute_metrics` + web。LLM 只输出 `AgentFinding`（短引用 `s1`/`s2`），编排层补全 Source / `claim.source_ids`，并在有 `metrics` 时发 `METRIC_FOUND`。
+
+几个刻意的边界：
+
+- 走 `ModelRole.BALANCED`；stock 仍走 `PlaceholderRunner`。
+- 先 `resolve_asset` 再取数。`asset` 必须是 coin_id。
+- 工具 `unsupported` / `quality.missing_fields` 必须进 `data_gaps`。代码会把 `ToolError.message` 抄进缺口，不依赖模型自觉。空字段不是 0。
+- 结构化工具成功时把页面 URL 登记为 `SourceType.API`（CoinGecko / DefiLlama 为 aggregator），`ToolResult.ref` 给模型引用。
+- 日期和 objective 放 user 消息（§9.8）。含网页工具，所以拼上 `untrusted_web` prompt。
+
+验收用 ScriptedModel 覆盖三个样例：「介绍一下 HYPE」「分析 HYPE 最近一个月上涨的原因」「查询 HYPE 的 TVL、交易量和资金变化」。第三问会打到 `get_exchange_flow` 的 `UNSUPPORTED`，finding 里有 data_gaps。P3-10 再做多源数值冲突。
 
 ---
 

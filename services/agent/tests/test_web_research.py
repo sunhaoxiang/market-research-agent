@@ -243,7 +243,7 @@ async def test_scripted_web_agent_produces_finding_with_sources() -> None:
     assert types.count(EventType.SOURCE_FOUND) == 1
 
 
-async def test_sub_agent_runner_still_placeholders_crypto() -> None:
+async def test_sub_agent_runner_still_placeholders_stock() -> None:
     runner = SubAgentRunner(
         _registry(),
         limits=IsolatedExecutionLimits(),
@@ -251,7 +251,7 @@ async def test_sub_agent_runner_still_placeholders_crypto() -> None:
     )
     bus = EventBus("sess-ph", heartbeat_interval_s=60.0)
     state = ResearchState("sess-ph", "问题", bus=bus)
-    task = ResearchTask(id="t1", agent=AgentName.CRYPTO_RESEARCH, objective="获取手续费")
+    task = ResearchTask(id="t1", agent=AgentName.STOCK_RESEARCH, objective="获取财报")
     finding = await runner.run(TaskContext(task=task), state)
     assert finding.data_gaps == [NOT_IMPLEMENTED_GAP]
     assert runner.model_id_for(AgentName.WEB_RESEARCH).startswith("deepseek:")
