@@ -79,8 +79,9 @@ def test_execution_limits_are_internally_consistent() -> None:
     limits = IsolatedSettings().limits
     assert limits.max_tasks_per_plan <= 10
     assert limits.max_parallel_tasks <= limits.max_tasks_per_plan
-    # 整体超时必须大于单任务超时，否则并行任务永远来不及完成
+    # 整体超时必须能覆盖至少两波串行任务（max_parallel < 同层任务数时）
     assert limits.total_timeout_s > limits.task_timeout_s
+    assert limits.total_timeout_s >= 2 * limits.task_timeout_s
 
 
 def test_secrets_are_not_exposed_in_repr(monkeypatch: pytest.MonkeyPatch) -> None:

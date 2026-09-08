@@ -151,7 +151,7 @@ async def test_independent_tasks_run_concurrently() -> None:
     state = _state(_task("t1"), _task("t2"), _task("t3"))
     runner = RecordingRunner(delays={"t1": 0.02, "t2": 0.02, "t3": 0.02})
 
-    await execute_plan(state, runner=runner, limits=_limits(), deadline_s=60.0)
+    await execute_plan(state, runner=runner, limits=_limits(max_parallel_tasks=4), deadline_s=60.0)
 
     assert runner.peak_concurrency == 3
     assert len(state.findings) == 3
@@ -228,6 +228,36 @@ async def test_timeout_is_reported_as_a_task_failure() -> None:
 
     assert state.task_status["t1"] is TaskStatus.FAILED
     assert state.task_status["t2"] is TaskStatus.COMPLETED
+    events = await _drain(state.bus)
+    failed = [event for event in events if event.type is EventType.AGENT_FAILED]
+    assert _payload(failed[0], AgentFailedPayload).error.code == "task_timeout"
+
+
+async def test_timeout_keeps_salvaged_finding_for_the_writer() -> None:
+    """超时不能把已经取到的来源丢掉：Writer 只看 state.findings（D20）。"""
+
+    class SalvagingRunner(RecordingRunner):
+        async def run(self, context: TaskContext, state: ResearchState) -> ResearchFinding:
+            try:
+                return await super().run(context, state)
+            except asyncio.CancelledError:
+                context.salvage.finding = ResearchFinding(
+                    task_id=context.task.id,
+                    agent=context.task.agent,
+                    summary="salvaged",
+                    data_gaps=["巨鲸转账没有免费 API"],
+                )
+                raise
+
+    state = _state(_task("t1"), _task("t2"))
+    runner = SalvagingRunner(delays={"t1": 5.0})
+
+    await execute_plan(state, runner=runner, limits=_limits(task_timeout_s=0.02), deadline_s=60.0)
+
+    assert state.task_status["t1"] is TaskStatus.FAILED
+    assert state.task_status["t2"] is TaskStatus.COMPLETED
+    salvaged = next(item for item in state.findings if item.task_id == "t1")
+    assert "巨鲸" in salvaged.data_gaps[0]
     events = await _drain(state.bus)
     failed = [event for event in events if event.type is EventType.AGENT_FAILED]
     assert _payload(failed[0], AgentFailedPayload).error.code == "task_timeout"

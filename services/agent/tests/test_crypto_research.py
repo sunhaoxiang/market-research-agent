@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 from datetime import UTC, datetime
 
+import pytest
 from agents.testing import ScriptedModel, assistant_message, function_call
 from pydantic import SecretStr
 
@@ -13,7 +15,11 @@ from agent_service.agents.crypto_research import (
     build_crypto_research,
     crypto_research_user_message,
 )
-from agent_service.agents.findings import EMPTY_CRYPTO_SOURCES_GAP, assemble_finding
+from agent_service.agents.findings import (
+    EMPTY_CRYPTO_SOURCES_GAP,
+    assemble_finding,
+    salvage_finding,
+)
 from agent_service.agents.placeholder import NOT_IMPLEMENTED_GAP
 from agent_service.agents.runner import SubAgentRunner
 from agent_service.agents.runtime import run_tool_agent
@@ -44,7 +50,7 @@ from agent_service.schemas.common import AgentName, SourceType
 from agent_service.schemas.events import EventType
 from agent_service.schemas.findings import ResearchFinding
 from agent_service.schemas.plan import ResearchTask
-from agent_service.schemas.tools import DataProvenance, ToolErrorCode
+from agent_service.schemas.tools import DataProvenance, ToolError, ToolErrorCode
 from agent_service.sources.registry import SourceRegistry
 from agent_service.testing import (
     IsolatedExecutionLimits,
@@ -469,6 +475,82 @@ async def test_tvl_volume_and_flow_gap() -> None:
     assert finding.tool_errors[0].code is ToolErrorCode.UNSUPPORTED
     assert any("交易所" in gap or "净流入" in gap for gap in finding.data_gaps)
     bus.close()
+
+
+def test_salvage_finding_keeps_sources_and_unsupported_errors() -> None:
+    """超时没有 LLM 草稿时，来源仍要能发 [n]，unsupported 必须进 data_gaps。"""
+    collector = SourceCollector()
+    collector.add(
+        url=_LLAMA,
+        title="Hyperliquid",
+        excerpt=None,
+        provider="defillama",
+        retrieved_at=_NOW,
+        source_type=SourceType.API,
+    )
+    collector.errors.append(
+        ToolError(
+            code=ToolErrorCode.UNSUPPORTED,
+            message="交易所净流入/流出没有免费 API",
+            tool="get_exchange_flow",
+        )
+    )
+    finding = salvage_finding(
+        _task("查询资金变化"),
+        collector,
+        timeout_s=180,
+        empty_sources_gap=EMPTY_CRYPTO_SOURCES_GAP,
+    )
+    assert finding.sources[0].url == _LLAMA
+    assert finding.claims[0].source_ids == [finding.sources[0].id]
+    assert any("180" in gap for gap in finding.data_gaps)
+    assert any("没有免费 API" in gap for gap in finding.data_gaps)
+    assert finding.tool_errors[0].code is ToolErrorCode.UNSUPPORTED
+
+
+async def test_crypto_runner_salvages_collector_on_cancel(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def hang(_agent: object, _user: object, **kwargs: object) -> None:
+        deps = kwargs["deps"]
+        assert isinstance(deps, ToolDeps)
+        sources = deps.sources
+        assert sources is not None
+        sources.add(
+            url=_LLAMA,
+            title="Hyperliquid",
+            excerpt=None,
+            provider="defillama",
+            retrieved_at=_NOW,
+            source_type=SourceType.API,
+        )
+        sources.errors.append(
+            ToolError(
+                code=ToolErrorCode.UNSUPPORTED,
+                message="交易所净流入/流出没有免费 API",
+                tool="get_exchange_flow",
+            )
+        )
+        await asyncio.Event().wait()
+
+    monkeypatch.setattr("agent_service.agents.runner.run_tool_agent", hang)
+    runner = SubAgentRunner(
+        _registry(),
+        limits=IsolatedExecutionLimits(),
+        fallback_model_id="deepseek:deepseek-v4-pro",
+    )
+    bus = EventBus("sess-salvage", heartbeat_interval_s=60.0)
+    state = ResearchState("sess-salvage", "问题", bus=bus)
+    context = TaskContext(task=_task("查询资金变化"), timeout_s=180)
+    running = asyncio.create_task(runner.run(context, state))
+    await asyncio.sleep(0.05)
+    running.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await running
+    saved = context.salvage.finding
+    assert saved is not None
+    assert saved.sources[0].url == _LLAMA
+    assert any("没有免费 API" in gap for gap in saved.data_gaps)
 
 
 async def test_sub_agent_runner_still_placeholders_stock() -> None:

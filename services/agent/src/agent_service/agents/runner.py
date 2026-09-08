@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import time
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -12,7 +13,11 @@ from agent_service.agents.crypto_research import (
     build_crypto_research,
     crypto_research_user_message,
 )
-from agent_service.agents.findings import EMPTY_CRYPTO_SOURCES_GAP, assemble_finding
+from agent_service.agents.findings import (
+    EMPTY_CRYPTO_SOURCES_GAP,
+    assemble_finding,
+    salvage_finding,
+)
 from agent_service.agents.placeholder import PlaceholderRunner
 from agent_service.agents.runtime import run_tool_agent
 from agent_service.agents.web_research import (
@@ -127,6 +132,10 @@ class SubAgentRunner:
             missing_upstream=context.missing_upstream,
         )
 
+        kwargs: dict[str, Any] = {}
+        if empty_sources_gap is not None:
+            kwargs["empty_sources_gap"] = empty_sources_gap
+
         try:
             structured = await run_tool_agent(
                 built.agent,
@@ -136,6 +145,28 @@ class SubAgentRunner:
                 translator=translator,
                 max_turns=self._limits.max_tool_calls_per_agent + 1,
             )
+        except asyncio.CancelledError:
+            # 执行器的 asyncio.timeout 会取消本协程。先把 collector 里已有的
+            # 来源和 unsupported 缺口塞进 salvage，再让取消冒泡——否则 Writer
+            # 只能写「数据缺失」，工具结果全废。
+            self._record(
+                built,
+                state,
+                started,
+                context.task,
+                usage=TokenUsage(),
+                error=ErrorInfo(
+                    code="task_timeout",
+                    message=f"任务超过 {context.timeout_s:.0f}s 未完成",
+                ),
+            )
+            context.salvage.finding = salvage_finding(
+                context.task,
+                collector,
+                timeout_s=context.timeout_s,
+                **kwargs,
+            )
+            raise
         except StructuredOutputError as error:
             self._record(built, state, started, context.task, usage=error.usage, error=error)
             raise
@@ -151,9 +182,6 @@ class SubAgentRunner:
             raise
 
         self._record(built, state, started, context.task, usage=structured.usage)
-        kwargs: dict[str, Any] = {}
-        if empty_sources_gap is not None:
-            kwargs["empty_sources_gap"] = empty_sources_gap
         return assemble_finding(context.task, structured.output, collector, **kwargs)
 
     def _record(

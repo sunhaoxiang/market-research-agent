@@ -5,8 +5,8 @@ LLM 只输出短引用 s1/s2；URL 与 source_id 由代码补全（§15.1）。
 
 from __future__ import annotations
 
-from agent_service.schemas.claims import Claim
-from agent_service.schemas.common import EpistemicType
+from agent_service.schemas.claims import Claim, ClaimDraft
+from agent_service.schemas.common import ConfidenceLevel, EpistemicType
 from agent_service.schemas.entities import MetricPoint
 from agent_service.schemas.events import MetricFoundEvent, MetricFoundPayload
 from agent_service.schemas.findings import AgentFinding, ResearchFinding
@@ -16,6 +16,10 @@ from agent_service.tools.web.collector import SourceCollector
 
 EMPTY_WEB_SOURCES_GAP = "本次任务未获得任何网页来源"
 EMPTY_CRYPTO_SOURCES_GAP = "本次任务未获得任何来源"
+TIMEOUT_INCOMPLETE_GAP = (
+    "任务超过 {timeout_s:.0f}s 未完成，未能输出结构化发现。以下来源与工具缺口是超时前已收集的。"
+)
+_SALVAGE_EXCERPT_CAP = 160
 
 
 def assemble_finding(
@@ -82,6 +86,51 @@ def assemble_finding(
         data_gaps=gaps,
         tool_errors=list(collector.errors),
     )
+
+
+def salvage_finding(
+    task: ResearchTask,
+    collector: SourceCollector,
+    *,
+    timeout_s: float,
+    empty_sources_gap: str = EMPTY_WEB_SOURCES_GAP,
+) -> ResearchFinding:
+    """超时取消时，把已登记的来源和工具缺口留给 Writer。
+
+    没有 LLM 草稿就没有数字 claims；来源仍做成可引用陈述，否则
+    `assign_citation_indices` 不会给孤儿来源发 [n]。
+    """
+    gap = TIMEOUT_INCOMPLETE_GAP.format(timeout_s=timeout_s)
+    draft = AgentFinding(
+        summary=gap,
+        claims=_salvage_claims(collector.sources()),
+        data_gaps=[gap],
+    )
+    return assemble_finding(task, draft, collector, empty_sources_gap=empty_sources_gap)
+
+
+def _salvage_claims(sources: list[Source]) -> list[ClaimDraft]:
+    return [
+        ClaimDraft(
+            text=_salvage_claim_text(source),
+            epistemic_type=EpistemicType.SOURCE_BACKED_FACT,
+            confidence=ConfidenceLevel.MEDIUM,
+            source_refs=[source.ref],
+        )
+        for source in sources
+        if source.ref
+    ]
+
+
+def _salvage_claim_text(source: Source) -> str:
+    title = (source.title or source.domain or source.url).strip()
+    excerpt = " ".join((source.excerpt or "").split())
+    if excerpt:
+        if len(excerpt) > _SALVAGE_EXCERPT_CAP:
+            excerpt = excerpt[:_SALVAGE_EXCERPT_CAP].rstrip() + "…"
+        return f"{title}：{excerpt}"
+    provider = source.provider or "未知来源"
+    return f"已从 {provider} 登记来源：{title}"
 
 
 def _metric(point: MetricPoint, by_ref: dict[str, Source], gaps: list[str]) -> MetricPoint:

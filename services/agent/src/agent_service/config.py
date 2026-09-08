@@ -77,11 +77,11 @@ class ExecutionLimits(BaseSettings):
     model_config = _env_config()
 
     max_tasks_per_plan: int = Field(default=6, ge=1, le=10)
-    max_parallel_tasks: int = Field(default=4, ge=1, le=6)
+    max_parallel_tasks: int = Field(default=2, ge=1, le=6)
     max_tool_calls_per_agent: int = Field(default=12, ge=1, le=20)
     max_supplement_rounds: int = Field(default=1, ge=0, le=2)
-    task_timeout_s: float = Field(default=120.0, gt=0)
-    total_timeout_s: float = Field(default=420.0, gt=0)
+    task_timeout_s: float = Field(default=180.0, gt=0)
+    total_timeout_s: float = Field(default=600.0, gt=0)
     max_session_cost_usd: float = Field(default=1.0, gt=0)
 
 

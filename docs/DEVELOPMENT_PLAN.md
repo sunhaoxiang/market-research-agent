@@ -447,13 +447,13 @@ User Question ─────►│ 1. Intent Classify       │  确定性 + �
 | 参数                       | 默认 | 上限 | 目的            |
 | -------------------------- | ---- | ---- | --------------- |
 | `max_tasks_per_plan`       | 6    | 10   | 控成本与延迟    |
-| `max_parallel_tasks`       | 4    | 6    | 控外部 API 并发 |
+| `max_parallel_tasks`       | 2    | 6    | 控外部 API 与 LLM 并发。4 路并行 DeepSeek 会把单任务 120s 耗尽（D20） |
 | `max_tool_calls_per_agent` | 12   | 20   | 防工具调用失控  |
 | `max_supplement_rounds`    | 1    | 2    | 防无限研究循环  |
-| `task_timeout_s`           | 120  | —    | 单任务超时      |
-| `total_timeout_s`          | 420  | —    | 整体超时        |
+| `task_timeout_s`           | 180  | —    | 单任务超时      |
+| `total_timeout_s`          | 600  | —    | 整体超时        |
 
-**失败降级原则**：任一子任务失败或超时，**不中断整个流程**。该任务标记为 `failed`，其 `data_gaps` 进入报告的"数据限制"章节。只有 Planner 或 Report Writer 失败才导致整体失败。
+**失败降级原则**：任一子任务失败或超时，**不中断整个流程**。该任务标记为 `failed`。超时前已收集的来源与工具缺口仍进入 `findings`（salvage），其 `data_gaps` 进入报告的"数据限制"章节。只有 Planner 或 Report Writer 失败才导致整体失败。
 
 ### 7.3 ResearchPlan 结构
 
@@ -1348,10 +1348,10 @@ MODEL_ROLE_WRITING=
 
 # ── 执行上限（见 §7.2）
 MAX_TASKS_PER_PLAN=6
-MAX_PARALLEL_TASKS=4
+MAX_PARALLEL_TASKS=2
 MAX_TOOL_CALLS_PER_AGENT=12
-TASK_TIMEOUT_S=120
-TOTAL_TIMEOUT_S=420
+TASK_TIMEOUT_S=180
+TOTAL_TIMEOUT_S=600
 
 # ── 可观察性
 LOG_LEVEL=info

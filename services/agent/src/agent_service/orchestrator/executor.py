@@ -10,14 +10,15 @@
   是因为同层任务已经并发出去了，中途叫停只会得到一堆半成品。
 
 **失败降级是这一层的主要职责**（§7.2）：单个任务失败或超时都不中断流程，
-任务标记为 failed，缺口进入报告的「数据限制」章节。整体失败只由 Planner 或
-Report Writer 触发——它们没有降级形态，缺了就没有报告。
+任务标记为 failed。超时前 runner 若已收集到来源或工具缺口，执行器会把
+salvage finding 留给 Writer，避免「工具成功、报告数据缺失」。整体失败只由
+Planner 或 Report Writer 触发——它们没有降级形态，缺了就没有报告。
 """
 
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Protocol
 
 import structlog
@@ -46,15 +47,24 @@ if TYPE_CHECKING:
 log = structlog.get_logger(__name__)
 
 
+@dataclass
+class SalvageSlot:
+    """超时取消时 runner 把已收集的 finding 放这里，执行器再交给 Writer。"""
+
+    finding: ResearchFinding | None = None
+
+
 @dataclass(frozen=True)
 class TaskContext:
     """交给子 Agent 执行的一个任务及其上游产出。"""
 
     task: ResearchTask
+    timeout_s: float = 0.0
     upstream: tuple[ResearchFinding, ...] = ()
     """`depends_on` 指向的任务的结果。"""
     missing_upstream: tuple[str, ...] = ()
     """失败或被跳过的依赖 id。执行仍会继续（见模块说明），但结果里要披露。"""
+    salvage: SalvageSlot = field(default_factory=SalvageSlot)
 
 
 class TaskRunner(Protocol):
@@ -122,7 +132,8 @@ async def _guarded(
     而降级处理需要知道**是哪个任务**失败了才能标状态、发事件。
     """
     async with gate:
-        context = _context_for(task, state)
+        timeout_s = min(limits.task_timeout_s, state.remaining_s(limits.total_timeout_s))
+        context = _context_for(task, state, timeout_s=timeout_s)
         state.mark(task.id, TaskStatus.RUNNING)
         state.bus.emit(
             AgentStartedEvent,
@@ -136,12 +147,22 @@ async def _guarded(
         )
 
         started_ms = state.elapsed_ms
-        timeout_s = min(limits.task_timeout_s, state.remaining_s(limits.total_timeout_s))
 
         try:
             async with asyncio.timeout(timeout_s):
                 finding = await runner.run(context, state)
         except TimeoutError:
+            salvaged = context.salvage.finding
+            if salvaged is not None:
+                _keep_salvage(
+                    state,
+                    task,
+                    salvaged,
+                    missing_upstream=context.missing_upstream,
+                    code="task_timeout",
+                    message=f"任务超过 {timeout_s:.0f}s 未完成",
+                )
+                return
             _fail(
                 state,
                 task,
@@ -176,7 +197,7 @@ async def _guarded(
         )
 
 
-def _context_for(task: ResearchTask, state: ResearchState) -> TaskContext:
+def _context_for(task: ResearchTask, state: ResearchState, *, timeout_s: float) -> TaskContext:
     """收集任务的上游产出。
 
     依赖失败时**照常执行**而不是跳过。理由：prompt 要求每个 objective 自包含，
@@ -189,6 +210,7 @@ def _context_for(task: ResearchTask, state: ResearchState) -> TaskContext:
     failed = state.failed_task_ids()
     return TaskContext(
         task=task,
+        timeout_s=timeout_s,
         upstream=tuple(by_id[dep] for dep in task.depends_on if dep in by_id),
         missing_upstream=tuple(dep for dep in task.depends_on if dep in failed),
     )
@@ -204,6 +226,22 @@ def _disclose_missing_upstream(
     """
     gap = f"依赖任务 {', '.join(missing)} 未成功，本任务缺少其产出作为输入"
     return finding.model_copy(update={"data_gaps": [*finding.data_gaps, gap]})
+
+
+def _keep_salvage(
+    state: ResearchState,
+    task: ResearchTask,
+    finding: ResearchFinding,
+    *,
+    missing_upstream: tuple[str, ...],
+    code: str,
+    message: str,
+) -> None:
+    """超时仍把已收集的来源/缺口交给 Writer，任务本身记为失败（§7.2）。"""
+    if missing_upstream:
+        finding = _disclose_missing_upstream(finding, missing_upstream)
+    state.findings.append(finding)
+    _fail(state, task, code=code, message=message)
 
 
 def _fail(state: ResearchState, task: ResearchTask, *, code: str, message: str) -> None:
