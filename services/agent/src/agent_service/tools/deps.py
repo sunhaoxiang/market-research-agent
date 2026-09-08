@@ -22,6 +22,7 @@ if TYPE_CHECKING:
         ProtocolTvl,
     )
     from agent_service.providers.fetch import PageFetcher
+    from agent_service.providers.onchain import PerpMarketSnapshot
     from agent_service.providers.runtime import Clock
     from agent_service.providers.search import SearchProvider
     from agent_service.tools.web.collector import SourceCollector
@@ -55,12 +56,19 @@ class DefiLlamaClient(Protocol):
     async def get_chain_overview(self, chain: str) -> ChainOverview: ...
 
 
+class HyperliquidClient(Protocol):
+    """Hyperliquid 在 ToolDeps 上的面。P3-8 只调永续快照。"""
+
+    async def get_perp_snapshot(self) -> PerpMarketSnapshot: ...
+
+
 @dataclass(frozen=True, slots=True)
 class ToolDeps:
     search: SearchProvider | None = None
     fetcher: PageFetcher | None = None
     coingecko: CoinGeckoClient | None = None
     defillama: DefiLlamaClient | None = None
+    hyperliquid: HyperliquidClient | None = None
     clock: Clock | None = None
     bus: EventBus | None = None
     sources: SourceCollector | None = None

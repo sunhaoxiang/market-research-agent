@@ -35,6 +35,18 @@ def fail_invalid[T](tool: str, message: str) -> ToolResult[T]:
     )
 
 
+def fail_unsupported[T](tool: str, message: str, *, provider: str | None = None) -> ToolResult[T]:
+    return ToolResult.failure(
+        ToolError(
+            code=ToolErrorCode.UNSUPPORTED,
+            message=message,
+            tool=tool,
+            provider=provider,
+            retryable=False,
+        )
+    )
+
+
 def fail_validation[T](tool: str, error: ValidationError) -> ToolResult[T]:
     first = error.errors()[0]
     loc = ".".join(str(part) for part in first["loc"] if part != "body")

@@ -6,7 +6,7 @@
 > **每完成一个任务就更新此表的状态**；每完成一个阶段，跑 `[DP §26]` 的收尾清单并写阶段小结。
 
 - 最后更新：2026-09-08
-- 当前阶段：**P3-7 `get_tokenomics` 已完成**；下一任务 P3-8 链上数据源选型调研。拿不到的字段进 `data_gaps`，不要让 LLM 编。
+- 当前阶段：**P3-8 链上覆盖度已落地**；下一任务 P3-9 Crypto Research Agent（整合 crypto/defi/onchain/web）。
 
 ### 已确认的前置决策（2026-09-07）
 
@@ -155,7 +155,7 @@ hash 跨会话稳定，说明 §9.8 的缓存前缀约束真的守住了；95.4%
 | P3-5  | `tools/system/compute_metrics`：涨跌幅 / CAGR / 波动率 / 百分位（纯 Python）`[DP §8.5]`          | P1-1            | ✅   | 单元测试含边界值                        |
 | P3-6  | `tools/defi/`：`get_tvl` / `get_protocol_fees_revenue` / `get_dex_volume` / `get_chain_overview`。包 `DefiLlamaProvider` 的现成类型，不要再解析一遍 JSON | P3-2            | ✅   | HYPE/Hyperliquid 数据正确               |
 | P3-7  | `tools/crypto/get_tokenomics`：供应量 / 分配 / 解锁（数据源覆盖度调研 + 缺失明确声明）           | P3-1            | ✅   | 拿不到的字段进 `data_gaps`              |
-| P3-8  | 链上数据源选型调研 + 可行子集实现（`get_chain_activity` 等），受限项写入风险登记 `[DP §23 R4]`   | P3-2            | ⬜   | 输出实际覆盖度结论文档                  |
+| P3-8  | 链上数据源选型调研 + 可行子集实现（`get_chain_activity` 等），受限项写入风险登记 `[DP §23 R4]`   | P3-2            | ✅   | 覆盖度结论见 [`docs/onchain-coverage.md`](./onchain-coverage.md) |
 | P3-9  | Crypto Research Agent + prompt（整合 crypto/defi/onchain/web tools）                             | P3-4~P3-8, P2-6 | ⬜   | 对 3 个样例 crypto 问题产出完整 finding |
 | P3-10 | 数值冲突检测：多源同指标差异 → `CONFLICT_DETECTED` + 报告并列展示 `[DP §23 R9]`                  | P3-9            | ⬜   | 注入冲突数据能被检出                    |
 | P3-11 | 前端：`METRIC_FOUND` 驱动的 Recharts 图表（价格 / TVL 走势）内嵌报告                             | P3-9, P2-10     | ⬜   | 报告中显示 30d TVL 曲线                 |
@@ -573,6 +573,19 @@ Agent / Tool 只依赖 `SearchProvider` 协议，Tavily 是第一个实现。换
 tool 只包已有 `get_market`，不另打 HTTP、不解析 JSON。`allocations` / `unlocks` 保持空列表，进 `DataQuality.missing_fields` + caveat；空列表不是「分配为 0」。Agent 把缺口抄进 `data_gaps` 是 P3-9。付费源（Tokenomist / DefiLlama Pro / TokenUnlocks）留作后续开关。
 
 `asset` 必须是 **P3-3** 的 `coin_id`。P3-9 再挂到 Crypto Research Agent。
+
+### P3-8 — 链上数据覆盖度 ✅（2026-09-08）
+
+完整结论见 [`docs/onchain-coverage.md`](./onchain-coverage.md)。免费档能拿到的就这些：
+
+| 指标 | 源 | 结论 |
+| --- | --- | --- |
+| 24h 永续名义成交量、持仓（USD） | Hyperliquid Info `metaAndAssetCtxs`，无 key | **可做。** OI USD = `markPx * openInterest` |
+| 活跃地址 / 交易数 | Hyperliquid 无全站 DAU；DefiLlama `active-users` 是 Pro；growthepie / L2Beat 不含 Hyperliquid L1 | **不做。** 空字段进 `missing_fields` |
+| holders / whale / exchange flow | Nansen / Arkham / Dune / CryptoQuant / Glassnode | **无免费源。** 立刻 `UNSUPPORTED` |
+| 其它链的 chain activity | — | **UNSUPPORTED**，不要假装成 Ethereum |
+
+`get_chain_activity` 包 `HyperliquidProvider.get_perp_snapshot()`，不解析 JSON。成功永远是 `partial`（`active_addresses` / `tx_count` 始终缺失）。`days != 1` 仍返回 24h 快照并写 caveat。三个缺口 tool 不接 HTTP，空 `asset` 才 `INVALID_INPUT`。TVL/fees/volume 已在 P3-6。付费源留作后续开关。`ONCHAIN_TOOLS` 已挂 `@function_tool` 和 invoke；P3-9 再挂到 Crypto Research Agent。R4 已补上本次结论。
 
 ---
 

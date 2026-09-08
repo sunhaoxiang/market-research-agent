@@ -39,6 +39,7 @@ def _deps(request: Request) -> ToolDeps:
         fetcher=getattr(request.app.state, "web_fetcher", None),
         coingecko=getattr(request.app.state, "coingecko", None),
         defillama=getattr(request.app.state, "defillama", None),
+        hyperliquid=getattr(request.app.state, "hyperliquid", None),
         clock=None if runtime is None else runtime.clock,
     )
 

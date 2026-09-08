@@ -36,6 +36,13 @@ from agent_service.tools.defi.models import (
     TvlData,
 )
 from agent_service.tools.deps import ToolDeps
+from agent_service.tools.onchain.activity import run_get_chain_activity
+from agent_service.tools.onchain.gaps import (
+    run_get_exchange_flow,
+    run_get_token_holders,
+    run_get_whale_activity,
+)
+from agent_service.tools.onchain.models import ChainActivityData
 from agent_service.tools.system.compute import run_compute_metrics
 from agent_service.tools.system.models import ComputeMetricsData, SeriesPoint
 from agent_service.tools.web.fetch import run_web_fetch
@@ -101,6 +108,25 @@ class ProtocolSlugArgs(BaseModel):
 
 class ChainNameArgs(BaseModel):
     chain: str
+
+
+class ChainActivityArgs(BaseModel):
+    chain: str
+    days: int = 1
+
+
+class TokenHoldersArgs(BaseModel):
+    asset: str
+
+
+class WhaleActivityArgs(BaseModel):
+    asset: str
+    threshold: float | None = None
+
+
+class ExchangeFlowArgs(BaseModel):
+    asset: str
+    days: int = 30
 
 
 async def _web_search(deps: ToolDeps, arguments: dict[str, Any]) -> ToolResult[WebSearchData]:
@@ -233,16 +259,54 @@ async def _get_chain_overview(
     return await run_get_chain_overview(deps, chain=args.chain)
 
 
+async def _get_chain_activity(
+    deps: ToolDeps, arguments: dict[str, Any]
+) -> ToolResult[ChainActivityData]:
+    try:
+        args = ChainActivityArgs.model_validate(arguments)
+    except ValidationError as exc:
+        return fail_validation("get_chain_activity", exc)
+    return await run_get_chain_activity(deps, chain=args.chain, days=args.days)
+
+
+async def _get_token_holders(deps: ToolDeps, arguments: dict[str, Any]) -> ToolResult[None]:
+    try:
+        args = TokenHoldersArgs.model_validate(arguments)
+    except ValidationError as exc:
+        return fail_validation("get_token_holders", exc)
+    return await run_get_token_holders(deps, asset=args.asset)
+
+
+async def _get_whale_activity(deps: ToolDeps, arguments: dict[str, Any]) -> ToolResult[None]:
+    try:
+        args = WhaleActivityArgs.model_validate(arguments)
+    except ValidationError as exc:
+        return fail_validation("get_whale_activity", exc)
+    return await run_get_whale_activity(deps, asset=args.asset, threshold=args.threshold)
+
+
+async def _get_exchange_flow(deps: ToolDeps, arguments: dict[str, Any]) -> ToolResult[None]:
+    try:
+        args = ExchangeFlowArgs.model_validate(arguments)
+    except ValidationError as exc:
+        return fail_validation("get_exchange_flow", exc)
+    return await run_get_exchange_flow(deps, asset=args.asset, days=args.days)
+
+
 HANDLERS: dict[str, ToolHandler] = {
     "compute_metrics": _compute_metrics,
+    "get_chain_activity": _get_chain_activity,
     "get_chain_overview": _get_chain_overview,
     "get_crypto_price": _get_crypto_price,
     "get_dex_volume": _get_dex_volume,
+    "get_exchange_flow": _get_exchange_flow,
     "get_market_data": _get_market_data,
     "get_price_history": _get_price_history,
     "get_protocol_fees_revenue": _get_protocol_fees_revenue,
+    "get_token_holders": _get_token_holders,
     "get_tokenomics": _get_tokenomics,
     "get_tvl": _get_tvl,
+    "get_whale_activity": _get_whale_activity,
     "news_search": _news_search,
     "resolve_asset": _resolve_asset,
     "web_fetch": _web_fetch,

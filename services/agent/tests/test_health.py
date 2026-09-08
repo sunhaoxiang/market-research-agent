@@ -51,6 +51,7 @@ def test_health_returns_expected_shape(client: TestClient) -> None:
     # 不需要 key 的数据源应始终报告为可用
     data_sources = {p["provider"]: p["configured"] for p in body["data_sources"]}
     assert data_sources["defillama"] is True
+    assert data_sources["hyperliquid"] is True
     assert data_sources["sec_edgar"] is True
     assert data_sources["coingecko"] is True
 

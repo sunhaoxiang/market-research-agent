@@ -23,6 +23,7 @@ from agent_service.observability.logging import configure_logging, get_logger
 from agent_service.providers.crypto import CoinGeckoProvider
 from agent_service.providers.defi import DefiLlamaProvider
 from agent_service.providers.fetch import WebFetcher
+from agent_service.providers.onchain import HyperliquidProvider
 from agent_service.providers.runtime import ProviderRuntime
 from agent_service.providers.search import TavilySearchProvider
 
@@ -71,8 +72,9 @@ def _data_source_status(settings: Settings) -> list[ProviderStatus]:
         # Demo 档无 key 也能打公共限流，所以始终可用；有 key 只是额度更高
         ProviderStatus(provider="coingecko", configured=True),
         ProviderStatus(provider="fmp", configured=settings.fmp_api_key is not None),
-        # 这两个不需要 key
+        # 这些不需要 key
         ProviderStatus(provider="defillama", configured=True),
+        ProviderStatus(provider="hyperliquid", configured=True),
         ProviderStatus(provider="sec_edgar", configured=True),
     ]
 
@@ -106,6 +108,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         api_key=None if cg_key is None else cg_key.get_secret_value(),
     )
     app.state.defillama = DefiLlamaProvider(runtime=runtime)
+    app.state.hyperliquid = HyperliquidProvider(runtime=runtime)
 
     configured = [p.provider for p in _llm_provider_status(settings) if p.configured]
     log.info(
@@ -135,6 +138,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     defillama = getattr(app.state, "defillama", None)
     if defillama is not None:
         await defillama.aclose()
+    hyperliquid = getattr(app.state, "hyperliquid", None)
+    if hyperliquid is not None:
+        await hyperliquid.aclose()
     await app.state.provider_runtime.aclose()
     await app.state.registry.aclose()
     log.info("agent_service.shutdown")
@@ -156,6 +162,7 @@ def create_app() -> FastAPI:
     app.state.web_fetcher = None
     app.state.coingecko = None
     app.state.defillama = None
+    app.state.hyperliquid = None
 
     @app.get("/v1/health", response_model=HealthResponse, tags=["system"])
     async def health() -> HealthResponse:

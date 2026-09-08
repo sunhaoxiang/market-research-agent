@@ -53,6 +53,10 @@ PROFILES: dict[str, ProviderProfile] = {
         rate_per_second=5.0,  # 无限额，礼貌限速
         burst=10,
     ),
+    "hyperliquid": ProviderProfile(
+        rate_per_second=1.0,  # Info 查询约 20 weight；1200/min 预算下偏保守
+        burst=3,
+    ),
     "fmp": ProviderProfile(
         rate_per_second=2.0,
         burst=5,

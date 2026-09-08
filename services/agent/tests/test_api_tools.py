@@ -12,6 +12,7 @@ from agent_service.config import get_settings
 from agent_service.main import create_app
 from agent_service.providers.crypto import CoinMarket, CoinPrice, CoinSearchHit, CoinSearchPage
 from agent_service.providers.defi import ProtocolTvl, TvlPoint
+from agent_service.providers.onchain import PerpMarketSnapshot
 from agent_service.providers.search import SearchHit, SearchPage
 from agent_service.schemas.tools import DataProvenance, ToolErrorCode
 
@@ -142,6 +143,25 @@ class _FakeDefiLlama:
         return None
 
 
+class _FakeHyperliquid:
+    async def get_perp_snapshot(self) -> PerpMarketSnapshot:
+        return PerpMarketSnapshot(
+            chain="Hyperliquid",
+            n_markets=2,
+            volume_24h_usd=150.0,
+            open_interest_usd=46.0,
+            url="https://app.hyperliquid.xyz",
+            provenance=DataProvenance(
+                provider="hyperliquid",
+                endpoint="metaAndAssetCtxs",
+                retrieved_at=datetime(2026, 9, 8, tzinfo=UTC),
+            ),
+        )
+
+    async def aclose(self) -> None:
+        return None
+
+
 @pytest.fixture
 def isolated_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     for name in _KEY_ENV_VARS:
@@ -159,6 +179,7 @@ def client(isolated_env: None) -> Iterator[TestClient]:
         app.state.search_provider = _FakeSearch(_page())
         app.state.coingecko = _FakeCoinGecko(_coins())
         app.state.defillama = _FakeDefiLlama()
+        app.state.hyperliquid = _FakeHyperliquid()
         yield test_client
 
 
@@ -244,6 +265,22 @@ def test_invoke_get_tvl(client: TestClient) -> None:
     assert body["data"]["protocol"] == "hyperliquid"
     assert body["data"]["tvl_usd"] == 1_500_000_000.0
     assert body["provenance"]["source_url"] == "https://defillama.com/protocol/hyperliquid"
+
+
+def test_invoke_get_chain_activity(client: TestClient) -> None:
+    response = client.post(
+        "/v1/tools/get_chain_activity/invoke",
+        json={"arguments": {"chain": "Hyperliquid"}},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["data"]["chain"] == "Hyperliquid"
+    assert body["data"]["volume_24h_usd"] == 150.0
+    assert body["data"]["open_interest_usd"] == 46.0
+    assert body["data"]["active_addresses"] is None
+    assert "active_addresses" in body["quality"]["missing_fields"]
+    assert body["provenance"]["source_url"] == "https://app.hyperliquid.xyz"
 
 
 def test_invoke_get_tokenomics(client: TestClient) -> None:

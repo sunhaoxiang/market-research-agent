@@ -155,7 +155,7 @@ TypeScript 类型直接从 schema 推导（无代码生成步骤）；SQL 语义
 | 美股行情+财务+估值    | **FMP** (Basic)              | **250 calls/day**       | 最紧的额度 → 强制缓存                     |
 | SEC Filing            | **SEC EDGAR**                | 免费（需 `User-Agent`） | `submissions` + `companyfacts` (XBRL)     |
 | Web 搜索/抓取         | **Tavily**                   | 1000 credits/mo         | + 自建 httpx/trafilatura fetch            |
-| 链上明细数据          | Phase 3 评估                 | —                       | 见 §25 风险 R4                            |
+| 链上明细数据          | **Hyperliquid Info API**（可行子集） | 免费无 key              | 24h 永续成交量/持仓；DAU/holders/whale/flow 无免费源，见 R4 与 [`docs/onchain-coverage.md`](./onchain-coverage.md) |
 
 **免费额度是硬约束**，因此 Provider 层的**缓存 + 限流 + 配额计数**在 Phase 2 就必须实现，属于必需品而非过早优化。
 
@@ -581,11 +581,11 @@ tools/defi/
   get_dex_volume(protocol|chain, days)                            [P3]
   get_chain_overview(chain)               # 生态聚合               [P3]
 
-tools/onchain/                            # 覆盖度取决于源，见 R4
-  get_chain_activity(chain, days)         # 活跃地址/交易数         [P3]
-  get_token_holders(asset)                                        [P3+]
-  get_whale_activity(asset, threshold)                            [P3+]
-  get_exchange_flow(asset, days)          # 净流入/流出             [P3+]
+tools/onchain/                            # 覆盖度见 R4 与 docs/onchain-coverage.md
+  get_chain_activity(chain, days)         # Hyperliquid: 24h 成交量/OI；DAU/tx 无免费源 [P3]
+  get_token_holders(asset)                # 无免费源 → UNSUPPORTED  [P3+]
+  get_whale_activity(asset, threshold)    # 无免费源 → UNSUPPORTED  [P3+]
+  get_exchange_flow(asset, days)          # 无免费源 → UNSUPPORTED  [P3+]
 
 tools/stocks/
   resolve_ticker(query)                                           [P4]
@@ -1575,7 +1575,7 @@ MVP = Phase 0 ~ Phase 5。达成标准：
 | R3  | **部分模型 structured output 支持弱**（DeepSeek/GLM 仅 `json_object`，不强制 schema） | 用户切到这些模型时 schema 解析失败 | 中（OpenAI 优先后已缓解） | §9.4 的 `json_mode` 路径作为**一等实现**并单测覆盖；**schema 保持扁平**；解析失败带错误信息重试 2 次；每个模型在 Phase 5 末冒烟 eval，结果写入 catalog `verified` 字段，UI 标注"已验证/未验证"            |
 | R3b | **LLM 调用成本**：默认配置下约 $0.5/次研究（§9.7）                                    | 高频使用时费用可观                 | 中                        | 成本实时显示 + `MAX_SESSION_COST_USD` 护栏；缓存命中降低重复取数的 LLM 轮次；成本敏感时把 `BALANCED` 降到 `luna`（约 $0.1/次）；prompt 缓存（OpenAI cached input 为标准价 1/10）                          |
 | R3c | **tracing 会上传 prompt/响应到 OpenAI**                                               | 研究内容外泄至第三方               | 低                        | 默认开启换取调试便利；可用 `trace_include_sensitive_data=False` 或 `OPENAI_AGENTS_DISABLE_TRACING=true` 关闭（§9.6-4）                                                                                    |
-| R4  | **链上明细数据源缺失**（holders/whale/exchange flow 无好的免费源）                    | 需求 §10 覆盖不全                  | 高                        | Phase 3 明确降级：优先做 DefiLlama 能给的（TVL/fees/volume）+ 项目官方 API（如 Hyperliquid）+ 区块浏览器免费档；拿不到的一律进 `data_gaps` **绝不让 LLM 编造**；付费源（Dune/Nansen/Artemis）留作后续开关 |
+| R4  | **链上明细数据源缺失**（holders/whale/exchange flow 无好的免费源）                    | 需求 §10 覆盖不全                  | 高                        | Phase 3 明确降级：优先做 DefiLlama 能给的（TVL/fees/volume，P3-6 已落地）+ 项目官方 API（P3-8：Hyperliquid Info `metaAndAssetCtxs` 给 24h 永续名义成交量与持仓 USD，无 key）+ 区块浏览器免费档。全站 DAU/tx 无免费源（DefiLlama `active-users` 为 Pro；growthepie/L2Beat 不含 Hyperliquid L1）。holders/whale/exchange flow 立刻返回 `UNSUPPORTED`，拿不到的一律进 `data_gaps` **绝不让 LLM 编造**。付费源（Dune/Nansen/Artemis/CryptoQuant/Glassnode）留作后续开关。详见 [`docs/onchain-coverage.md`](./onchain-coverage.md) |
 | R5  | **Prompt injection**（抓取的网页含恶意指令）                                          | 报告被污染                         | 中                        | §17.1-5 隔离标签 + 指令声明 + planner 不接触 web 内容 + 注入检测 warning；eval 中加入注入用例                                                                                                             |
 | R6  | **SSE 长连接被中断**（Next.js dev server / 反代 / 浏览器超时）                        | 研究结果丢失                       | 中                        | HEARTBEAT 事件保活；Next.js 侧消费不绑 request signal（断开也落库）；Phase 6 做 `?after=seq` 重连回放                                                                                                     |
 | R7  | **SQLite 写锁竞争**                                                                   | 写失败                             | 低                        | 决策 C（单 writer）+ WAL + busy_timeout + 事件批写                                                                                                                                                        |
