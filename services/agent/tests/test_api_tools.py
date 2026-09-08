@@ -67,6 +67,7 @@ def client(isolated_env: None) -> Iterator[TestClient]:
     app = create_app()
     with TestClient(app) as test_client:
         app.state.search_provider = _FakeSearch(_page())
+        app.state.coingecko = _FakeCoinGecko(_coins())
         yield test_client
 
 
@@ -92,6 +93,26 @@ def _page() -> SearchPage:
     )
 
 
+def _coins() -> CoinSearchPage:
+    return CoinSearchPage(
+        query="HYPE",
+        hits=(
+            CoinSearchHit(
+                id="hyperliquid",
+                symbol="HYPE",
+                name="Hyperliquid",
+                market_cap_rank=15,
+                url="https://www.coingecko.com/en/coins/hyperliquid",
+            ),
+        ),
+        provenance=DataProvenance(
+            provider="coingecko",
+            endpoint="/search",
+            retrieved_at=datetime(2026, 9, 8, tzinfo=UTC),
+        ),
+    )
+
+
 def test_invoke_web_search(client: TestClient) -> None:
     response = client.post(
         "/v1/tools/web_search/invoke",
@@ -111,25 +132,6 @@ def test_invoke_unknown_tool_is_404(client: TestClient) -> None:
 
 
 def test_invoke_resolve_asset(client: TestClient) -> None:
-    client.app.state.coingecko = _FakeCoinGecko(
-        CoinSearchPage(
-            query="HYPE",
-            hits=(
-                CoinSearchHit(
-                    id="hyperliquid",
-                    symbol="HYPE",
-                    name="Hyperliquid",
-                    market_cap_rank=15,
-                    url="https://www.coingecko.com/en/coins/hyperliquid",
-                ),
-            ),
-            provenance=DataProvenance(
-                provider="coingecko",
-                endpoint="/search",
-                retrieved_at=datetime(2026, 9, 8, tzinfo=UTC),
-            ),
-        )
-    )
     response = client.post("/v1/tools/resolve_asset/invoke", json={"arguments": {"query": "HYPE"}})
     assert response.status_code == 200
     body = response.json()
