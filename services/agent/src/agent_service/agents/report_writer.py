@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
@@ -23,7 +24,7 @@ if TYPE_CHECKING:
     from agent_service.models.catalog import ModelEntry
     from agent_service.models.registry import ModelRegistry
     from agent_service.models.structured_output import StructuredOutputStrategy
-    from agent_service.schemas.findings import ResearchFinding
+    from agent_service.schemas.findings import Conflict, ResearchFinding
     from agent_service.schemas.sources import Source
 
 PROMPT_NAME = "report_writer"
@@ -66,6 +67,7 @@ def report_writer_user_message(
     sources: list[Source],
     *,
     section_ids: tuple[str, ...] = (),
+    conflicts: Sequence[Conflict] = (),
     now: datetime | None = None,
 ) -> str:
     """日期、问题、发现都放 user 消息，避免污染 system prompt 缓存前缀。"""
@@ -85,6 +87,9 @@ def report_writer_user_message(
         parts.append(
             "各任务声明的数据缺口（必须写入 data_gaps）：\n" + "\n".join(f"- {g}" for g in unique)
         )
+    conflict_block = _conflicts_block(conflicts)
+    if conflict_block is not None:
+        parts.append(conflict_block)
     parts.append("请根据以上发现撰写结构化报告。")
     return "\n\n".join(parts)
 
@@ -115,6 +120,17 @@ def _findings_block(findings: list[ResearchFinding], cited: dict[str, Source]) -
             label = f"{claim.epistemic_type.value} / {claim.confidence.value}"
             chunks.append(f"- [{label}] {claim.text} {marks}".rstrip())
     return "\n".join(chunks)
+
+
+def _conflicts_block(conflicts: Sequence[Conflict]) -> str | None:
+    if not conflicts:
+        return None
+    lines = ["数值冲突（必须并列写出各源数值与出处，不要取平均、不要只保留其中一个）："]
+    for item in conflicts:
+        lines.append(f"- {item.description}")
+        if item.values:
+            lines.append("  " + "；".join(item.values))
+    return "\n".join(lines)
 
 
 def _bibliography_block(cited: list[Source]) -> str:

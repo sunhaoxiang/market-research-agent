@@ -6,7 +6,7 @@
 > **每完成一个任务就更新此表的状态**；每完成一个阶段，跑 `[DP §26]` 的收尾清单并写阶段小结。
 
 - 最后更新：2026-09-08
-- 当前阶段：**P3-9 Crypto Research Agent 已完成**；下一任务 P3-10 数值冲突检测。
+- 当前阶段：**P3-10 数值冲突检测已完成**；下一任务 P3-11 前端 METRIC_FOUND 图表。
 
 ### 已确认的前置决策（2026-09-07）
 
@@ -157,7 +157,7 @@ hash 跨会话稳定，说明 §9.8 的缓存前缀约束真的守住了；95.4%
 | P3-7  | `tools/crypto/get_tokenomics`：供应量 / 分配 / 解锁（数据源覆盖度调研 + 缺失明确声明）           | P3-1            | ✅   | 拿不到的字段进 `data_gaps`              |
 | P3-8  | 链上数据源选型调研 + 可行子集实现（`get_chain_activity` 等），受限项写入风险登记 `[DP §23 R4]`   | P3-2            | ✅   | 覆盖度结论见 [`docs/onchain-coverage.md`](./onchain-coverage.md) |
 | P3-9  | Crypto Research Agent + prompt（整合 crypto/defi/onchain/web tools）                             | P3-4~P3-8, P2-6 | ✅   | 对 3 个样例 crypto 问题产出完整 finding |
-| P3-10 | 数值冲突检测：多源同指标差异 → `CONFLICT_DETECTED` + 报告并列展示 `[DP §23 R9]`                  | P3-9            | ⬜   | 注入冲突数据能被检出                    |
+| P3-10 | 数值冲突检测：多源同指标差异 → `CONFLICT_DETECTED` + 报告并列展示 `[DP §23 R9]`                  | P3-9            | ✅   | 注入冲突数据能被检出                    |
 | P3-11 | 前端：`METRIC_FOUND` 驱动的 Recharts 图表（价格 / TVL 走势）内嵌报告                             | P3-9, P2-10     | ⬜   | 报告中显示 30d TVL 曲线                 |
 
 **阶段验收**：「介绍一下 HYPE」「分析 HYPE 最近一个月上涨的原因」「查询 HYPE 的 TVL、交易量和资金变化」三个问题都能产出带数据、图表和引用的报告。
@@ -600,6 +600,14 @@ tool 只包已有 `get_market`，不另打 HTTP、不解析 JSON。`allocations`
 - 日期和 objective 放 user 消息（§9.8）。含网页工具，所以拼上 `untrusted_web` prompt。
 
 验收用 ScriptedModel 覆盖三个样例：「介绍一下 HYPE」「分析 HYPE 最近一个月上涨的原因」「查询 HYPE 的 TVL、交易量和资金变化」。第三问会打到 `get_exchange_flow` 的 `UNSUPPORTED`，finding 里有 data_gaps。P3-10 再做多源数值冲突。
+
+### P3-10 — 数值冲突检测 ✅（2026-09-08）
+
+Merge 阶段的纯代码检测，不让 LLM 判断两个数字算不算冲突。同一指标（`name` + 标的 + 单位 + UTC 数据日）相对差超过 1% → `CONFLICT_DETECTED`，`values` 列出各源 `provider` 与原值，**不取平均**。不同日期是时间序列，不是冲突。
+
+Writer 的 user 消息带上冲突清单，prompt 要求并列写出；前端从事件归约出 `conflicts`，报告在摘要后用黄色警示条展示。Claim 合并与 Fact Checker 仍是 P5-4 / P5-5。
+
+验收：注入 CoinGecko 12 亿 / DefiLlama 18 亿 TVL，事件与警示条都能检出，平均值不会出现。
 
 ---
 

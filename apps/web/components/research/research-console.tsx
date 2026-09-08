@@ -177,6 +177,7 @@ export function ResearchConsole({ models }: { models: ModelOption[] }) {
                 report={state.report}
                 sources={state.sources}
                 claims={state.claims}
+                conflicts={state.conflicts}
                 activeIndex={activeCitation}
                 onCite={setActiveCitation}
               />

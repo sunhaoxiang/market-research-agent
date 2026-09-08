@@ -72,6 +72,7 @@ async def write_report(
         state.findings,
         numbered,
         section_ids=section_ids,
+        conflicts=state.conflicts,
         now=moment,
     )
 

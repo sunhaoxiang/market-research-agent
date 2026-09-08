@@ -490,6 +490,29 @@ describe("来源", () => {
   });
 });
 
+describe("冲突", () => {
+  it("conflict_detected 累积各源数值，不覆盖", () => {
+    const e = script();
+    const first = {
+      claim_ids: ["c1"],
+      description: "TVL（HYPE）多源数值不一致，已并列保留各来源结果，未取平均。",
+      values: ["coingecko: 1.2e+09 USD", "defillama: 1.8e+09 USD"],
+    };
+    const second = {
+      claim_ids: [],
+      description: "市值（HYPE）多源数值不一致，已并列保留各来源结果，未取平均。",
+      values: ["coingecko: 14e9 USD", "coinmarketcap: 15e9 USD"],
+    };
+    const state = reduceAll([
+      e("conflict_detected", { conflict: first }, first.description),
+      e("conflict_detected", { conflict: second }, second.description),
+    ]);
+
+    expect(state.conflicts).toEqual([first, second]);
+    expect(state.lastMessage).toBe(second.description);
+  });
+});
+
 describe("报告", () => {
   it("report_completed 存下报告并为来源补上 [n]", () => {
     const e = script();

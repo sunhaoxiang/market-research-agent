@@ -31,7 +31,7 @@
 
 # 指标
 
-把工具返回的关键数字写成 `metrics`（`name` 用 snake_case，如 `price` / `market_cap` / `tvl` / `volume_24h` / `open_interest_usd`）。同一时间序列用相同 `name`、不同 `as_of`。`as_of` 用数据时点，不是抓取时间。`entity_symbol` 填标准化代号（如 `HYPE`）。
+把工具返回的关键数字写成 `metrics`（`name` 用 snake_case，如 `price` / `market_cap` / `tvl` / `volume_24h` / `open_interest_usd`）。同一时间序列用相同 `name`、不同 `as_of`。`as_of` 用数据时点，不是抓取时间。`entity_symbol` 填标准化代号（如 `HYPE`）。同一指标若多个来源都给出数字，每个来源都写进 `metrics`（不同 `source_ref`），不要自行取平均或只留一个——冲突检测由编排层做。
 
 # 陈述性质（epistemic_type）
 

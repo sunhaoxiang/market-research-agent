@@ -25,12 +25,14 @@ from agent_service.observability.event_bus import EventBus
 from agent_service.orchestrator.executor import TaskContext
 from agent_service.orchestrator.pipeline import run_research
 from agent_service.orchestrator.state import ResearchState
-from agent_service.schemas.common import AgentName, Stage, TaskStatus
+from agent_service.schemas.common import AgentName, SourceType, Stage, TaskStatus
+from agent_service.schemas.entities import MetricPoint
 from agent_service.schemas.events import (
     TERMINAL_EVENT_TYPES,
     AgentCompletedPayload,
     AgentRunMetricsEvent,
     AgentStartedPayload,
+    ConflictDetectedPayload,
     EventType,
     ResearchEvent,
     SessionCompletedPayload,
@@ -39,6 +41,7 @@ from agent_service.schemas.events import (
     TokenUsage,
 )
 from agent_service.schemas.findings import ResearchFinding
+from agent_service.schemas.sources import Source
 from agent_service.testing import (
     IsolatedExecutionLimits,
     IsolatedProviderCredentials,
@@ -556,3 +559,96 @@ async def test_report_writer_failure_fails_the_session() -> None:
     assert events[-1].type is EventType.SESSION_FAILED
     assert _payload(events[-1], SessionFailedPayload).stage is Stage.WRITING
     assert _payload(events[-1], SessionFailedPayload).error.code == "structured_output"
+
+
+async def test_injected_metric_conflict_emits_conflict_detected() -> None:
+    """验收：注入冲突数据能被检出，事件出现在撰写之前。"""
+    cg = Source(
+        ref="s1",
+        url="https://www.coingecko.com/en/coins/hyperliquid",
+        url_canonical="https://www.coingecko.com/en/coins/hyperliquid",
+        title="CoinGecko",
+        domain="coingecko.com",
+        source_type=SourceType.API,
+        provider="coingecko",
+        retrieved_at=_NOW,
+    )
+    llama = Source(
+        ref="s2",
+        url="https://defillama.com/protocol/hyperliquid",
+        url_canonical="https://defillama.com/protocol/hyperliquid",
+        title="DefiLlama",
+        domain="defillama.com",
+        source_type=SourceType.API,
+        provider="defillama",
+        retrieved_at=_NOW,
+    )
+
+    @dataclass
+    class InjectedRunner:
+        def model_id_for(self, agent: AgentName) -> str:
+            del agent
+            return "deepseek:deepseek-v4-flash"
+
+        async def run(self, context: TaskContext, state: ResearchState) -> ResearchFinding:
+            del state
+            if context.task.id != "t1":
+                return ResearchFinding(
+                    task_id=context.task.id,
+                    agent=context.task.agent,
+                    summary=f"{context.task.id} 的结论",
+                )
+            return ResearchFinding(
+                task_id=context.task.id,
+                agent=context.task.agent,
+                summary="TVL 来自两个数据源。",
+                sources=[cg, llama],
+                metrics=[
+                    MetricPoint(
+                        name="tvl",
+                        label="TVL",
+                        value=1.2e9,
+                        unit="USD",
+                        entity_symbol="HYPE",
+                        as_of=_NOW,
+                        source_ref="s1",
+                    ),
+                    MetricPoint(
+                        name="tvl",
+                        label="TVL",
+                        value=1.8e9,
+                        unit="USD",
+                        entity_symbol="HYPE",
+                        as_of=_NOW,
+                        source_ref="s2",
+                    ),
+                ],
+            )
+
+    bus = _bus()
+    outcome = await run_research(
+        "查询 HYPE 的 TVL",
+        planner=_planner(_plan_json()),
+        runner=InjectedRunner(),
+        writer=_writer(),
+        limits=_limits(),
+        bus=bus,
+        now=_NOW,
+    )
+
+    assert outcome.succeeded
+    assert len(outcome.state.conflicts) == 1
+    events = await _drain(bus)
+    types = [event.type for event in events]
+    detected = [event for event in events if event.type is EventType.CONFLICT_DETECTED]
+    assert len(detected) == 1
+    conflict = _payload(detected[0], ConflictDetectedPayload).conflict
+    assert conflict.values == ["coingecko: 1.2e+09 USD", "defillama: 1.8e+09 USD"]
+    assert types.index(EventType.CONFLICT_DETECTED) > types.index(EventType.AGENT_COMPLETED)
+    writing = next(
+        i
+        for i, event in enumerate(events)
+        if event.type is EventType.STAGE_CHANGED
+        and _payload(event, StageChangedPayload).stage is Stage.WRITING
+    )
+    assert types.index(EventType.CONFLICT_DETECTED) < writing

@@ -6,7 +6,7 @@
 
 import { fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
-import type { Claim, ResearchReport, Source } from "@mra/shared";
+import type { Claim, Conflict, ResearchReport, Source } from "@mra/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ReportViewer } from "@/components/report/report-viewer";
@@ -61,10 +61,12 @@ function Shell({
   report = REPORT,
   sources = [SOURCE],
   claims = [CLAIM],
+  conflicts = [],
 }: {
   report?: ResearchReport;
   sources?: Source[];
   claims?: Claim[];
+  conflicts?: Conflict[];
 }) {
   const [active, setActive] = useState<number | null>(null);
   return (
@@ -73,6 +75,7 @@ function Shell({
         report={report}
         sources={sources}
         claims={claims}
+        conflicts={conflicts}
         activeIndex={active}
         onCite={setActive}
       />
@@ -141,5 +144,25 @@ describe("sanitize 与徽标", () => {
 
     expect(screen.getByText("数据限制")).toBeDefined();
     expect(screen.getByText("未找到官方解锁时间表")).toBeDefined();
+  });
+
+  it("数值冲突以黄色警示条并列展示各源数值", () => {
+    render(
+      <Shell
+        conflicts={[
+          {
+            claim_ids: ["c1"],
+            description: "TVL（HYPE）多源数值不一致，已并列保留各来源结果，未取平均。",
+            values: ["coingecko: 1.2e+09 USD", "defillama: 1.8e+09 USD"],
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByRole("status")).toBeDefined();
+    expect(screen.getByText("数值冲突")).toBeDefined();
+    expect(screen.getByText("coingecko: 1.2e+09 USD")).toBeDefined();
+    expect(screen.getByText("defillama: 1.8e+09 USD")).toBeDefined();
+    expect(screen.queryByText(/1\.5e/)).toBeNull();
   });
 });

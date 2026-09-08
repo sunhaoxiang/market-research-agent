@@ -31,7 +31,7 @@ from agent_service.schemas.events import (
     TokenUsage,
     WarningEvent,
 )
-from agent_service.schemas.findings import ResearchFinding
+from agent_service.schemas.findings import Conflict, ResearchFinding
 from agent_service.schemas.report import ResearchReport
 from agent_service.schemas.sources import Source
 from agent_service.sources.citations import assign_citation_indices
@@ -196,6 +196,29 @@ async def _write(
     state.findings = [finding]
     await write_report(state, _writer(*replies, per_call=per_call), now=_NOW)
     return state, await _drain(bus)
+
+
+def test_user_message_lists_conflicts_side_by_side() -> None:
+    raw = _source()
+    numbered = assign_citation_indices([raw], _finding(raw).claims)
+    text = report_writer_user_message(
+        "查询 HYPE 的 TVL",
+        [_finding(numbered[0])],
+        numbered,
+        conflicts=[
+            Conflict(
+                claim_ids=[],
+                description="TVL（HYPE）多源数值不一致，已并列保留各来源结果，未取平均。",
+                values=["coingecko: 1.2e+09 USD", "defillama: 1.8e+09 USD"],
+            )
+        ],
+        now=_NOW,
+    )
+    assert "不要取平均" in text
+    assert "coingecko: 1.2e+09 USD" in text
+    assert "defillama: 1.8e+09 USD" in text
+    built = build_report_writer(_registry())
+    assert "数值冲突" in str(built.agent.instructions)
 
 
 async def test_write_report_passes_without_retry() -> None:

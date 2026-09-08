@@ -1,6 +1,6 @@
 "use client";
 
-import type { Claim, ResearchReport, Source } from "@mra/shared";
+import type { Claim, Conflict, ResearchReport, Source } from "@mra/shared";
 
 import { EpistemicBadge, marksForClaims } from "@/components/report/epistemic-badge";
 import { ReportMarkdown } from "@/components/report/markdown";
@@ -9,11 +9,19 @@ type ReportViewerProps = {
   report: ResearchReport;
   sources: Source[];
   claims: Claim[];
+  conflicts?: Conflict[];
   activeIndex: number | null;
   onCite: (index: number) => void;
 };
 
-export function ReportViewer({ report, sources, claims, activeIndex, onCite }: ReportViewerProps) {
+export function ReportViewer({
+  report,
+  sources,
+  claims,
+  conflicts = [],
+  activeIndex,
+  onCite,
+}: ReportViewerProps) {
   const sourcesByIndex = new Map(
     sources
       .filter((item) => item.citation_index !== null)
@@ -37,6 +45,29 @@ export function ReportViewer({ report, sources, claims, activeIndex, onCite }: R
           onCite={onCite}
         />
       </section>
+
+      {conflicts.length > 0 && (
+        <aside
+          role="status"
+          className="space-y-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200"
+        >
+          <h4 className="font-semibold">数值冲突</h4>
+          <ul className="space-y-2">
+            {conflicts.map((item) => (
+              <li key={item.description}>
+                <p>{item.description}</p>
+                {item.values.length > 0 && (
+                  <ul className="mt-1 list-disc pl-5">
+                    {item.values.map((value) => (
+                      <li key={value}>{value}</li>
+                    ))}
+                  </ul>
+                )}
+              </li>
+            ))}
+          </ul>
+        </aside>
+      )}
 
       {report.sections.map((section) => {
         const sectionClaims = section.claim_ids

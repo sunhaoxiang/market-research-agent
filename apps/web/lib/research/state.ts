@@ -11,6 +11,7 @@
 import type {
   AgentName,
   Claim,
+  Conflict,
   Entity,
   ErrorInfo,
   MetricPoint,
@@ -76,6 +77,7 @@ export type ResearchViewState = {
   claims: Claim[];
   report: ResearchReport | null;
   metrics: MetricPoint[];
+  conflicts: Conflict[];
   warnings: { code: string; message: string }[];
   usage: TokenUsage;
   costUsd: number | null;
@@ -106,6 +108,7 @@ export const initialState: ResearchViewState = {
   claims: [],
   report: null,
   metrics: [],
+  conflicts: [],
   warnings: [],
   usage: { input: 0, output: 0, cached: 0 },
   costUsd: null,
@@ -284,6 +287,9 @@ function applyEvent(state: ResearchViewState, event: ResearchEvent): ResearchVie
 
     case "metric_found":
       return { ...state, metrics: [...state.metrics, event.payload.metric] };
+
+    case "conflict_detected":
+      return { ...state, conflicts: [...state.conflicts, event.payload.conflict] };
 
     case "usage_updated":
       return { ...state, usage: event.payload.usage, costUsd: event.payload.cost_usd };
