@@ -229,4 +229,5 @@ def test_function_tool_name_is_stable() -> None:
         "get_crypto_price",
         "get_market_data",
         "get_price_history",
+        "get_tokenomics",
     ]

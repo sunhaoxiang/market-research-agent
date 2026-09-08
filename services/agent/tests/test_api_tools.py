@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 
 from agent_service.config import get_settings
 from agent_service.main import create_app
-from agent_service.providers.crypto import CoinPrice, CoinSearchHit, CoinSearchPage
+from agent_service.providers.crypto import CoinMarket, CoinPrice, CoinSearchHit, CoinSearchPage
 from agent_service.providers.defi import ProtocolTvl, TvlPoint
 from agent_service.providers.search import SearchHit, SearchPage
 from agent_service.schemas.tools import DataProvenance, ToolErrorCode
@@ -67,8 +67,35 @@ class _FakeCoinGecko:
             ),
         )
 
-    async def get_market(self, coin_id: str, *, vs_currency: str = "usd") -> object:
-        raise AssertionError("invoke tests do not call get_market")
+    async def get_market(self, coin_id: str, *, vs_currency: str = "usd") -> CoinMarket:
+        del vs_currency
+        return CoinMarket(
+            coin_id=coin_id,
+            symbol="HYPE",
+            name="Hyperliquid",
+            vs_currency="usd",
+            current_price=42.5,
+            market_cap=14_000_000_000.0,
+            fully_diluted_valuation=42_500_000_000.0,
+            total_volume=200_000_000.0,
+            circulating_supply=333_000_000.0,
+            total_supply=1_000_000_000.0,
+            max_supply=1_000_000_000.0,
+            ath=50.0,
+            ath_date=datetime(2026, 9, 8, tzinfo=UTC),
+            atl=1.0,
+            atl_date=datetime(2026, 9, 8, tzinfo=UTC),
+            high_24h=44.0,
+            low_24h=40.0,
+            change_24h_pct=3.2,
+            last_updated=datetime(2026, 9, 8, tzinfo=UTC),
+            url=f"https://www.coingecko.com/en/coins/{coin_id}",
+            provenance=DataProvenance(
+                provider="coingecko",
+                endpoint="/coins/markets",
+                retrieved_at=datetime(2026, 9, 8, tzinfo=UTC),
+            ),
+        )
 
     async def get_market_chart(
         self, coin_id: str, *, days: int = 30, vs_currency: str = "usd"
@@ -217,6 +244,23 @@ def test_invoke_get_tvl(client: TestClient) -> None:
     assert body["data"]["protocol"] == "hyperliquid"
     assert body["data"]["tvl_usd"] == 1_500_000_000.0
     assert body["provenance"]["source_url"] == "https://defillama.com/protocol/hyperliquid"
+
+
+def test_invoke_get_tokenomics(client: TestClient) -> None:
+    response = client.post(
+        "/v1/tools/get_tokenomics/invoke",
+        json={"arguments": {"asset": "hyperliquid"}},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["data"]["coin_id"] == "hyperliquid"
+    assert body["data"]["circulating_supply"] == 333_000_000.0
+    assert body["data"]["allocations"] == []
+    assert body["data"]["unlocks"] == []
+    assert "allocations" in body["quality"]["missing_fields"]
+    assert "unlocks" in body["quality"]["missing_fields"]
+    assert body["provenance"]["source_url"] == "https://www.coingecko.com/en/coins/hyperliquid"
 
 
 def test_invoke_crypto_price(client: TestClient) -> None:

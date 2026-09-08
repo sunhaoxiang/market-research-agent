@@ -15,8 +15,10 @@ from agent_service.tools.crypto.models import (
     CryptoPriceData,
     CryptoPriceHistoryData,
     ResolveAssetData,
+    TokenomicsData,
 )
 from agent_service.tools.crypto.resolve import run_resolve_asset
+from agent_service.tools.crypto.tokenomics import run_get_tokenomics
 from agent_service.tools.deps import ToolDeps
 
 
@@ -78,9 +80,25 @@ async def get_price_history(
     return await run_get_price_history(ctx.context, asset=asset, days=days, vs_currency=vs_currency)
 
 
+@function_tool
+async def get_tokenomics(
+    ctx: RunContextWrapper[ToolDeps], asset: str, vs_currency: str = "usd"
+) -> ToolResult[TokenomicsData]:
+    """查询代币供应量。分配表和解锁日程在免费源上通常没有，看 quality.missing_fields，不要编造。
+
+    asset 必须是 resolve_asset 返回的 coin_id。
+
+    Args:
+        asset: CoinGecko coin id，例如 "hyperliquid"。
+        vs_currency: 计价货币（影响 FDV），默认 usd。
+    """
+    return await run_get_tokenomics(ctx.context, asset=asset, vs_currency=vs_currency)
+
+
 CRYPTO_TOOLS: list[Tool] = [
     resolve_asset,
     get_crypto_price,
     get_market_data,
     get_price_history,
+    get_tokenomics,
 ]

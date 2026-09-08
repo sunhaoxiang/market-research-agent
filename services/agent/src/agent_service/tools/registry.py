@@ -19,8 +19,10 @@ from agent_service.tools.crypto.models import (
     CryptoPriceData,
     CryptoPriceHistoryData,
     ResolveAssetData,
+    TokenomicsData,
 )
 from agent_service.tools.crypto.resolve import run_resolve_asset
+from agent_service.tools.crypto.tokenomics import run_get_tokenomics
 from agent_service.tools.defi.llama import (
     run_get_chain_overview,
     run_get_dex_volume,
@@ -171,6 +173,14 @@ async def _get_price_history(
     )
 
 
+async def _get_tokenomics(deps: ToolDeps, arguments: dict[str, Any]) -> ToolResult[TokenomicsData]:
+    try:
+        args = CryptoMarketArgs.model_validate(arguments)
+    except ValidationError as exc:
+        return fail_validation("get_tokenomics", exc)
+    return await run_get_tokenomics(deps, asset=args.asset, vs_currency=args.vs_currency)
+
+
 async def _compute_metrics(
     deps: ToolDeps, arguments: dict[str, Any]
 ) -> ToolResult[ComputeMetricsData]:
@@ -231,6 +241,7 @@ HANDLERS: dict[str, ToolHandler] = {
     "get_market_data": _get_market_data,
     "get_price_history": _get_price_history,
     "get_protocol_fees_revenue": _get_protocol_fees_revenue,
+    "get_tokenomics": _get_tokenomics,
     "get_tvl": _get_tvl,
     "news_search": _news_search,
     "resolve_asset": _resolve_asset,

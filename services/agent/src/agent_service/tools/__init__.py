@@ -5,6 +5,7 @@ from agent_service.tools.crypto.bindings import (
     get_crypto_price,
     get_market_data,
     get_price_history,
+    get_tokenomics,
     resolve_asset,
 )
 from agent_service.tools.defi.bindings import (
@@ -33,6 +34,7 @@ __all__ = [
     "get_market_data",
     "get_price_history",
     "get_protocol_fees_revenue",
+    "get_tokenomics",
     "get_tvl",
     "invoke_tool",
     "news_search",

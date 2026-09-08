@@ -6,7 +6,7 @@
 > **每完成一个任务就更新此表的状态**；每完成一个阶段，跑 `[DP §26]` 的收尾清单并写阶段小结。
 
 - 最后更新：2026-09-08
-- 当前阶段：**P3-6 Defi tools 已完成**；下一任务 P3-7 `get_tokenomics`。P3-7 先调研数据源覆盖度，拿不到的字段进 `data_gaps`。
+- 当前阶段：**P3-7 `get_tokenomics` 已完成**；下一任务 P3-8 链上数据源选型调研。拿不到的字段进 `data_gaps`，不要让 LLM 编。
 
 ### 已确认的前置决策（2026-09-07）
 
@@ -154,7 +154,7 @@ hash 跨会话稳定，说明 §9.8 的缓存前缀约束真的守住了；95.4%
 | P3-4  | `tools/crypto/`：`get_crypto_price` / `get_market_data` / `get_price_history`。包 `CoinGeckoProvider` 的现成类型，不要再解析一遍 JSON | P3-1, P3-3      | ✅   | 结构化输出 + provenance 完整            |
 | P3-5  | `tools/system/compute_metrics`：涨跌幅 / CAGR / 波动率 / 百分位（纯 Python）`[DP §8.5]`          | P1-1            | ✅   | 单元测试含边界值                        |
 | P3-6  | `tools/defi/`：`get_tvl` / `get_protocol_fees_revenue` / `get_dex_volume` / `get_chain_overview`。包 `DefiLlamaProvider` 的现成类型，不要再解析一遍 JSON | P3-2            | ✅   | HYPE/Hyperliquid 数据正确               |
-| P3-7  | `tools/crypto/get_tokenomics`：供应量 / 分配 / 解锁（数据源覆盖度调研 + 缺失明确声明）           | P3-1            | ⬜   | 拿不到的字段进 `data_gaps`              |
+| P3-7  | `tools/crypto/get_tokenomics`：供应量 / 分配 / 解锁（数据源覆盖度调研 + 缺失明确声明）           | P3-1            | ✅   | 拿不到的字段进 `data_gaps`              |
 | P3-8  | 链上数据源选型调研 + 可行子集实现（`get_chain_activity` 等），受限项写入风险登记 `[DP §23 R4]`   | P3-2            | ⬜   | 输出实际覆盖度结论文档                  |
 | P3-9  | Crypto Research Agent + prompt（整合 crypto/defi/onchain/web tools）                             | P3-4~P3-8, P2-6 | ⬜   | 对 3 个样例 crypto 问题产出完整 finding |
 | P3-10 | 数值冲突检测：多源同指标差异 → `CONFLICT_DETECTED` + 报告并列展示 `[DP §23 R9]`                  | P3-9            | ⬜   | 注入冲突数据能被检出                    |
@@ -559,6 +559,20 @@ Agent / Tool 只依赖 `SearchProvider` 协议，Tavily 是第一个实现。换
 空 `series` 进 `missing_fields`，不要当成 TVL=0。`provenance.source_url` 是 `defillama.com/protocol/{slug}` 或 `/chain/{name}`，不是 API 地址。TVL 的 `as_of` 用序列最后一点。
 
 `DEFI_TOOLS` 已挂 `@function_tool` 和 invoke。注入 `ToolDeps.defillama`。P3-9 再挂到 Crypto Research Agent。
+
+### P3-7 — `get_tokenomics` ✅（2026-09-08）
+
+覆盖度调研结论（免费档能拿到的就这些）：
+
+| 字段 | 源 | 结论 |
+| --- | --- | --- |
+| 流通 / 总 / 最大供应量、FDV | CoinGecko Demo `get_market`（`/coins/markets`） | 有。流通占比由 Python 用 circulating/max 算，ratio 是小数 |
+| 分配表 / 解锁日程 | CoinGecko 网站 Tokenomics 页（Tokenomist） | **未进 API**。`/coins/{id}` 也没有这些字段 |
+| 排放 / vesting | DefiLlama `/api/emission*` | **Pro API**，本项不用 |
+
+tool 只包已有 `get_market`，不另打 HTTP、不解析 JSON。`allocations` / `unlocks` 保持空列表，进 `DataQuality.missing_fields` + caveat；空列表不是「分配为 0」。Agent 把缺口抄进 `data_gaps` 是 P3-9。付费源（Tokenomist / DefiLlama Pro / TokenUnlocks）留作后续开关。
+
+`asset` 必须是 **P3-3** 的 `coin_id`。P3-9 再挂到 Crypto Research Agent。
 
 ---
 

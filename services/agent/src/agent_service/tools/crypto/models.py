@@ -79,3 +79,30 @@ class CryptoPriceHistoryData(Schema):
     days: int
     prices: list[CryptoPricePoint] = Field(default_factory=list)
     url: str
+
+
+class TokenAllocation(Schema):
+    category: str
+    pct: float | None = None
+    amount: float | None = None
+
+
+class TokenUnlock(Schema):
+    timestamp: datetime | None = None
+    amount: float | None = None
+    description: str | None = None
+
+
+class TokenomicsData(Schema):
+    coin_id: str
+    symbol: str
+    name: str
+    vs_currency: str
+    circulating_supply: float | None = None
+    total_supply: float | None = None
+    max_supply: float | None = None
+    fully_diluted_valuation: float | None = None
+    circulating_pct: float | None = None
+    allocations: list[TokenAllocation] = Field(default_factory=list)
+    unlocks: list[TokenUnlock] = Field(default_factory=list)
+    url: str
