@@ -2,6 +2,8 @@
 
 它不使用任何工具：唯一职责是把用户问题变成 `ResearchPlan`。给规划者配工具会
 诱导它"先查一下再规划"，把成本与延迟推到规划阶段，而那本该是执行阶段的事。
+P5-2 把子 Agent 装进编排层（`SubAgentRunner`），**不要**用 `agent.as_tool()`
+挂到本 Agent 上——那会变成 LLM 自主循环，违背决策 A。
 """
 
 from __future__ import annotations

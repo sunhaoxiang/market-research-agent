@@ -1,8 +1,8 @@
 """尚未实现的子 Agent 占位（fact_checker）。
 
-`web_research` 已在 P2-6 接上真工具，`crypto_research` 已在 P3-9 接上，
-`stock_research` 已在 P4-10 接上。其余任务仍走这里，好让编排层在接手前
-就能发出 agent_started / agent_completed。
+`web_research` / `crypto_research` / `stock_research` 已由 P5-2 装进
+`SubAgentRunner`。其余任务仍走这里，好让编排层在接手前就能发出
+agent_started / agent_completed。
 
 **它刻意不假装成功。** `data_gaps` 写明尚未实现，缺口会走进报告的
 「数据限制」章节，而不是一段编造的 summary。

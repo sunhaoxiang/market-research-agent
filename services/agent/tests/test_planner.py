@@ -185,6 +185,13 @@ def test_prompt_lists_exactly_the_executable_agents() -> None:
             assert agent.value not in prompt, f"{agent.value} 不该出现在 prompt 中"
 
 
+def test_prompt_asks_for_crypto_and_web_together() -> None:
+    """P5-2：结构化数据与网页是两个 Agent，一次研究里可以同时规划。"""
+    prompt = render_prompt(PROMPT_NAME, max_tasks=6)
+    assert "结构化数据与网页分开" in prompt
+    assert "一次研究可以同时用" in prompt
+
+
 def test_planner_temperature_is_low() -> None:
     """同一个问题两次得到完全不同的任务树会让人怀疑系统可靠性。"""
     built = build_research_manager(_registry(), _limits())

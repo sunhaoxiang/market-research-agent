@@ -6,7 +6,7 @@
 > **每完成一个任务就更新此表的状态**；每完成一个阶段，跑 `[DP §26]` 的收尾清单并写阶段小结。
 
 - 最后更新：2026-09-08
-- 当前阶段：**P5-1 已完成**；下一任务 P5-2。
+- 当前阶段：**P5-2 已完成**；下一任务 P5-3（开工先带 D22）。
 
 ### 已确认的前置决策（2026-09-07）
 
@@ -193,7 +193,7 @@ hash 跨会话稳定，说明 §9.8 的缓存前缀约束真的守住了；95.4%
 | ID   | 任务                                                                                                       | 依赖              | 状态 | 验收                                        |
 | ---- | ---------------------------------------------------------------------------------------------------------- | ----------------- | ---- | ------------------------------------------- |
 | P5-1 | 意图分类层（词典/正则短路 + FAST 模型兜底）`[DP §25.1]`                                                    | P1-9              | ✅   | 常见问题不走 LLM 也能正确分类               |
-| P5-2 | Agents-as-Tools 装配：Manager 通过工具调用子 Agent，结果回编排层 `[DP 决策 B]`                             | P3-9, P4-10, P2-6 | ⬜   | 单次研究可同时用到 crypto + web             |
+| P5-2 | Agents-as-Tools 装配：Manager 通过工具调用子 Agent，结果回编排层 `[DP 决策 B]`                             | P3-9, P4-10, P2-6 | ✅   | 单次研究可同时用到 crypto + web             |
 | P5-3 | 完整并行 fan-out：依赖分层 + `asyncio.gather` + 单任务超时 + 部分失败降级。**开工先带 D22**：超时 salvage 已拉到的 SEC 三表/季报要进对比表 `metrics` | P5-2              | ⬜   | 1 个任务失败不影响整体出报告；salvage 数字能进对比表 |
 | P5-4 | Merge & Dedup 阶段：source 归一、claim 合并、冲突汇总                                                      | P5-3, P3-10       | ⬜   | 跨 Agent 的重复来源被合并                   |
 | P5-5 | Fact Checker Agent（干净上下文，只看 claims + sources，可复检索）+ 校验事件流                              | P5-4              | ⬜   | 能识别注入的错误声明                        |
@@ -211,6 +211,14 @@ hash 跨会话稳定，说明 §9.8 的缓存前缀约束真的守住了；95.4%
 ticker 只匹配原文大写独立词，避免 `sol` / `meta` / `hype` 误伤。跨资产且没有比较词、宏观词叠 ticker、比较词但不足两个标的 → 交给 FAST。FAST 构造失败（没配 key）则 `classifier=None`，规则仍可用。
 
 规则覆盖的常见问：`NVDA 是做什么的` / 财报 / 估值 / `英伟达…` → stock·NVDA；`HYPE 最近有什么重要进展` / TVL / `Hyperliquid 怎么样？` → crypto·HYPE；`比较 NVDA、AMD、AVGO` → compare 三标的；`比较 Solana 和 Sui` → SOL, SUI；`美联储会不会降息` → macro；`你好` → generic。
+
+### P5-2 — Agents-as-Tools 装配 ✅（2026-09-08）
+
+按决策 A，Research Manager **仍然没有工具**，只出 `ResearchPlan`。给它挂 `agent.as_tool()` 会变成「规划阶段就做研究」的 LLM 循环，和「先画出任务树再点亮」的 UX 冲突。
+
+决策 B 的落地是：`SubAgentRunner` 把 crypto / web / stock 装成编排层可调用的专职 Agent，Python 执行器 fan-out，结构化 `ResearchFinding` 回到编排层再交给 Writer。Handoff 会转移控制权且不返回，用不了并行汇总。`fact_checker` 仍是占位（P5-5）。
+
+规划 prompt 写明：结构化数据与网页分开，一次研究里两者可以同时出现、默认并行。验收是 ScriptedModel：一份含 `crypto_research` + `web_research` 的计划，两次 finding 都进了 `outcome.findings` 和 `AGENT_STARTED`。不是真跑 DeepSeek。
 
 P5-3 开工备忘：**D22** — 超时 salvage 没有把已成功的 SEC 数字写成 `metrics`，对比表 AVGO 列因此缺失。不要只改超时秒数。
 

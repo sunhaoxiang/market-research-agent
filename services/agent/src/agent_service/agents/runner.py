@@ -1,10 +1,19 @@
-"""按任务类型分派子 Agent。web / crypto / stock 已接真工具；fact_checker 仍走占位。"""
+"""按任务类型分派子 Agent（P5-2 / [DP 决策 B]）。
+
+web / crypto / stock 已装成可被编排层调用的专职 Agent，结果回到
+`ResearchFinding`。这是 Agents-as-Tools 的落地：**调用方是 Python 执行器**，
+不是 Research Manager——Manager 仍然没有工具（决策 A）。Handoff 会转移
+控制权且不返回，用不了「多路并行 + 汇总」。
+
+fact_checker 仍走占位（P5-5）。
+"""
 
 from __future__ import annotations
 
 import asyncio
 import time
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
@@ -62,8 +71,17 @@ type _UserMessage = Callable[..., str]
 type _BuiltAgent = WebResearchAgent | CryptoResearchAgent | StockResearchAgent
 
 
+@dataclass(frozen=True)
+class _Assembled:
+    """一个已装好的子 Agent：编排层按任务类型取用。"""
+
+    built: _BuiltAgent
+    user_message: _UserMessage
+    empty_sources_gap: str | None = None
+
+
 class SubAgentRunner:
-    """`TaskRunner`：web / crypto / stock 走真 Agent，fact_checker 仍是占位。"""
+    """`TaskRunner`：把三个研究 Agent 装进一次会话，fact_checker 仍是占位。"""
 
     def __init__(
         self,
@@ -79,10 +97,26 @@ class SubAgentRunner:
         fmp: FmpClient | None = None,
         clock: Clock | None = None,
         fallback_model_id: str,
+        web: WebResearchAgent | None = None,
+        crypto: CryptoResearchAgent | None = None,
+        stock: StockResearchAgent | None = None,
     ) -> None:
-        self._web = build_web_research(registry)
-        self._crypto = build_crypto_research(registry)
-        self._stock = build_stock_research(registry)
+        assembled_web = web or build_web_research(registry)
+        assembled_crypto = crypto or build_crypto_research(registry)
+        assembled_stock = stock or build_stock_research(registry)
+        self._agents: dict[AgentName, _Assembled] = {
+            AgentName.WEB_RESEARCH: _Assembled(assembled_web, web_research_user_message),
+            AgentName.CRYPTO_RESEARCH: _Assembled(
+                assembled_crypto,
+                crypto_research_user_message,
+                EMPTY_CRYPTO_SOURCES_GAP,
+            ),
+            AgentName.STOCK_RESEARCH: _Assembled(
+                assembled_stock,
+                stock_research_user_message,
+                EMPTY_STOCK_SOURCES_GAP,
+            ),
+        }
         self._placeholder = PlaceholderRunner(fallback_model_id)
         self._limits = limits
         self._search = search
@@ -95,48 +129,22 @@ class SubAgentRunner:
         self._clock = clock
 
     def model_id_for(self, agent: AgentName) -> str:
-        if agent is AgentName.WEB_RESEARCH:
-            return self._web.model_id
-        if agent is AgentName.CRYPTO_RESEARCH:
-            return self._crypto.model_id
-        if agent is AgentName.STOCK_RESEARCH:
-            return self._stock.model_id
+        assembled = self._agents.get(agent)
+        if assembled is not None:
+            return assembled.built.model_id
         return self._placeholder.model_id_for(agent)
 
     async def run(self, context: TaskContext, state: ResearchState) -> ResearchFinding:
-        if context.task.agent is AgentName.WEB_RESEARCH:
-            return await self._run_built(
-                self._web,
-                context,
-                state,
-                user_message=web_research_user_message,
-            )
-        if context.task.agent is AgentName.CRYPTO_RESEARCH:
-            return await self._run_built(
-                self._crypto,
-                context,
-                state,
-                user_message=crypto_research_user_message,
-                empty_sources_gap=EMPTY_CRYPTO_SOURCES_GAP,
-            )
-        if context.task.agent is AgentName.STOCK_RESEARCH:
-            return await self._run_built(
-                self._stock,
-                context,
-                state,
-                user_message=stock_research_user_message,
-                empty_sources_gap=EMPTY_STOCK_SOURCES_GAP,
-            )
-        return await self._placeholder.run(context, state)
+        assembled = self._agents.get(context.task.agent)
+        if assembled is None:
+            return await self._placeholder.run(context, state)
+        return await self._run_built(assembled, context, state)
 
     async def _run_built(
         self,
-        built: _BuiltAgent,
+        assembled: _Assembled,
         context: TaskContext,
         state: ResearchState,
-        *,
-        user_message: _UserMessage,
-        empty_sources_gap: str | None = None,
     ) -> ResearchFinding:
         started = time.monotonic()
         collector = SourceCollector(registry=state.source_registry)
@@ -156,22 +164,21 @@ class SubAgentRunner:
             state.bus, agent=context.task.agent, task_id=context.task.id
         )
         now = self._clock.now() if self._clock is not None else datetime.now(UTC)
-        user_input = user_message(
+        user_input = assembled.user_message(
             context.task,
             now=now,
             upstream_summaries=tuple(format_upstream_finding(item) for item in context.upstream),
             missing_upstream=context.missing_upstream,
         )
-
         kwargs: dict[str, Any] = {}
-        if empty_sources_gap is not None:
-            kwargs["empty_sources_gap"] = empty_sources_gap
+        if assembled.empty_sources_gap is not None:
+            kwargs["empty_sources_gap"] = assembled.empty_sources_gap
 
         try:
             structured = await run_tool_agent(
-                built.agent,
+                assembled.built.agent,
                 user_input,
-                strategy=built.strategy,
+                strategy=assembled.built.strategy,
                 deps=deps,
                 translator=translator,
                 max_turns=self._limits.max_tool_calls_per_agent + 1,
@@ -181,7 +188,7 @@ class SubAgentRunner:
             # 来源和 unsupported 缺口塞进 salvage，再让取消冒泡——否则 Writer
             # 只能写「数据缺失」，工具结果全废。
             self._record(
-                built,
+                assembled.built,
                 state,
                 started,
                 context.task,
@@ -199,11 +206,13 @@ class SubAgentRunner:
             )
             raise
         except StructuredOutputError as error:
-            self._record(built, state, started, context.task, usage=error.usage, error=error)
+            self._record(
+                assembled.built, state, started, context.task, usage=error.usage, error=error
+            )
             raise
         except Exception as error:
             self._record(
-                built,
+                assembled.built,
                 state,
                 started,
                 context.task,
@@ -212,7 +221,7 @@ class SubAgentRunner:
             )
             raise
 
-        self._record(built, state, started, context.task, usage=structured.usage)
+        self._record(assembled.built, state, started, context.task, usage=structured.usage)
         return assemble_finding(context.task, structured.output, collector, **kwargs)
 
     def _record(
