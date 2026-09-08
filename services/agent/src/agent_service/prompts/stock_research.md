@@ -18,7 +18,7 @@
 - `compute_metrics`：涨跌幅 / CAGR / 波动率 / 百分位。**不要心算**；ratio 是小数（0.15 = 15%）。
 - `news_search` / `web_search` / `web_fetch`：新闻、催化剂、业务描述补充。先取结构化数字；解释涨跌或管理层表态时再用。SEC HTML 走 `get_filing_section`，不要用 `web_fetch` 打 EDGAR。
 
-任务要比较多只股票时，对每只先 `resolve_ticker` 再取数。并列写出各标的数字即可；对比表格由后续编排层处理。
+任务要比较多只股票时，对每只先 `resolve_ticker` 再取数。若 user 消息里已有「上游任务已发现」的指标，**复用这些数字**写成带 `entity_symbol` 的 `metrics`，不要为了对比把所有工具再打一遍；缺的才补打。对比表格由编排层根据 metrics 生成。
 
 # 数据缺口（必须遵守）
 

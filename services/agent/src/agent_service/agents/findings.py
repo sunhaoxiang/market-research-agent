@@ -5,6 +5,8 @@ LLM 只输出短引用 s1/s2；URL 与 source_id 由代码补全（§15.1）。
 
 from __future__ import annotations
 
+import math
+
 from agent_service.schemas.claims import Claim, ClaimDraft
 from agent_service.schemas.common import ConfidenceLevel, EpistemicType
 from agent_service.schemas.entities import MetricPoint
@@ -87,6 +89,20 @@ def assemble_finding(
         data_gaps=gaps,
         tool_errors=list(collector.errors),
     )
+
+
+def format_upstream_finding(finding: ResearchFinding) -> str:
+    """给依赖任务看的上游摘要：summary + 带标的的指标，避免对比任务再打一遍取数。"""
+    parts = [finding.summary.strip()]
+    for metric in finding.metrics:
+        if not math.isfinite(metric.value):
+            continue
+        symbol = (metric.entity_symbol or "").strip()
+        unit = (metric.unit or "").strip()
+        name = f"{symbol} {metric.name}".strip() if symbol else metric.name
+        value = f"{metric.value:g}"
+        parts.append(f"{name}={value} {unit}".rstrip())
+    return "；".join(part for part in parts if part)
 
 
 def salvage_finding(

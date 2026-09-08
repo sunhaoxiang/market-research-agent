@@ -6,7 +6,7 @@
 > **每完成一个任务就更新此表的状态**；每完成一个阶段，跑 `[DP §26]` 的收尾清单并写阶段小结。
 
 - 最后更新：2026-09-08
-- 当前阶段：**P4-10 完成**。下一任务 P4-11 多标的对比。
+- 当前阶段：**P4-11 完成**。Phase 4 任务已齐，阶段验收四问待真跑。
 
 ### 已确认的前置决策（2026-09-07）
 
@@ -40,7 +40,7 @@
 | P1    | Agent 骨架 + 多模型 + Streaming | 13     | ✅   | **端到端最小闭环**               |
 | P2    | Web Research + Citation         | 10     | ✅   | Source / Claim / 带引用报告          |
 | P3    | Crypto 数据能力                 | 11     | ✅   | 市场 / TVL / Tokenomics / 链上   |
-| P4    | 美股数据能力                    | 11     | ⬜   | 行情 / 财务 / 估值 / SEC         |
+| P4    | 美股数据能力                    | 11     | 🟡   | 任务已齐，阶段验收四问待真跑     |
 | P5    | Multi-Agent 完整编排            | 9      | ⬜   | Fact Checker / 并行 / 报告结构   |
 | P5.5  | **MVP 验收**                    | 1      | ⬜   | 见 `[DP §21.1]`                  |
 | P6    | 高级 UX + 历史 + 可观察性       | 11     | ⬜   | Activity 完善 / History / /debug |
@@ -180,7 +180,7 @@ hash 跨会话稳定，说明 §9.8 的缓存前缀约束真的守住了；95.4%
 | P4-8  | `tools/sec/`：`list_sec_filings` / `get_filing_section`（10-K Item 1A/7、10-Q）/ `get_xbrl_facts` / `get_earnings_summary` | P4-2         | ✅   | 能取出指定章节正文                  |
 | P4-9  | 大文件处理策略：10-K 全文分节 + 按需截取 + 永久缓存（避免爆上下文）                                                        | P4-8         | ✅   | 单次注入上下文可控                  |
 | P4-10 | Stock Research Agent + prompt                                                                                              | P4-4~P4-9    | ✅   | 对 4 个样例股票问题产出完整 finding |
-| P4-11 | 多标的对比支持：Plan 层生成依赖任务 + 报告对比表格                                                                         | P4-10, P1-10 | ⬜   | 「比较 NVDA/AMD/AVGO 基本面」可用   |
+| P4-11 | 多标的对比支持：Plan 层生成依赖任务 + 报告对比表格                                                                         | P4-10, P1-10 | ✅   | 「比较 NVDA/AMD/AVGO 基本面」可用   |
 
 **阶段验收**：「NVDA 是做什么的」「分析 NVDA 最近一季财报」「NVDA 估值贵不贵」「比较 NVDA、AMD、AVGO」四个问题都能产出带财务数据与 SEC 引用的报告。
 
@@ -831,6 +831,16 @@ HTML 仍按 accession **永久缓存**（`CacheTTL.PERMANENT`），不把整份 
 - 验收用 ScriptedModel 覆盖四问，不是真跑 DeepSeek 端到端。阶段验收四问仍待 P4-11 / 真跑。
 
 验收四问（finding，非完整报告）：「NVDA 是做什么的」「分析 NVDA 最近一季财报」「NVDA 估值贵不贵」「比较 NVDA、AMD、AVGO」。最近一季有 10-Q 时用季报（fake Q2 营收 46.743B）；年报路径仍钉 FY2025 营收 130,497,000,000（P4-5 / P4-8）。
+
+### P4-11 — 多标的对比 ✅（2026-09-08）
+
+Plan 层：`compare` 问题按标的拆取数任务（同层并行），再加一个 `depends_on` 这些取数任务的对比任务；`report_sections` 含 `Comparison`。这不是写报告——Writer 仍由流程负责。
+
+报告层：对比表由代码从 `metrics`（`entity_symbol` × 指标名）生成 GFM 表格，缺格子写「—」不是 0。时间序列同一指标只留最新 `as_of`。表注入 Writer 的 user 消息；模型漏贴时 `ensure_comparison_table` 补进 Comparison 章节。前端 `remark-gfm` 渲染表格。
+
+依赖任务会在 user 消息里看到上游 summary **和** 指标，避免对比任务把所有 tool 再打一遍。
+
+验收用 ScriptedModel：三路并行 + 一层依赖的计划能校验分层；Writer 漏表时报告仍有 NVDA/AMD/AVGO 数字表。不是真跑 DeepSeek 端到端。阶段验收四问仍待真跑。
 
 ---
 

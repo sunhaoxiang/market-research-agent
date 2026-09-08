@@ -19,10 +19,12 @@ from agent_service.agents.report_writer import (
 from agent_service.models.registry import ModelRegistry
 from agent_service.models.structured_output import StructuredOutputError, run_structured
 from agent_service.observability.event_bus import EventBus
+from agent_service.orchestrator.comparison import build_comparison_table
 from agent_service.orchestrator.state import ResearchState
 from agent_service.orchestrator.writer import write_report
 from agent_service.schemas.claims import Claim
 from agent_service.schemas.common import AgentName, ConfidenceLevel, EpistemicType, SourceType
+from agent_service.schemas.entities import MetricPoint
 from agent_service.schemas.events import (
     AgentRunMetricsEvent,
     EventType,
@@ -322,3 +324,101 @@ async def test_first_json_failure_still_fails_the_session() -> None:
     assert len(metrics) == 1
     assert metrics[0].payload.error is not None
     assert metrics[0].payload.error.code == "structured_output"
+
+
+def _stock_finding(
+    task_id: str,
+    symbol: str,
+    source: Source,
+    *,
+    revenue: float,
+    pe: float,
+) -> ResearchFinding:
+    return ResearchFinding(
+        task_id=task_id,
+        agent=AgentName.STOCK_RESEARCH,
+        summary=f"{symbol} 基本面。",
+        claims=[
+            Claim(
+                text=f"{symbol} 最近一季营收已获取。",
+                epistemic_type=EpistemicType.SOURCE_BACKED_FACT,
+                confidence=ConfidenceLevel.HIGH,
+                source_ids=[source.id],
+            )
+        ],
+        sources=[source],
+        metrics=[
+            MetricPoint(
+                name="revenue",
+                label="营收",
+                value=revenue,
+                unit="USD",
+                entity_symbol=symbol,
+            ),
+            MetricPoint(
+                name="pe",
+                label="PE",
+                value=pe,
+                unit="x",
+                entity_symbol=symbol,
+            ),
+        ],
+    )
+
+
+def test_user_message_includes_comparison_table() -> None:
+    raw = _source()
+    numbered = assign_citation_indices([raw], _finding(raw).claims)
+    nvda = _stock_finding("t1", "NVDA", numbered[0], revenue=46_743_000_000.0, pe=45.2)
+    amd = _stock_finding("t2", "AMD", numbered[0], revenue=7_400_000_000.0, pe=40.0)
+    table = build_comparison_table([nvda, amd])
+    text = report_writer_user_message(
+        "比较 NVDA、AMD 基本面",
+        [nvda, amd],
+        numbered,
+        section_ids=("Executive Summary", "Comparison", "Key Differences", "Conclusion"),
+        comparison_table=table,
+        now=_NOW,
+    )
+    assert "对比表" in text
+    assert table is not None
+    assert table in text
+    assert "NVDA revenue=" in text
+    built = build_report_writer(_registry())
+    assert "对比表" in str(built.agent.instructions)
+    assert "不要改数字" in str(built.agent.instructions)
+
+
+async def test_write_report_injects_comparison_table_when_omitted() -> None:
+    """模型漏贴表格时，编排层把代码生成的表补进 Comparison。"""
+    source = _source()
+    nvda = _stock_finding("t1", "NVDA", source, revenue=46_743_000_000.0, pe=45.2)
+    amd = _stock_finding("t2", "AMD", source, revenue=7_400_000_000.0, pe=40.0)
+    avgo = _stock_finding("t3", "AVGO", source, revenue=15_000_000_000.0, pe=38.0)
+    payload = json.dumps(
+        {
+            "title": "NVDA / AMD / AVGO 对比",
+            "executive_summary": "三家半导体公司规模与估值不同。[1]",
+            "sections": [
+                {
+                    "id": "Comparison",
+                    "title": "对比",
+                    "markdown": "以下为基本面对照。[1]",
+                    "claim_ids": [],
+                }
+            ],
+            "data_gaps": [],
+        },
+        ensure_ascii=False,
+    )
+    bus = EventBus("sess-cmp", heartbeat_interval_s=60.0)
+    state = ResearchState("sess-cmp", "比较 NVDA、AMD、AVGO 基本面", bus=bus)
+    state.source_registry.replace_all([source])
+    state.findings = [nvda, amd, avgo]
+    await write_report(state, _writer(payload), now=_NOW)
+    assert state.report is not None
+    markdown = state.report.sections[0].markdown
+    assert "以下为基本面对照。[1]" in markdown
+    assert "| 指标 | NVDA | AMD | AVGO |" in markdown
+    assert "46,743,000,000" in markdown
+    assert "营收（USD）" in markdown

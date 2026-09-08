@@ -366,3 +366,89 @@ async def test_repairs_surface_as_warnings() -> None:
     warnings = [event for event in events if event.type is EventType.WARNING]
     assert len(warnings) == 1
     assert _payload(warnings[0], WarningPayload).code == "plan.invalid_dependency"
+
+
+def test_prompt_teaches_compare_fan_out_and_dependent_task() -> None:
+    prompt = render_prompt(PROMPT_NAME, max_tasks=6)
+    assert "每个标的一个取数任务" in prompt
+    assert "再加一个对比任务" in prompt
+    assert "Executive Summary" in prompt
+    assert "Comparison" in prompt
+    assert "fact_checker" not in prompt
+    assert "report_writer" not in prompt
+
+
+async def test_compare_plan_validates_with_two_layers() -> None:
+    """「比较 NVDA/AMD/AVGO」应拆成三路并行取数 + 依赖它们的对比任务。"""
+    tasks = [
+        {
+            "id": "t1",
+            "agent": "stock_research",
+            "objective": "获取 NVDA 最近一季营收、净利与估值倍数",
+            "entities": [{"type": "stock", "symbol": "NVDA", "name": "NVIDIA"}],
+            "suggested_tools": ["get_earnings_summary", "get_valuation_metrics"],
+            "depends_on": [],
+            "priority": 1,
+        },
+        {
+            "id": "t2",
+            "agent": "stock_research",
+            "objective": "获取 AMD 最近一季营收、净利与估值倍数",
+            "entities": [{"type": "stock", "symbol": "AMD", "name": "AMD"}],
+            "suggested_tools": ["get_earnings_summary", "get_valuation_metrics"],
+            "depends_on": [],
+            "priority": 1,
+        },
+        {
+            "id": "t3",
+            "agent": "stock_research",
+            "objective": "获取 AVGO 最近一季营收、净利与估值倍数",
+            "entities": [{"type": "stock", "symbol": "AVGO", "name": "Broadcom"}],
+            "suggested_tools": ["get_earnings_summary", "get_valuation_metrics"],
+            "depends_on": [],
+            "priority": 1,
+        },
+        {
+            "id": "t4",
+            "agent": "stock_research",
+            "objective": "对比 NVDA、AMD、AVGO 的营收规模与估值倍数",
+            "entities": [
+                {"type": "stock", "symbol": "NVDA", "name": "NVIDIA"},
+                {"type": "stock", "symbol": "AMD", "name": "AMD"},
+                {"type": "stock", "symbol": "AVGO", "name": "Broadcom"},
+            ],
+            "suggested_tools": [],
+            "depends_on": ["t1", "t2", "t3"],
+            "priority": 0,
+        },
+    ]
+    result = await create_plan(
+        "比较 NVDA、AMD、AVGO 基本面",
+        planner=_scripted_planner(
+            _plan_json(
+                question_type="compare",
+                interpretation="用户要横向对比三家半导体公司的基本面",
+                entities=[
+                    {"type": "stock", "symbol": "NVDA", "name": "NVIDIA"},
+                    {"type": "stock", "symbol": "AMD", "name": "AMD"},
+                    {"type": "stock", "symbol": "AVGO", "name": "Broadcom"},
+                ],
+                tasks=tasks,
+                report_sections=[
+                    "Executive Summary",
+                    "Comparison",
+                    "Key Differences",
+                    "Conclusion",
+                ],
+            )
+        ),
+        limits=_limits(),
+        now=_NOW,
+    )
+    assert result.plan.question_type is QuestionType.COMPARE
+    assert "Comparison" in result.plan.report_sections
+    assert [[task.id for task in layer] for layer in result.validated.layers] == [
+        ["t1", "t2", "t3"],
+        ["t4"],
+    ]
+    assert result.validated.issues == ()

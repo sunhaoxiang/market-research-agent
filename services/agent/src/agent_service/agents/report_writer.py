@@ -68,6 +68,7 @@ def report_writer_user_message(
     *,
     section_ids: tuple[str, ...] = (),
     conflicts: Sequence[Conflict] = (),
+    comparison_table: str | None = None,
     now: datetime | None = None,
 ) -> str:
     """日期、问题、发现都放 user 消息，避免污染 system prompt 缓存前缀。"""
@@ -90,6 +91,8 @@ def report_writer_user_message(
     conflict_block = _conflicts_block(conflicts)
     if conflict_block is not None:
         parts.append(conflict_block)
+    if comparison_table:
+        parts.append("对比表（Comparison 章节必须原样纳入，不要改数字）：\n" + comparison_table)
     parts.append("请根据以上发现撰写结构化报告。")
     return "\n\n".join(parts)
 
@@ -119,6 +122,14 @@ def _findings_block(findings: list[ResearchFinding], cited: dict[str, Source]) -
             )
             label = f"{claim.epistemic_type.value} / {claim.confidence.value}"
             chunks.append(f"- [{label}] {claim.text} {marks}".rstrip())
+        if finding.metrics:
+            chunks.append(
+                "指标："
+                + "；".join(
+                    f"{(metric.entity_symbol or '').strip()} {metric.name}={metric.value:g}".strip()
+                    for metric in finding.metrics
+                )
+            )
     return "\n".join(chunks)
 
 

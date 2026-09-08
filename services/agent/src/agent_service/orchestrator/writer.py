@@ -16,6 +16,10 @@ from agent_service.agents.report_writer import (
     report_writer_user_message,
 )
 from agent_service.models.structured_output import StructuredOutputError, run_structured
+from agent_service.orchestrator.comparison import (
+    build_comparison_table,
+    ensure_comparison_table,
+)
 from agent_service.orchestrator.state import AgentRun
 from agent_service.schemas.common import AgentName
 from agent_service.schemas.events import (
@@ -67,12 +71,14 @@ async def write_report(
     cited = bibliography(numbered)
     section_ids = tuple(state.plan.plan.report_sections) if state.plan is not None else ()
     moment = now or datetime.now(UTC)
+    table = build_comparison_table(state.findings)
     user_input = report_writer_user_message(
         state.question,
         state.findings,
         numbered,
         section_ids=section_ids,
         conflicts=state.conflicts,
+        comparison_table=table,
         now=moment,
     )
 
@@ -95,7 +101,7 @@ async def write_report(
         )
         raise
 
-    report = merge_report_gaps(structured.output, state.findings)
+    report = ensure_comparison_table(merge_report_gaps(structured.output, state.findings), table)
     report, usage, leftover = await _revise(
         writer,
         structured,
@@ -103,6 +109,7 @@ async def write_report(
         numbered=numbered,
         claims=claims,
         findings=state.findings,
+        comparison_table=table,
     )
     if leftover:
         report = apply_degradation(report, numbered, leftover)
@@ -132,6 +139,7 @@ async def _revise(
     numbered: Sequence[Source],
     claims: Sequence[Claim],
     findings: Sequence[ResearchFinding],
+    comparison_table: str | None,
 ) -> tuple[ResearchReport, TokenUsage, list[CitationIssue]]:
     """第一次检查不过就回喂改一次。第二次仍不过：把问题交给调用方降级。"""
     issues = check_report(report, numbered, claims)
@@ -149,7 +157,9 @@ async def _revise(
         return report, usage + error.usage, issues
 
     usage = usage + retry.usage
-    candidate = merge_report_gaps(retry.output, list(findings))
+    candidate = ensure_comparison_table(
+        merge_report_gaps(retry.output, list(findings)), comparison_table
+    )
     retry_issues = check_report(candidate, numbered, claims)
     if retry_issues:
         return candidate, usage, retry_issues

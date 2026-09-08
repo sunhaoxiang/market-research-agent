@@ -15,6 +15,7 @@ from agent_service.agents.crypto_research import CRYPTO_RESEARCH_TOOLS
 from agent_service.agents.findings import (
     EMPTY_STOCK_SOURCES_GAP,
     assemble_finding,
+    format_upstream_finding,
     salvage_finding,
 )
 from agent_service.agents.placeholder import NOT_IMPLEMENTED_GAP
@@ -55,6 +56,7 @@ from agent_service.providers.sec import (
     filing_document_url,
 )
 from agent_service.schemas.common import AgentName, SourceType
+from agent_service.schemas.entities import MetricPoint
 from agent_service.schemas.events import EventType
 from agent_service.schemas.findings import ResearchFinding
 from agent_service.schemas.plan import ResearchTask
@@ -506,6 +508,31 @@ def test_user_message_keeps_date_out_of_system_prompt() -> None:
     built = build_stock_research(_registry())
     assert "2026-09-08" not in str(built.agent.instructions)
     assert built.agent.model_settings.temperature == 0.3
+
+
+def test_user_message_includes_upstream_metrics() -> None:
+    upstream = ResearchFinding(
+        task_id="t1",
+        agent=AgentName.STOCK_RESEARCH,
+        summary="NVDA 最近一季营收 467 亿美元。",
+        metrics=[
+            MetricPoint(
+                name="revenue",
+                label="营收",
+                value=46_743_000_000.0,
+                unit="USD",
+                entity_symbol="NVDA",
+            )
+        ],
+    )
+    text = stock_research_user_message(
+        _task("对比 NVDA 与 AMD 的营收"),
+        now=_NOW,
+        upstream_summaries=(format_upstream_finding(upstream),),
+    )
+    assert "NVDA 最近一季营收 467 亿美元。" in text
+    assert "NVDA revenue=" in text
+    assert "USD" in text
 
 
 async def test_nvda_intro_finding_uses_profile() -> None:

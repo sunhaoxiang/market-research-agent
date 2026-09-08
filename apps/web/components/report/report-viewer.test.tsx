@@ -190,4 +190,27 @@ describe("sanitize 与徽标", () => {
     expect(screen.getByText("TVL · HYPE · 30 天")).toBeDefined();
     expect(document.querySelector("svg .recharts-line")).not.toBeNull();
   });
+
+  it("Comparison 章节的 Markdown 表格渲染成 table", () => {
+    render(
+      <Shell
+        report={{
+          ...REPORT,
+          sections: [
+            {
+              id: "Comparison",
+              title: "对比",
+              markdown:
+                "| 指标 | NVDA | AMD | AVGO |\n| --- | --- | --- | --- |\n| 营收（USD） | 46,743,000,000 | 7,400,000,000 | 15,000,000,000 |",
+              claim_ids: [],
+            },
+          ],
+        }}
+      />,
+    );
+
+    expect(screen.getByRole("table")).toBeDefined();
+    expect(screen.getByRole("columnheader", { name: "NVDA" })).toBeDefined();
+    expect(screen.getByRole("cell", { name: "46,743,000,000" })).toBeDefined();
+  });
 });

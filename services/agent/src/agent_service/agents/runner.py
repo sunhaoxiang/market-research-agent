@@ -17,6 +17,7 @@ from agent_service.agents.findings import (
     EMPTY_CRYPTO_SOURCES_GAP,
     EMPTY_STOCK_SOURCES_GAP,
     assemble_finding,
+    format_upstream_finding,
     salvage_finding,
 )
 from agent_service.agents.placeholder import PlaceholderRunner
@@ -158,7 +159,7 @@ class SubAgentRunner:
         user_input = user_message(
             context.task,
             now=now,
-            upstream_summaries=tuple(item.summary for item in context.upstream),
+            upstream_summaries=tuple(format_upstream_finding(item) for item in context.upstream),
             missing_upstream=context.missing_upstream,
         )
 

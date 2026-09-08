@@ -179,6 +179,23 @@ def test_diamond_dependency_collapses_to_three_layers() -> None:
     ]
 
 
+def test_compare_plan_fans_out_then_depends() -> None:
+    """P4-11：NVDA/AMD/AVGO 各取数并行，对比任务进第二层。"""
+    validated = validate_plan(
+        _plan(
+            _task("t1"),
+            _task("t2"),
+            _task("t3"),
+            _task("t4", depends_on=["t1", "t2", "t3"]),
+        ),
+        _limits(),
+    )
+    assert [[task.id for task in layer] for layer in validated.layers] == [
+        ["t1", "t2", "t3"],
+        ["t4"],
+    ]
+
+
 def test_layers_cover_every_task_exactly_once() -> None:
     validated = validate_plan(
         _plan(_task("t1"), _task("t2", depends_on=["t1"]), _task("t3", depends_on=["t1"])),
