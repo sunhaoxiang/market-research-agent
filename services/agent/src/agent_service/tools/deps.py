@@ -14,6 +14,13 @@ from typing import TYPE_CHECKING, Protocol
 if TYPE_CHECKING:
     from agent_service.observability.event_bus import EventBus
     from agent_service.providers.crypto import CoinMarket, CoinPrice, CoinSearchPage, MarketChart
+    from agent_service.providers.defi import (
+        ChainOverview,
+        ChainTvl,
+        DexVolume,
+        FeesRevenue,
+        ProtocolTvl,
+    )
     from agent_service.providers.fetch import PageFetcher
     from agent_service.providers.runtime import Clock
     from agent_service.providers.search import SearchProvider
@@ -34,11 +41,26 @@ class CoinGeckoClient(Protocol):
     ) -> MarketChart: ...
 
 
+class DefiLlamaClient(Protocol):
+    """DefiLlama 在 ToolDeps 上的面。P3-6 四个 tool 只调这些方法。"""
+
+    async def get_protocol_tvl(self, slug: str, *, days: int = 30) -> ProtocolTvl: ...
+
+    async def get_chain_tvl(self, chain: str, *, days: int = 30) -> ChainTvl: ...
+
+    async def get_fees_revenue(self, slug: str) -> FeesRevenue: ...
+
+    async def get_dex_volume(self, slug: str) -> DexVolume: ...
+
+    async def get_chain_overview(self, chain: str) -> ChainOverview: ...
+
+
 @dataclass(frozen=True, slots=True)
 class ToolDeps:
     search: SearchProvider | None = None
     fetcher: PageFetcher | None = None
     coingecko: CoinGeckoClient | None = None
+    defillama: DefiLlamaClient | None = None
     clock: Clock | None = None
     bus: EventBus | None = None
     sources: SourceCollector | None = None

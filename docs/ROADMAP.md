@@ -6,7 +6,7 @@
 > **每完成一个任务就更新此表的状态**；每完成一个阶段，跑 `[DP §26]` 的收尾清单并写阶段小结。
 
 - 最后更新：2026-09-08
-- 当前阶段：**P3-5 `compute_metrics` 已完成**；下一任务 P3-6 Defi tools。P3-6 用已有 DefiLlama 类型，不要再包 HTTP。
+- 当前阶段：**P3-6 Defi tools 已完成**；下一任务 P3-7 `get_tokenomics`。P3-7 先调研数据源覆盖度，拿不到的字段进 `data_gaps`。
 
 ### 已确认的前置决策（2026-09-07）
 
@@ -153,7 +153,7 @@ hash 跨会话稳定，说明 §9.8 的缓存前缀约束真的守住了；95.4%
 | P3-3  | `resolve_asset`：符号→coin id 消歧（含同名冲突处理，多候选时返回列表让 Agent 选）。底层用已有 `search_coins`，不要再包一层 HTTP | P3-1            | ✅   | "HYPE" 正确解析到 Hyperliquid           |
 | P3-4  | `tools/crypto/`：`get_crypto_price` / `get_market_data` / `get_price_history`。包 `CoinGeckoProvider` 的现成类型，不要再解析一遍 JSON | P3-1, P3-3      | ✅   | 结构化输出 + provenance 完整            |
 | P3-5  | `tools/system/compute_metrics`：涨跌幅 / CAGR / 波动率 / 百分位（纯 Python）`[DP §8.5]`          | P1-1            | ✅   | 单元测试含边界值                        |
-| P3-6  | `tools/defi/`：`get_tvl` / `get_protocol_fees_revenue` / `get_dex_volume` / `get_chain_overview`。包 `DefiLlamaProvider` 的现成类型，不要再解析一遍 JSON | P3-2            | ⬜   | HYPE/Hyperliquid 数据正确               |
+| P3-6  | `tools/defi/`：`get_tvl` / `get_protocol_fees_revenue` / `get_dex_volume` / `get_chain_overview`。包 `DefiLlamaProvider` 的现成类型，不要再解析一遍 JSON | P3-2            | ✅   | HYPE/Hyperliquid 数据正确               |
 | P3-7  | `tools/crypto/get_tokenomics`：供应量 / 分配 / 解锁（数据源覆盖度调研 + 缺失明确声明）           | P3-1            | ⬜   | 拿不到的字段进 `data_gaps`              |
 | P3-8  | 链上数据源选型调研 + 可行子集实现（`get_chain_activity` 等），受限项写入风险登记 `[DP §23 R4]`   | P3-2            | ⬜   | 输出实际覆盖度结论文档                  |
 | P3-9  | Crypto Research Agent + prompt（整合 crypto/defi/onchain/web tools）                             | P3-4~P3-8, P2-6 | ⬜   | 对 3 个样例 crypto 问题产出完整 finding |
@@ -514,7 +514,7 @@ Agent / Tool 只依赖 `SearchProvider` 协议，Tavily 是第一个实现。换
 - `get_dex_volume` / `get_chain_overview` 同名 tool。overview 先拉 `/v2/chains` 再按名匹配（大小写不敏感），列表缓存共享。
 - 给人点的 URL 是 `defillama.com/protocol/{slug}` 或 `/chain/{name}`。
 
-注入 `ToolDeps` 是 P3-6。本项只把客户端放进 `app.state.defillama`。
+注入 `ToolDeps` 从 P3-6 开始。本项只把客户端放进 `app.state.defillama`。
 
 ### P3-3 — `resolve_asset` ✅（2026-09-08）
 
@@ -546,6 +546,19 @@ Agent / Tool 只依赖 `SearchProvider` 协议，Tavily 是第一个实现。换
 边界：空序列 / 未知 op / 非有限值是 `INVALID_INPUT`。两点不够算波动率（样本标准差需要两个对数收益）；CAGR 没有 timestamp 也没有 `years` 时该项为 None，其它 ops 照算。起点为 0 的涨跌幅、非正数的 CAGR、常数序列的百分位同理。波动率没给时间戳时按每年 365 个点年化，并写进 caveats。YoY / QoQ 是 P4-6。
 
 `SYSTEM_TOOLS` 已挂 `@function_tool` 和 invoke。P3-9 再接到 Crypto Research Agent。
+
+### P3-6 — defi tools ✅（2026-09-08）
+
+四个 tool 只包 `DefiLlamaProvider` 已解析好的类型，不碰 JSON：
+
+- `get_tvl` → `get_protocol_tvl` **或** `get_chain_tvl`。`protocol`（slug，如 `hyperliquid`）与 `chain`（保留大小写，如 `Hyperliquid`）只填一个；两个都填或都空是 `INVALID_INPUT`。`days` 默认 30，由 provider 本地裁切。
+- `get_protocol_fees_revenue` → `get_fees_revenue`。不要加 `days`（provider 已给 24h/7d/30d）。缺 revenue 是 `DataQuality.partial`，不是失败。
+- `get_dex_volume` → `get_dex_volume`。只要协议 slug。DP 写了 protocol|chain，但 provider 只有协议；链上 DEX 量不要发明。
+- `get_chain_overview` → `get_chain_overview`。链名大小写不敏感匹配。
+
+空 `series` 进 `missing_fields`，不要当成 TVL=0。`provenance.source_url` 是 `defillama.com/protocol/{slug}` 或 `/chain/{name}`，不是 API 地址。TVL 的 `as_of` 用序列最后一点。
+
+`DEFI_TOOLS` 已挂 `@function_tool` 和 invoke。注入 `ToolDeps.defillama`。P3-9 再挂到 Crypto Research Agent。
 
 ---
 

@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 from agent_service.config import get_settings
 from agent_service.main import create_app
 from agent_service.providers.crypto import CoinPrice, CoinSearchHit, CoinSearchPage
+from agent_service.providers.defi import ProtocolTvl, TvlPoint
 from agent_service.providers.search import SearchHit, SearchPage
 from agent_service.schemas.tools import DataProvenance, ToolErrorCode
 
@@ -78,6 +79,42 @@ class _FakeCoinGecko:
         return None
 
 
+class _FakeDefiLlama:
+    async def get_protocol_tvl(self, slug: str, *, days: int = 30) -> ProtocolTvl:
+        del days
+        return ProtocolTvl(
+            slug=slug,
+            name="Hyperliquid",
+            symbol="HYPE",
+            category="Derivatives",
+            chains=("Hyperliquid",),
+            tvl_usd=1_500_000_000.0,
+            chain_tvls=(("Hyperliquid", 1_500_000_000.0),),
+            series=(TvlPoint(timestamp=datetime(2026, 9, 8, tzinfo=UTC), tvl_usd=1_500_000_000.0),),
+            url=f"https://defillama.com/protocol/{slug}",
+            provenance=DataProvenance(
+                provider="defillama",
+                endpoint=f"/protocol/{slug}",
+                retrieved_at=datetime(2026, 9, 8, tzinfo=UTC),
+            ),
+        )
+
+    async def get_chain_tvl(self, chain: str, *, days: int = 30) -> object:
+        raise AssertionError("invoke tests do not call get_chain_tvl")
+
+    async def get_fees_revenue(self, slug: str) -> object:
+        raise AssertionError("invoke tests do not call get_fees_revenue")
+
+    async def get_dex_volume(self, slug: str) -> object:
+        raise AssertionError("invoke tests do not call get_dex_volume")
+
+    async def get_chain_overview(self, chain: str) -> object:
+        raise AssertionError("invoke tests do not call get_chain_overview")
+
+    async def aclose(self) -> None:
+        return None
+
+
 @pytest.fixture
 def isolated_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     for name in _KEY_ENV_VARS:
@@ -94,6 +131,7 @@ def client(isolated_env: None) -> Iterator[TestClient]:
     with TestClient(app) as test_client:
         app.state.search_provider = _FakeSearch(_page())
         app.state.coingecko = _FakeCoinGecko(_coins())
+        app.state.defillama = _FakeDefiLlama()
         yield test_client
 
 
@@ -165,6 +203,20 @@ def test_invoke_resolve_asset(client: TestClient) -> None:
     assert body["data"]["resolved"]["coin_id"] == "hyperliquid"
     assert body["data"]["resolved"]["name"] == "Hyperliquid"
     assert body["provenance"]["provider"] == "coingecko"
+
+
+def test_invoke_get_tvl(client: TestClient) -> None:
+    response = client.post(
+        "/v1/tools/get_tvl/invoke",
+        json={"arguments": {"protocol": "hyperliquid"}},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["data"]["scope"] == "protocol"
+    assert body["data"]["protocol"] == "hyperliquid"
+    assert body["data"]["tvl_usd"] == 1_500_000_000.0
+    assert body["provenance"]["source_url"] == "https://defillama.com/protocol/hyperliquid"
 
 
 def test_invoke_crypto_price(client: TestClient) -> None:

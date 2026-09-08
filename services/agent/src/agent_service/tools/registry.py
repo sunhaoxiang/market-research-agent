@@ -21,6 +21,18 @@ from agent_service.tools.crypto.models import (
     ResolveAssetData,
 )
 from agent_service.tools.crypto.resolve import run_resolve_asset
+from agent_service.tools.defi.llama import (
+    run_get_chain_overview,
+    run_get_dex_volume,
+    run_get_protocol_fees_revenue,
+    run_get_tvl,
+)
+from agent_service.tools.defi.models import (
+    ChainOverviewData,
+    DexVolumeData,
+    FeesRevenueData,
+    TvlData,
+)
 from agent_service.tools.deps import ToolDeps
 from agent_service.tools.system.compute import run_compute_metrics
 from agent_service.tools.system.models import ComputeMetricsData, SeriesPoint
@@ -73,6 +85,20 @@ class ComputeMetricsArgs(BaseModel):
     ops: list[str]
     years: float | None = None
     periods_per_year: float | None = None
+
+
+class GetTvlArgs(BaseModel):
+    protocol: str | None = None
+    chain: str | None = None
+    days: int = 30
+
+
+class ProtocolSlugArgs(BaseModel):
+    protocol: str
+
+
+class ChainNameArgs(BaseModel):
+    chain: str
 
 
 async def _web_search(deps: ToolDeps, arguments: dict[str, Any]) -> ToolResult[WebSearchData]:
@@ -161,11 +187,51 @@ async def _compute_metrics(
     )
 
 
+async def _get_tvl(deps: ToolDeps, arguments: dict[str, Any]) -> ToolResult[TvlData]:
+    try:
+        args = GetTvlArgs.model_validate(arguments)
+    except ValidationError as exc:
+        return fail_validation("get_tvl", exc)
+    return await run_get_tvl(deps, protocol=args.protocol, chain=args.chain, days=args.days)
+
+
+async def _get_protocol_fees_revenue(
+    deps: ToolDeps, arguments: dict[str, Any]
+) -> ToolResult[FeesRevenueData]:
+    try:
+        args = ProtocolSlugArgs.model_validate(arguments)
+    except ValidationError as exc:
+        return fail_validation("get_protocol_fees_revenue", exc)
+    return await run_get_protocol_fees_revenue(deps, protocol=args.protocol)
+
+
+async def _get_dex_volume(deps: ToolDeps, arguments: dict[str, Any]) -> ToolResult[DexVolumeData]:
+    try:
+        args = ProtocolSlugArgs.model_validate(arguments)
+    except ValidationError as exc:
+        return fail_validation("get_dex_volume", exc)
+    return await run_get_dex_volume(deps, protocol=args.protocol)
+
+
+async def _get_chain_overview(
+    deps: ToolDeps, arguments: dict[str, Any]
+) -> ToolResult[ChainOverviewData]:
+    try:
+        args = ChainNameArgs.model_validate(arguments)
+    except ValidationError as exc:
+        return fail_validation("get_chain_overview", exc)
+    return await run_get_chain_overview(deps, chain=args.chain)
+
+
 HANDLERS: dict[str, ToolHandler] = {
     "compute_metrics": _compute_metrics,
+    "get_chain_overview": _get_chain_overview,
     "get_crypto_price": _get_crypto_price,
+    "get_dex_volume": _get_dex_volume,
     "get_market_data": _get_market_data,
     "get_price_history": _get_price_history,
+    "get_protocol_fees_revenue": _get_protocol_fees_revenue,
+    "get_tvl": _get_tvl,
     "news_search": _news_search,
     "resolve_asset": _resolve_asset,
     "web_fetch": _web_fetch,

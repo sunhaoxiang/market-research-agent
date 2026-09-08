@@ -38,6 +38,7 @@ def _deps(request: Request) -> ToolDeps:
         search=getattr(request.app.state, "search_provider", None),
         fetcher=getattr(request.app.state, "web_fetcher", None),
         coingecko=getattr(request.app.state, "coingecko", None),
+        defillama=getattr(request.app.state, "defillama", None),
         clock=None if runtime is None else runtime.clock,
     )
 
