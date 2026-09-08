@@ -6,7 +6,7 @@
 > **每完成一个任务就更新此表的状态**；每完成一个阶段，跑 `[DP §26]` 的收尾清单并写阶段小结。
 
 - 最后更新：2026-09-08
-- 当前阶段：**P4-1 完成**。下一任务 P4-2 SEC EDGAR provider。
+- 当前阶段：**P4-2 完成**。下一任务 P4-3 `resolve_ticker` + ticker↔CIK。
 
 ### 已确认的前置决策（2026-09-07）
 
@@ -171,7 +171,7 @@ hash 跨会话稳定，说明 §9.8 的缓存前缀约束真的守住了；95.4%
 | ID    | 任务                                                                                                                       | 依赖         | 状态 | 验收                                |
 | ----- | -------------------------------------------------------------------------------------------------------------------------- | ------------ | ---- | ----------------------------------- |
 | P4-1  | FMP provider（含日配额计数 + `QUOTA_EXHAUSTED` 快速失败）                                                                  | P2-1         | ✅   | 配额耗尽时优雅降级                  |
-| P4-2  | SEC EDGAR provider（`User-Agent` 合规、10 req/s 限流、`submissions` + `companyfacts`）                                     | P2-1         | ⬜   | 契约测试通过                        |
+| P4-2  | SEC EDGAR provider（`User-Agent` 合规、10 req/s 限流、`submissions` + `companyfacts`）                                     | P2-1         | ✅   | 契约测试通过                        |
 | P4-3  | `resolve_ticker` + ticker↔CIK 映射（本地缓存 SEC company_tickers.json）                                                    | P4-2         | ⬜   | NVDA→CIK 正确                       |
 | P4-4  | `tools/stocks/`：`get_stock_quote` / `get_company_profile` / `get_price_history` / `get_peers` / `compare_to_index`        | P4-1, P4-3   | ⬜   | 结构化输出完整                      |
 | P4-5  | `tools/financials/` 三表：income / balance / cash flow（优先 XBRL，FMP 兜底）                                              | P4-2, P4-1   | ⬜   | 与官方财报数字一致                  |
@@ -729,6 +729,19 @@ Writer 的 user 消息带上冲突清单，prompt 要求并列写出；前端从
 - 给人点的 URL 是 `financialmodelingprep.com/financial-summary/{symbol}`，不是 API 地址。
 
 日配额在 `QuotaTracker` 里预检：耗尽时 `QUOTA_EXHAUSTED` 快速失败、不打 HTTP；缓存命中不记账。本项只把客户端放进 `app.state.fmp`（无 key 则为 None）。注入 `ToolDeps` 从 **P4-4** 开始。
+
+### P4-2 — SEC EDGAR provider ✅（2026-09-08）
+
+继承 `BaseProvider`，不重复实现限流/缓存/429 重试。profile 已按 Fair Access **10 req/s** 钉死。无需 key，但每个请求必须带 `User-Agent: {应用名} {邮箱}`，否则 SEC 会 403 封 IP。空 UA 或缺 `@` 在构造时就拒绝，避免打上去才发现。
+
+两个方法是给后面任务用的原语，不要在 tool 层再包一遍 HTTP：
+
+- `get_submissions` → **P4-8** `list_sec_filings`。`filings.recent` 是平行数组，在这里 zip 成 `FilingRef`；`filings_of("10-K")` 给后续筛表。归档 URL 用去连字符的 accession。
+- `get_company_facts` → **P4-5** 三表 XBRL / **P4-8** `get_xbrl_facts`。按 `(taxonomy, tag)` 索引；缺 `val` 的点丢掉，不要当成 0。
+- CIK 在路径里补成 10 位。传入 `NVDA` 是 `INVALID_INPUT`——ticker→CIK 是 **P4-3**。
+- 404 → `NOT_FOUND`；403 → 提示检查 User-Agent。给人点的 URL 是 `sec.gov/edgar/browse/?CIK=`，不是 `data.sec.gov` 的 JSON。
+
+`SEC_USER_AGENT` 与 DP 里的 `SEC_EDGAR_USER_AGENT` 都能读。本项只把客户端放进 `app.state.sec_edgar`。注入 `ToolDeps` 从 P4-5 / P4-8 开始。
 
 ---
 

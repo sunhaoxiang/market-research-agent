@@ -6,7 +6,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Annotated, Literal
 
-from pydantic import BeforeValidator, Field, SecretStr
+from pydantic import AliasChoices, BeforeValidator, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # 仓库根目录：src/agent_service/config.py → 上溯 4 层
@@ -100,7 +100,10 @@ class Settings(BaseSettings):
     tavily_api_key: OptionalSecret = None
     coingecko_api_key: OptionalSecret = None
     fmp_api_key: OptionalSecret = None
-    sec_user_agent: str = "market-research-agent contact@example.com"
+    sec_user_agent: str = Field(
+        default="market-research-agent contact@example.com",
+        validation_alias=AliasChoices("SEC_USER_AGENT", "SEC_EDGAR_USER_AGENT"),
+    )
 
     # ── 缓存
     agent_cache_db: Path = REPO_ROOT / "data" / "provider-cache.db"

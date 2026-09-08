@@ -27,6 +27,7 @@ from agent_service.providers.fetch import WebFetcher
 from agent_service.providers.onchain import HyperliquidProvider
 from agent_service.providers.runtime import ProviderRuntime
 from agent_service.providers.search import TavilySearchProvider
+from agent_service.providers.sec import SecEdgarProvider
 
 log = get_logger(__name__)
 
@@ -117,6 +118,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         if fmp_key is None
         else FmpProvider(runtime=runtime, api_key=fmp_key.get_secret_value())
     )
+    # 无需 key；Fair Access 靠 User-Agent。tool 层从 P4-5 / P4-8 注入
+    app.state.sec_edgar = SecEdgarProvider(runtime=runtime, user_agent=settings.sec_user_agent)
 
     configured = [p.provider for p in _llm_provider_status(settings) if p.configured]
     log.info(
@@ -152,6 +155,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     fmp = getattr(app.state, "fmp", None)
     if fmp is not None:
         await fmp.aclose()
+    sec_edgar = getattr(app.state, "sec_edgar", None)
+    if sec_edgar is not None:
+        await sec_edgar.aclose()
     await app.state.provider_runtime.aclose()
     await app.state.registry.aclose()
     log.info("agent_service.shutdown")
@@ -175,6 +181,7 @@ def create_app() -> FastAPI:
     app.state.defillama = None
     app.state.hyperliquid = None
     app.state.fmp = None
+    app.state.sec_edgar = None
 
     @app.get("/v1/health", response_model=HealthResponse, tags=["system"])
     async def health() -> HealthResponse:

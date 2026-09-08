@@ -24,6 +24,7 @@ from agent_service.providers.search import (
     SearchQuery,
     TavilySearchProvider,
 )
+from agent_service.providers.sec import SecEdgarProvider
 from agent_service.providers.ttl import CacheTTL
 
 __all__ = [
@@ -48,6 +49,7 @@ __all__ = [
     "SearchPage",
     "SearchProvider",
     "SearchQuery",
+    "SecEdgarProvider",
     "TavilySearchProvider",
     "WebFetcher",
     "profile_for",
