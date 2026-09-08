@@ -13,24 +13,32 @@ from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
     from agent_service.observability.event_bus import EventBus
-    from agent_service.providers.crypto import CoinSearchPage
+    from agent_service.providers.crypto import CoinMarket, CoinPrice, CoinSearchPage, MarketChart
     from agent_service.providers.fetch import PageFetcher
     from agent_service.providers.runtime import Clock
     from agent_service.providers.search import SearchProvider
     from agent_service.tools.web.collector import SourceCollector
 
 
-class CoinSearcher(Protocol):
-    """P3-3 只用 `search_coins`；行情方法留给 P3-4。"""
+class CoinGeckoClient(Protocol):
+    """CoinGecko 在 ToolDeps 上的面。P3-3 用 search；P3-4 用行情方法。假客户端按需实现。"""
 
     async def search_coins(self, query: str) -> CoinSearchPage: ...
+
+    async def get_price(self, coin_id: str, *, vs_currency: str = "usd") -> CoinPrice: ...
+
+    async def get_market(self, coin_id: str, *, vs_currency: str = "usd") -> CoinMarket: ...
+
+    async def get_market_chart(
+        self, coin_id: str, *, days: int = 30, vs_currency: str = "usd"
+    ) -> MarketChart: ...
 
 
 @dataclass(frozen=True, slots=True)
 class ToolDeps:
     search: SearchProvider | None = None
     fetcher: PageFetcher | None = None
-    coingecko: CoinSearcher | None = None
+    coingecko: CoinGeckoClient | None = None
     clock: Clock | None = None
     bus: EventBus | None = None
     sources: SourceCollector | None = None

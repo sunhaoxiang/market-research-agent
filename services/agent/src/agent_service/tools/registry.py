@@ -9,7 +9,17 @@ from pydantic import BaseModel, Field, ValidationError
 
 from agent_service.schemas.tools import ToolResult
 from agent_service.tools._result import fail_validation
-from agent_service.tools.crypto.models import ResolveAssetData
+from agent_service.tools.crypto.market import (
+    run_get_crypto_price,
+    run_get_market_data,
+    run_get_price_history,
+)
+from agent_service.tools.crypto.models import (
+    CryptoMarketData,
+    CryptoPriceData,
+    CryptoPriceHistoryData,
+    ResolveAssetData,
+)
 from agent_service.tools.crypto.resolve import run_resolve_asset
 from agent_service.tools.deps import ToolDeps
 from agent_service.tools.web.fetch import run_web_fetch
@@ -38,6 +48,22 @@ class WebFetchArgs(BaseModel):
 
 class ResolveAssetArgs(BaseModel):
     query: str
+
+
+class CryptoPriceArgs(BaseModel):
+    asset: str
+    vs_currency: str = "usd"
+
+
+class CryptoMarketArgs(BaseModel):
+    asset: str
+    vs_currency: str = "usd"
+
+
+class CryptoHistoryArgs(BaseModel):
+    asset: str
+    days: int = 30
+    vs_currency: str = "usd"
 
 
 async def _web_search(deps: ToolDeps, arguments: dict[str, Any]) -> ToolResult[WebSearchData]:
@@ -78,7 +104,42 @@ async def _resolve_asset(deps: ToolDeps, arguments: dict[str, Any]) -> ToolResul
     return await run_resolve_asset(deps, query=args.query)
 
 
+async def _get_crypto_price(
+    deps: ToolDeps, arguments: dict[str, Any]
+) -> ToolResult[CryptoPriceData]:
+    try:
+        args = CryptoPriceArgs.model_validate(arguments)
+    except ValidationError as exc:
+        return fail_validation("get_crypto_price", exc)
+    return await run_get_crypto_price(deps, asset=args.asset, vs_currency=args.vs_currency)
+
+
+async def _get_market_data(
+    deps: ToolDeps, arguments: dict[str, Any]
+) -> ToolResult[CryptoMarketData]:
+    try:
+        args = CryptoMarketArgs.model_validate(arguments)
+    except ValidationError as exc:
+        return fail_validation("get_market_data", exc)
+    return await run_get_market_data(deps, asset=args.asset, vs_currency=args.vs_currency)
+
+
+async def _get_price_history(
+    deps: ToolDeps, arguments: dict[str, Any]
+) -> ToolResult[CryptoPriceHistoryData]:
+    try:
+        args = CryptoHistoryArgs.model_validate(arguments)
+    except ValidationError as exc:
+        return fail_validation("get_price_history", exc)
+    return await run_get_price_history(
+        deps, asset=args.asset, days=args.days, vs_currency=args.vs_currency
+    )
+
+
 HANDLERS: dict[str, ToolHandler] = {
+    "get_crypto_price": _get_crypto_price,
+    "get_market_data": _get_market_data,
+    "get_price_history": _get_price_history,
     "news_search": _news_search,
     "resolve_asset": _resolve_asset,
     "web_fetch": _web_fetch,

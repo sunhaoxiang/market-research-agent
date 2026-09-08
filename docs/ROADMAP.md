@@ -6,7 +6,7 @@
 > **每完成一个任务就更新此表的状态**；每完成一个阶段，跑 `[DP §26]` 的收尾清单并写阶段小结。
 
 - 最后更新：2026-09-08
-- 当前阶段：**P3-3 `resolve_asset` 已完成**；下一任务 P3-4 crypto 行情 tools。P3-4 复用 `ToolDeps.coingecko` 与现成类型，不要再包 HTTP。
+- 当前阶段：**P3-4 crypto 行情 tools 已完成**；下一任务 P3-5 `compute_metrics`。P3-6 用已有 DefiLlama 类型，不要再包 HTTP。
 
 ### 已确认的前置决策（2026-09-07）
 
@@ -151,7 +151,7 @@ hash 跨会话稳定，说明 §9.8 的缓存前缀约束真的守住了；95.4%
 | P3-1  | CoinGecko provider（限流/缓存/错误映射）                                                         | P2-1            | ✅   | 契约测试通过                            |
 | P3-2  | DefiLlama provider                                                                               | P2-1            | ✅   | 契约测试通过                            |
 | P3-3  | `resolve_asset`：符号→coin id 消歧（含同名冲突处理，多候选时返回列表让 Agent 选）。底层用已有 `search_coins`，不要再包一层 HTTP | P3-1            | ✅   | "HYPE" 正确解析到 Hyperliquid           |
-| P3-4  | `tools/crypto/`：`get_crypto_price` / `get_market_data` / `get_price_history`。包 `CoinGeckoProvider` 的现成类型，不要再解析一遍 JSON | P3-1, P3-3      | ⬜   | 结构化输出 + provenance 完整            |
+| P3-4  | `tools/crypto/`：`get_crypto_price` / `get_market_data` / `get_price_history`。包 `CoinGeckoProvider` 的现成类型，不要再解析一遍 JSON | P3-1, P3-3      | ✅   | 结构化输出 + provenance 完整            |
 | P3-5  | `tools/system/compute_metrics`：涨跌幅 / CAGR / 波动率 / 百分位（纯 Python）`[DP §8.5]`          | P1-1            | ⬜   | 单元测试含边界值                        |
 | P3-6  | `tools/defi/`：`get_tvl` / `get_protocol_fees_revenue` / `get_dex_volume` / `get_chain_overview`。包 `DefiLlamaProvider` 的现成类型，不要再解析一遍 JSON | P3-2            | ⬜   | HYPE/Hyperliquid 数据正确               |
 | P3-7  | `tools/crypto/get_tokenomics`：供应量 / 分配 / 解锁（数据源覆盖度调研 + 缺失明确声明）           | P3-1            | ⬜   | 拿不到的字段进 `data_gaps`              |
@@ -526,6 +526,18 @@ Agent / Tool 只依赖 `SearchProvider` 协议，Tavily 是第一个实现。换
 - 零结果是 `NOT_FOUND`，不要把空列表当成「解析成功」。
 
 `CRYPTO_TOOLS` 已挂 `@function_tool` 和 `/v1/tools/resolve_asset/invoke`。P3-9 再接到 Crypto Research Agent；不要提前塞进 Web Research。
+
+### P3-4 — crypto 行情 tools ✅（2026-09-08）
+
+三个 tool 只包 `CoinGeckoProvider` 已解析好的类型，不碰 JSON、不做符号消歧：
+
+- `get_crypto_price` → `get_price`
+- `get_market_data` → `get_market`（市值 / FDV / 供应 / ATH / ATL）
+- `get_price_history` → `get_market_chart`。粒度由 CoinGecko 按 `days` 决定；空序列映射成 `NOT_FOUND`，不要把空列表画成一条平线。
+
+`asset` 必须是 **P3-3** 给出的 `coin_id`。缺字段进 `DataQuality.missing_fields`。`provenance.source_url` 是 `coingecko.com/en/coins/{id}`，不是 API 地址。
+
+复用 `ToolDeps.coingecko`。P3-9 再挂到 Crypto Research Agent。
 
 ---
 

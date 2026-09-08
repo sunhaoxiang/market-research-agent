@@ -8,7 +8,13 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from agent_service.providers.crypto import CoinSearchHit, CoinSearchPage
+from agent_service.providers.crypto import (
+    CoinMarket,
+    CoinPrice,
+    CoinSearchHit,
+    CoinSearchPage,
+    MarketChart,
+)
 from agent_service.providers.errors import ProviderError
 from agent_service.schemas.tools import DataProvenance, ToolErrorCode
 from agent_service.tools.crypto.bindings import CRYPTO_TOOLS
@@ -65,6 +71,17 @@ class FakeCoinGecko:
             raise self.error
         assert self.page is not None
         return self.page
+
+    async def get_price(self, coin_id: str, *, vs_currency: str = "usd") -> CoinPrice:
+        raise AssertionError("search-only fake")
+
+    async def get_market(self, coin_id: str, *, vs_currency: str = "usd") -> CoinMarket:
+        raise AssertionError("search-only fake")
+
+    async def get_market_chart(
+        self, coin_id: str, *, days: int = 30, vs_currency: str = "usd"
+    ) -> MarketChart:
+        raise AssertionError("search-only fake")
 
     async def aclose(self) -> None:
         return None
@@ -207,4 +224,9 @@ async def test_invoke_registry() -> None:
 
 
 def test_function_tool_name_is_stable() -> None:
-    assert [tool.name for tool in CRYPTO_TOOLS] == ["resolve_asset"]
+    assert [tool.name for tool in CRYPTO_TOOLS] == [
+        "resolve_asset",
+        "get_crypto_price",
+        "get_market_data",
+        "get_price_history",
+    ]
