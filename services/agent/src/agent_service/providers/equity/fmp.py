@@ -11,7 +11,7 @@ key 走 `apikey` 请求头，**不放进 query**——放进 params 会进缓存
 - `get_quote` / `get_profile` / `get_historical_prices` / `get_peers` → **P4-4**
 - `get_income_statements` / `get_balance_sheets` / `get_cash_flow_statements`
   → **P4-5** 三表兜底。主路径是 SEC XBRL。
-- `get_ratios_ttm` → **P4-7** 估值。缺字段保持 None，不要当成 0。
+- `get_ratios_ttm` / `get_ratios` → **P4-7** 估值。缺字段保持 None，不要当成 0。
 """
 
 from __future__ import annotations
@@ -37,6 +37,7 @@ _PROFILE_PATH = "/profile"
 _HISTORY_PATH = "/historical-price-eod/full"
 _PEERS_PATH = "/stock-peers"
 _RATIOS_PATH = "/ratios-ttm"
+_RATIOS_HISTORY_PATH = "/ratios"
 _INCOME_PATH = "/income-statement"
 _BALANCE_PATH = "/balance-sheet-statement"
 _CASH_FLOW_PATH = "/cash-flow-statement"
@@ -142,6 +143,26 @@ class ValuationRatios:
     ps: float | None
     ev_ebitda: float | None
     dividend_yield: float | None
+    url: str
+    provenance: DataProvenance
+
+
+@dataclass(frozen=True, slots=True)
+class ValuationRatioRow:
+    period_end: date
+    fiscal_year: int | None
+    fiscal_period: str | None
+    pe: float | None
+    pb: float | None
+    ps: float | None
+    ev_ebitda: float | None
+
+
+@dataclass(frozen=True, slots=True)
+class ValuationRatioHistory:
+    symbol: str
+    period: str
+    rows: tuple[ValuationRatioRow, ...]
     url: str
     provenance: DataProvenance
 
@@ -282,6 +303,31 @@ class FmpProvider(BaseProvider):
         ticker = _require_symbol(symbol, endpoint=_RATIOS_PATH)
         response = await self._get(_RATIOS_PATH, CacheTTL.MARKET, {"symbol": ticker})
         return _parse_ratios(response, symbol=ticker)
+
+    async def get_ratios(
+        self, symbol: str, *, period: str = "quarterly", limit: int = 20
+    ) -> ValuationRatioHistory:
+        ticker, period_key, limit_n = _require_statement(
+            symbol, period, limit, _RATIOS_HISTORY_PATH
+        )
+        response = await self._get(
+            _RATIOS_HISTORY_PATH,
+            CacheTTL.PROFILE,
+            {"symbol": ticker, "period": period_key, "limit": limit_n},
+        )
+        rows = _ratio_rows(
+            response.data,
+            endpoint=_RATIOS_HISTORY_PATH,
+            missing=f"FMP 没有这只股票的历史估值：{ticker}",
+            limit=limit_n,
+        )
+        return ValuationRatioHistory(
+            symbol=ticker,
+            period="quarterly" if period_key == "quarter" else "annual",
+            rows=rows,
+            url=stock_page_url(ticker),
+            provenance=response.provenance(),
+        )
 
     async def get_income_statements(
         self, symbol: str, *, period: str = "annual", limit: int = 4
@@ -862,6 +908,45 @@ def _parse_ratios(response: ProviderResponse, *, symbol: str) -> ValuationRatios
         ),
         url=stock_page_url(symbol),
         provenance=response.provenance(),
+    )
+
+
+def _ratio_rows(
+    data: Any, *, endpoint: str, missing: str, limit: int
+) -> tuple[ValuationRatioRow, ...]:
+    rows = tuple(
+        row
+        for item in _object_list(data, endpoint=endpoint, missing=missing)
+        if (row := _parse_ratio_row(item)) is not None
+    )
+    if not rows:
+        raise ProviderError(
+            ToolErrorCode.NOT_FOUND,
+            missing,
+            retryable=False,
+            provider="fmp",
+            endpoint=endpoint,
+        )
+    ordered = tuple(sorted(rows, key=lambda item: item.period_end, reverse=True))
+    return ordered[:limit]
+
+
+def _parse_ratio_row(row: dict[str, Any]) -> ValuationRatioRow | None:
+    period_end = _optional_date(row.get("date") or row.get("fillingDate") or row.get("filingDate"))
+    if period_end is None:
+        return None
+    return ValuationRatioRow(
+        period_end=period_end,
+        fiscal_year=_optional_int(row.get("fiscalYear") or row.get("calendarYear")),
+        fiscal_period=_optional_str(row.get("period")),
+        pe=_first_float(row, "priceToEarningsRatio", "peRatio"),
+        pb=_first_float(row, "priceToBookRatio", "pbRatio"),
+        ps=_first_float(row, "priceToSalesRatio", "priceSalesRatio"),
+        ev_ebitda=_first_float(
+            row,
+            "enterpriseValueMultiple",
+            "enterpriseValueOverEBITDA",
+        ),
     )
 
 

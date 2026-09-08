@@ -29,6 +29,8 @@ if TYPE_CHECKING:
         StockPeers,
         StockProfile,
         StockQuote,
+        ValuationRatioHistory,
+        ValuationRatios,
     )
     from agent_service.providers.fetch import PageFetcher
     from agent_service.providers.onchain import PerpMarketSnapshot
@@ -81,7 +83,7 @@ class SecEdgarClient(Protocol):
 
 
 class FmpClient(Protocol):
-    """FMP 在 ToolDeps 上的面。P4-4 行情；P4-5 三表兜底；P4-7 再加 ratios。"""
+    """FMP 在 ToolDeps 上的面。P4-4 行情；P4-5 三表兜底；P4-7 估值。"""
 
     async def get_quote(self, symbol: str) -> StockQuote: ...
 
@@ -102,6 +104,12 @@ class FmpClient(Protocol):
     async def get_cash_flow_statements(
         self, symbol: str, *, period: str = "annual", limit: int = 4
     ) -> CashFlowStatements: ...
+
+    async def get_ratios_ttm(self, symbol: str) -> ValuationRatios: ...
+
+    async def get_ratios(
+        self, symbol: str, *, period: str = "quarterly", limit: int = 20
+    ) -> ValuationRatioHistory: ...
 
 
 @dataclass(frozen=True, slots=True)

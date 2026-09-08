@@ -12,11 +12,17 @@ from agent_service.tools.financials.models import (
     CashFlowData,
     GrowthMetricsData,
     IncomeStatementData,
+    ValuationHistoryData,
+    ValuationMetricsData,
 )
 from agent_service.tools.financials.statements import (
     run_get_balance_sheet,
     run_get_cash_flow,
     run_get_income_statement,
+)
+from agent_service.tools.financials.valuation import (
+    run_get_valuation_history,
+    run_get_valuation_metrics,
 )
 from agent_service.tools.web.collector import stamp_for_agent
 
@@ -99,9 +105,42 @@ async def get_growth_metrics(
     )
 
 
+@function_tool
+async def get_valuation_metrics(
+    ctx: RunContextWrapper[ToolDeps],
+    ticker: str,
+) -> ToolResult[ValuationMetricsData]:
+    """查询 TTM 估值比率：PE / PB / PS / EV·EBITDA。缺字段是 None，不要当成 0。
+
+    Args:
+        ticker: 美股代号，例如 "NVDA"。
+    """
+    return stamp_for_agent(ctx.context, await run_get_valuation_metrics(ctx.context, ticker=ticker))
+
+
+@function_tool
+async def get_valuation_history(
+    ctx: RunContextWrapper[ToolDeps],
+    ticker: str,
+    years: int = 5,
+) -> ToolResult[ValuationHistoryData]:
+    """查询估值历史，并用 Python 计算当前 PE/PB/PS/EV·EBITDA 在窗口内的分位（0–100）。
+
+    Args:
+        ticker: 美股代号，例如 "NVDA"。
+        years: 回看年数，1–10，默认 5。分位按季报序列，最多 20 期。
+    """
+    return stamp_for_agent(
+        ctx.context,
+        await run_get_valuation_history(ctx.context, ticker=ticker, years=years),
+    )
+
+
 FINANCIALS_TOOLS: list[Tool] = [
     get_income_statement,
     get_balance_sheet,
     get_cash_flow,
     get_growth_metrics,
+    get_valuation_metrics,
+    get_valuation_history,
 ]

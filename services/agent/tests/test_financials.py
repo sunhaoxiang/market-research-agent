@@ -16,6 +16,8 @@ from agent_service.providers.equity import (
     StockPeers,
     StockProfile,
     StockQuote,
+    ValuationRatioHistory,
+    ValuationRatios,
 )
 from agent_service.providers.sec import (
     CompanyFacts,
@@ -159,6 +161,16 @@ class FakeFmp:
     ) -> CashFlowStatements:
         del symbol, period, limit
         raise AssertionError("本测试只覆盖利润表 FMP")
+
+    async def get_ratios_ttm(self, symbol: str) -> ValuationRatios:
+        del symbol
+        raise AssertionError("三表不应打估值")
+
+    async def get_ratios(
+        self, symbol: str, *, period: str = "quarterly", limit: int = 20
+    ) -> ValuationRatioHistory:
+        del symbol, period, limit
+        raise AssertionError("三表不应打估值")
 
 
 def test_assemble_income_pins_nvda_10k_revenue() -> None:
@@ -333,4 +345,6 @@ def test_function_tool_names_are_stable() -> None:
         "get_balance_sheet",
         "get_cash_flow",
         "get_growth_metrics",
+        "get_valuation_metrics",
+        "get_valuation_history",
     ]

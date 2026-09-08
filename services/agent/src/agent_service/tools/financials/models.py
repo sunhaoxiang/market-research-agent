@@ -113,3 +113,39 @@ class GrowthMetricsData(Schema):
     operating_margin_yoy: float | None = None
     net_margin_yoy: float | None = None
     margins: list[MarginPeriodData] = Field(default_factory=list)
+
+
+class ValuationMetricsData(Schema):
+    ticker: str
+    pe: float | None = None
+    pb: float | None = None
+    ps: float | None = None
+    ev_ebitda: float | None = None
+    dividend_yield: float | None = None
+    url: str
+
+
+class ValuationPointData(Schema):
+    period_end: date
+    fiscal_year: int | None = None
+    fiscal_period: str | None = None
+    pe: float | None = None
+    pb: float | None = None
+    ps: float | None = None
+    ev_ebitda: float | None = None
+
+
+class ValuationHistoryData(Schema):
+    ticker: str
+    years: int
+    period: str
+    pe: float | None = None
+    pb: float | None = None
+    ps: float | None = None
+    ev_ebitda: float | None = None
+    pe_percentile: float | None = None
+    pb_percentile: float | None = None
+    ps_percentile: float | None = None
+    ev_ebitda_percentile: float | None = None
+    points: list[ValuationPointData] = Field(default_factory=list)
+    url: str

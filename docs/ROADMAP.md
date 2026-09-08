@@ -6,7 +6,7 @@
 > **每完成一个任务就更新此表的状态**；每完成一个阶段，跑 `[DP §26]` 的收尾清单并写阶段小结。
 
 - 最后更新：2026-09-08
-- 当前阶段：**P4-6 完成**。下一任务 P4-7 `get_valuation_metrics` + `get_valuation_history`。
+- 当前阶段：**P4-7 完成**。下一任务 P4-8 `tools/sec/` 文本与 XBRL facts。
 
 ### 已确认的前置决策（2026-09-07）
 
@@ -176,7 +176,7 @@ hash 跨会话稳定，说明 §9.8 的缓存前缀约束真的守住了；95.4%
 | P4-4  | `tools/stocks/`：`get_stock_quote` / `get_company_profile` / `get_stock_price_history` / `get_peers` / `compare_to_index`  | P4-1, P4-3   | ✅   | 结构化输出完整                      |
 | P4-5  | `tools/financials/` 三表：income / balance / cash flow（优先 XBRL，FMP 兜底）                                              | P4-2, P4-1   | ✅   | 与官方财报数字一致                  |
 | P4-6  | `tools/financials/get_growth_metrics`：YoY / QoQ / CAGR / margin trend（**Python 计算**）                                  | P4-5, P3-5   | ✅   | 与手算一致                          |
-| P4-7  | `tools/financials/get_valuation_metrics` + `get_valuation_history`（历史估值分位）                                         | P4-1         | ⬜   | "NVDA PE 处于 5 年 X 分位"可回答    |
+| P4-7  | `tools/financials/get_valuation_metrics` + `get_valuation_history`（历史估值分位）                                         | P4-1         | ✅   | "NVDA PE 处于 5 年 X 分位"可回答    |
 | P4-8  | `tools/sec/`：`list_sec_filings` / `get_filing_section`（10-K Item 1A/7、10-Q）/ `get_xbrl_facts` / `get_earnings_summary` | P4-2         | ⬜   | 能取出指定章节正文                  |
 | P4-9  | 大文件处理策略：10-K 全文分节 + 按需截取 + 永久缓存（避免爆上下文）                                                        | P4-8         | ⬜   | 单次注入上下文可控                  |
 | P4-10 | Stock Research Agent + prompt                                                                                              | P4-4~P4-9    | ⬜   | 对 4 个样例股票问题产出完整 finding |
@@ -786,6 +786,14 @@ Writer 的 user 消息带上冲突清单，prompt 要求并列写出；前端从
 - 年报不够两期仍然 `ok=true`，缺的字段进 `missing_fields`。NVDA FY2025/FY2024 营收 YoY 钉死 `130497e9 / 60922e9 - 1`。
 
 不要在本项包 PE/PS（那是 P4-7）。P4-10 再接到 Stock Research Agent。
+
+### P4-7 — 估值（TTM + 历史分位）✅（2026-09-08）
+
+FMP 补 PE/PB/PS/EV·EBITDA，不走 SEC。缺字段保持 None，不要当成 0。给人点的 URL 仍是 FMP 公司页。
+
+- `get_valuation_metrics` 只打 `/ratios-ttm`。
+- `get_valuation_history` 并行打 TTM + `/ratios` 季报（`years` 默认 5，最多 20 期）。当前值优先 TTM；分位用 P3-5 的 `range_percentile`（0–100，当前值计入区间）。常数序列分位为 None。
+- 不要在本项算增长率（那是 P4-6）。P4-10 再接到 Stock Research Agent。
 
 ---
 

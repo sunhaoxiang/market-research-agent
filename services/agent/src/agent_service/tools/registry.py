@@ -42,11 +42,17 @@ from agent_service.tools.financials.models import (
     CashFlowData,
     GrowthMetricsData,
     IncomeStatementData,
+    ValuationHistoryData,
+    ValuationMetricsData,
 )
 from agent_service.tools.financials.statements import (
     run_get_balance_sheet,
     run_get_cash_flow,
     run_get_income_statement,
+)
+from agent_service.tools.financials.valuation import (
+    run_get_valuation_history,
+    run_get_valuation_metrics,
 )
 from agent_service.tools.onchain.activity import run_get_chain_activity
 from agent_service.tools.onchain.gaps import (
@@ -129,6 +135,11 @@ class StatementArgs(BaseModel):
 class GrowthArgs(BaseModel):
     ticker: str
     years: int = 3
+
+
+class ValuationHistoryArgs(BaseModel):
+    ticker: str
+    years: int = 5
 
 
 class CryptoPriceArgs(BaseModel):
@@ -323,6 +334,26 @@ async def _get_growth_metrics(
     return await run_get_growth_metrics(deps, ticker=args.ticker, years=args.years)
 
 
+async def _get_valuation_metrics(
+    deps: ToolDeps, arguments: dict[str, Any]
+) -> ToolResult[ValuationMetricsData]:
+    try:
+        args = StockTickerArgs.model_validate(arguments)
+    except ValidationError as exc:
+        return fail_validation("get_valuation_metrics", exc)
+    return await run_get_valuation_metrics(deps, ticker=args.ticker)
+
+
+async def _get_valuation_history(
+    deps: ToolDeps, arguments: dict[str, Any]
+) -> ToolResult[ValuationHistoryData]:
+    try:
+        args = ValuationHistoryArgs.model_validate(arguments)
+    except ValidationError as exc:
+        return fail_validation("get_valuation_history", exc)
+    return await run_get_valuation_history(deps, ticker=args.ticker, years=args.years)
+
+
 async def _get_crypto_price(
     deps: ToolDeps, arguments: dict[str, Any]
 ) -> ToolResult[CryptoPriceData]:
@@ -471,6 +502,8 @@ HANDLERS: dict[str, ToolHandler] = {
     "get_token_holders": _get_token_holders,
     "get_tokenomics": _get_tokenomics,
     "get_tvl": _get_tvl,
+    "get_valuation_history": _get_valuation_history,
+    "get_valuation_metrics": _get_valuation_metrics,
     "get_whale_activity": _get_whale_activity,
     "news_search": _news_search,
     "resolve_asset": _resolve_asset,

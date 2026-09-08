@@ -23,6 +23,9 @@ from agent_service.providers.equity import (
     StockPeers,
     StockProfile,
     StockQuote,
+    ValuationRatioHistory,
+    ValuationRatioRow,
+    ValuationRatios,
 )
 from agent_service.providers.onchain import PerpMarketSnapshot
 from agent_service.providers.search import SearchHit, SearchPage
@@ -426,6 +429,58 @@ class _FakeFmp:
     ) -> CashFlowStatements:
         raise AssertionError("invoke 三表应走 SEC XBRL")
 
+    async def get_ratios_ttm(self, symbol: str) -> ValuationRatios:
+        return ValuationRatios(
+            symbol=symbol,
+            pe=30.0,
+            pb=20.0,
+            ps=15.0,
+            ev_ebitda=25.0,
+            dividend_yield=None,
+            url=f"https://financialmodelingprep.com/financial-summary/{symbol}",
+            provenance=DataProvenance(
+                provider="fmp",
+                endpoint="/ratios-ttm",
+                retrieved_at=datetime(2026, 9, 8, tzinfo=UTC),
+            ),
+        )
+
+    async def get_ratios(
+        self, symbol: str, *, period: str = "quarterly", limit: int = 20
+    ) -> ValuationRatioHistory:
+        del period, limit
+        ends = (
+            date(2025, 7, 27),
+            date(2025, 4, 27),
+            date(2025, 1, 26),
+            date(2024, 10, 27),
+            date(2024, 7, 28),
+        )
+        pes = (50.0, 40.0, 30.0, 20.0, 10.0)
+        rows = tuple(
+            ValuationRatioRow(
+                period_end=end,
+                fiscal_year=end.year,
+                fiscal_period="Q2",
+                pe=pe,
+                pb=None,
+                ps=None,
+                ev_ebitda=None,
+            )
+            for end, pe in zip(ends, pes, strict=True)
+        )
+        return ValuationRatioHistory(
+            symbol=symbol,
+            period="quarterly",
+            rows=rows,
+            url=f"https://financialmodelingprep.com/financial-summary/{symbol}",
+            provenance=DataProvenance(
+                provider="fmp",
+                endpoint="/ratios",
+                retrieved_at=datetime(2026, 9, 8, tzinfo=UTC),
+            ),
+        )
+
     async def aclose(self) -> None:
         return None
 
@@ -639,6 +694,32 @@ def test_invoke_growth_metrics(client: TestClient) -> None:
     assert body["ok"] is True
     assert body["data"]["revenue_yoy"] == pytest.approx(130_497_000_000.0 / 60_922_000_000.0 - 1.0)
     assert body["data"]["source"] == "sec_xbrl"
+
+
+def test_invoke_valuation_metrics(client: TestClient) -> None:
+    response = client.post(
+        "/v1/tools/get_valuation_metrics/invoke",
+        json={"arguments": {"ticker": "NVDA"}},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["data"]["pe"] == 30.0
+    assert body["data"]["pb"] == 20.0
+    assert "dividend_yield" in body["quality"]["missing_fields"]
+
+
+def test_invoke_valuation_history(client: TestClient) -> None:
+    response = client.post(
+        "/v1/tools/get_valuation_history/invoke",
+        json={"arguments": {"ticker": "NVDA", "years": 5}},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["data"]["pe"] == 30.0
+    assert body["data"]["pe_percentile"] == pytest.approx(50.0)
+    assert len(body["data"]["points"]) == 5
 
 
 def test_invoke_get_tvl(client: TestClient) -> None:

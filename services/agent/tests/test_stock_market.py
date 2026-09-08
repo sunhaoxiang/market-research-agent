@@ -20,6 +20,8 @@ from agent_service.providers.equity import (
     StockPeers,
     StockProfile,
     StockQuote,
+    ValuationRatioHistory,
+    ValuationRatios,
 )
 from agent_service.providers.errors import ProviderError
 from agent_service.schemas.tools import DataProvenance, ToolErrorCode
@@ -235,7 +237,14 @@ class FakeFmp:
         del symbol, period, limit
         raise AssertionError("P4-4 不应拉三表")
 
-    async def get_ratios_ttm(self, symbol: str) -> object:
+    async def get_ratios_ttm(self, symbol: str) -> ValuationRatios:
+        del symbol
+        raise AssertionError("P4-4 不应包估值比率")
+
+    async def get_ratios(
+        self, symbol: str, *, period: str = "quarterly", limit: int = 20
+    ) -> ValuationRatioHistory:
+        del symbol, period, limit
         raise AssertionError("P4-4 不应包估值比率")
 
 

@@ -22,6 +22,8 @@ from agent_service.tools.financials.bindings import (
     get_cash_flow,
     get_growth_metrics,
     get_income_statement,
+    get_valuation_history,
+    get_valuation_metrics,
 )
 from agent_service.tools.onchain.bindings import (
     ONCHAIN_TOOLS,
@@ -74,6 +76,8 @@ __all__ = [
     "get_token_holders",
     "get_tokenomics",
     "get_tvl",
+    "get_valuation_history",
+    "get_valuation_metrics",
     "get_whale_activity",
     "invoke_tool",
     "news_search",

@@ -276,6 +276,50 @@ async def test_missing_ratio_fields_stay_none(
 
 
 @respx.mock(base_url=_BASE)
+async def test_ratio_history_maps_and_sorts(
+    respx_mock: respx.MockRouter, runtime: ProviderRuntime
+) -> None:
+    route = respx_mock.get("/ratios").mock(
+        return_value=httpx.Response(
+            200,
+            json=[
+                {
+                    "date": "2024-04-28",
+                    "fiscalYear": 2025,
+                    "period": "Q1",
+                    "priceToEarningsRatio": 20.0,
+                },
+                {
+                    "date": "2025-01-26",
+                    "fiscalYear": 2025,
+                    "period": "FY",
+                    "priceToEarningsRatio": 40.0,
+                    "priceToBookRatio": 32.0,
+                },
+            ],
+        )
+    )
+    async with fmp(runtime) as provider:
+        page = await provider.get_ratios("nvda", period="quarterly", limit=8)
+    assert [row.period_end.isoformat() for row in page.rows] == ["2025-01-26", "2024-04-28"]
+    assert page.rows[0].pe == pytest.approx(40.0)
+    assert page.rows[0].pb == pytest.approx(32.0)
+    assert page.period == "quarterly"
+    assert "apikey" not in str(route.calls[0].request.url)
+
+
+@respx.mock(base_url=_BASE)
+async def test_empty_ratio_history_is_not_found(
+    respx_mock: respx.MockRouter, runtime: ProviderRuntime
+) -> None:
+    respx_mock.get("/ratios").mock(return_value=httpx.Response(200, json=[]))
+    async with fmp(runtime) as provider:
+        with pytest.raises(ProviderError) as captured:
+            await provider.get_ratios("NOPE")
+    assert captured.value.code is ToolErrorCode.NOT_FOUND
+
+
+@respx.mock(base_url=_BASE)
 async def test_identical_queries_hit_the_cache(
     respx_mock: respx.MockRouter, runtime: ProviderRuntime
 ) -> None:

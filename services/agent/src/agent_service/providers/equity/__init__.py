@@ -14,6 +14,8 @@ from agent_service.providers.equity.fmp import (
     StockPeers,
     StockProfile,
     StockQuote,
+    ValuationRatioHistory,
+    ValuationRatioRow,
     ValuationRatios,
     stock_page_url,
 )
@@ -32,6 +34,8 @@ __all__ = [
     "StockPeers",
     "StockProfile",
     "StockQuote",
+    "ValuationRatioHistory",
+    "ValuationRatioRow",
     "ValuationRatios",
     "stock_page_url",
 ]
