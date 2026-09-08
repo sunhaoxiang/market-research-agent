@@ -6,7 +6,7 @@
 > **每完成一个任务就更新此表的状态**；每完成一个阶段，跑 `[DP §26]` 的收尾清单并写阶段小结。
 
 - 最后更新：2026-09-08
-- 当前阶段：**P5-7 已完成**；下一任务 P5-8。
+- 当前阶段：**P5-8 已完成**；下一任务 P5-9。
 
 ### 已确认的前置决策（2026-09-07）
 
@@ -199,7 +199,7 @@ hash 跨会话稳定，说明 §9.8 的缓存前缀约束真的守住了；95.4%
 | P5-5 | Fact Checker Agent（干净上下文，只看 claims + sources，可复检索）+ 校验事件流                              | P5-4              | ✅   | 能识别注入的错误声明                        |
 | P5-6 | Gap Check + 最多 1 轮补充研究（`PLAN_UPDATED`）                                                            | P5-5              | ✅   | 缺关键数据时能补一轮                        |
 | P5-7 | Report Writer v2：动态 `report_sections`、Executive Summary、Bull/Bear Case、Risks、数据限制章节、免责声明。**`claim_ids` 继续由 `attach_section_claims` 代码回填**，不要改回让模型抄 id | P5-6, P2-8        | ✅   | 不同问题类型报告结构不同                        |
-| P5-8 | 全流程 workflow 测试（ScriptedModel）：正常 / 工具失败 / 超时 / 冲突 / 引用缺失 / schema 解析失败 6 条路径 | P5-7, P1-8        | ⬜   | 全部确定性通过                              |
+| P5-8 | 全流程 workflow 测试（ScriptedModel）：正常 / 工具失败 / 超时 / 冲突 / 引用缺失 / schema 解析失败 6 条路径 | P5-7, P1-8        | ✅   | 全部确定性通过                              |
 | P5-9 | 多模型冒烟：6 个 provider 各跑一次完整研究，结果写入 catalog `verified` 字段 + `[DP §9.4]` 降级验证        | P5-8, P1-4        | ⬜   | 已配 key 的 provider 全部跑通或明确标注限制 |
 
 ### P5-1 — 意图分类层 ✅（2026-09-08）
@@ -263,6 +263,21 @@ Merge / Fact Checker 之后、Writer 之前。**纯代码规则，不打模型�
 末两节固定、覆盖模型输出：`Data Limitations` 从各任务 `data_gaps` 生成；`Disclaimer` 是固定免责声明（R11），模型写「建议立即买入」也会被换成中性文本。`claim_ids` 继续由 `attach_section_claims` 按正文 `[n]` 回填，prompt 仍要求模型交空数组。前端已有 Data Limitations 节时不再重复渲染 `data_gaps` 列表。
 
 验收是 ScriptedModel：同一套 Writer，crypto 深研报告含 Bull/Bear、对比报告含 Comparison 且不含 Bull/Bear；免责声明与数据限制都在。不是真跑 DeepSeek。
+
+### P5-8 — 全流程 workflow 测试 ✅（2026-09-08）
+
+`tests/test_workflow.py` 把 Phase 5 串成一条流水线验收：planning → fan-out → merge → fact check → report。Planner / Writer / Fact Checker 走 ScriptedModel；子任务用替身 runner 注入失败、超时与冲突（与 P5-3 相同，真工具既贵又不稳）。`max_supplement_rounds=0`，避免缺口检测把六条路径搅成补充轮。
+
+| 路径 | 断言 |
+| --- | --- |
+| 正常 | 两任务完成，进入 `checking`，报告有 `[1]` 与免责声明 |
+| 工具失败 | t1 挂、t2 成，会话仍 `SESSION_COMPLETED`，缺口进数据限制 |
+| 超时 | salvage 营收进对比表三列 |
+| 冲突 | `CONFLICT_DETECTED` 在撰写之前，数值并列不取平均 |
+| 引用缺失 | 第一次 `[99]` 回喂后改成 `[1]`，不发 citation warning |
+| schema 解析失败 | 规划首次坏 JSON 重试成功并累计用量；Writer 三次都坏则 `SESSION_FAILED` / `writing` |
+
+不是真跑 DeepSeek。
 
 ### P5.5 — MVP 验收 ⬜
 
