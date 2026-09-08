@@ -2,6 +2,7 @@
 
 from agent_service.sources.canonical import canonicalize_url
 from agent_service.sources.citations import assign_citation_indices, bibliography
+from agent_service.sources.guardrail import check_report
 from agent_service.sources.registry import SourceRegistry
 from agent_service.sources.reliability import classify_reliability
 
@@ -10,5 +11,6 @@ __all__ = [
     "assign_citation_indices",
     "bibliography",
     "canonicalize_url",
+    "check_report",
     "classify_reliability",
 ]
