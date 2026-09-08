@@ -6,7 +6,7 @@
 > **每完成一个任务就更新此表的状态**；每完成一个阶段，跑 `[DP §26]` 的收尾清单并写阶段小结。
 
 - 最后更新：2026-09-08
-- 当前阶段：**P3-11 报告内嵌价格 / TVL 图表已完成**；下一任务 P4-1 FMP provider。
+- 当前阶段：**Phase 3 任务表 11/11 完成；三问真实验收未完全通过**（第一问 0/5 超时）。下一任务先处理超时，不要直接开 P4-1。
 
 ### 已确认的前置决策（2026-09-07）
 
@@ -160,7 +160,7 @@ hash 跨会话稳定，说明 §9.8 的缓存前缀约束真的守住了；95.4%
 | P3-10 | 数值冲突检测：多源同指标差异 → `CONFLICT_DETECTED` + 报告并列展示 `[DP §23 R9]`                  | P3-9            | ✅   | 注入冲突数据能被检出                    |
 | P3-11 | 前端：`METRIC_FOUND` 驱动的 Recharts 图表（价格 / TVL 走势）内嵌报告                             | P3-9, P2-10     | ✅   | 报告中显示 30d TVL 曲线                 |
 
-**阶段验收**：「介绍一下 HYPE」「分析 HYPE 最近一个月上涨的原因」「查询 HYPE 的 TVL、交易量和资金变化」三个问题都能产出带数据、图表和引用的报告。
+**阶段验收 🟡**（2026-09-08 真跑）：第二、三问产出了带数据、图表和可点击引用的报告；第一问 5 个任务全部 `task_timeout`，报告写成「数据缺失」。详见下方验收记录。
 
 ---
 
@@ -617,11 +617,72 @@ Writer 的 user 消息带上冲突清单，prompt 要求并列写出；前端从
 
 验收：注入跨 30 天的 31 个 TVL 点，报告出现「TVL · HYPE · 30 天」曲线。三个样例问题的真实端到端带图跑，仍取决于当时工具有没有返回序列。
 
-### Phase 3 阶段小结 ✅（2026-09-08）
+### Phase 3 阶段验收 🟡（2026-09-08）
 
-Crypto 从「只会搜网页」补齐了免费档能拿到的结构化数据：CoinGecko 行情与供应、DefiLlama TVL/fees/volume、Hyperliquid 24h 成交与持仓；holders / whale / flow 明确 `UNSUPPORTED`。Crypto Research Agent 产出带 metrics 的 finding；多源数值冲突并列展示；报告能画出价格 / TVL 走势。
+浏览器 + DeepSeek + 真实 Tavily / CoinGecko / DefiLlama / Hyperliquid。`[DP §26]` 自动化项在开跑前已全绿（pytest 551 / vitest 130）。三问都落库，可 `?session=` 回放。
 
-美股能力是 Phase 4。Fact Checker 与跨 Agent merge 是 Phase 5。
+#### 问 1「介绍一下 HYPE」— 未通过
+
+会话 `01a07f67-4745-7413-b914-c313d99d0b41`。
+
+| 项 | 结果 |
+| --- | --- |
+| 意图 | crypto · HYPE |
+| 计划 | 5 任务（4 crypto / 1 web），一次通过 |
+| 工具 | `resolve_asset` / `get_market_data` / `get_price_history` / `get_tvl` / `get_tokenomics` 等均成功；`get_chain_overview(Hyperliquid)` `not_found`（DefiLlama 无该链） |
+| 图表 | 报告未出时已画出「价格 · hyperliquid · 90 天」「TVL · HYPE · 89 天」「TVL · Hyperliquid · 89 天」（2342 条 `METRIC_FOUND`） |
+| 报告 | 《HYPE 研究报告（数据缺失）》；0 引用、0 claims |
+| 耗时 / 成本 | 332.9s；$0.012 |
+
+**未通过原因**：4 路 crypto 并行把 DeepSeek 打满，工具在前 50s 就返回了，但 120s 内交不出 `AgentFinding`。超时后 finding 被丢弃，Writer 只能写缺口。Source Panel 仍有 52 条 `SOURCE_FOUND`，进不了报告。
+
+#### 问 2「分析 HYPE 最近一个月上涨的原因」— 通过
+
+会话 `01a07f70-4898-7658-8961-bbbab57d2396`。
+
+| 项 | 结果 |
+| --- | --- |
+| 意图 | crypto · HYPE |
+| 计划 | 5 任务（4 crypto / 1 web） |
+| 成功任务 | t2 crypto 6 claims / 3 sources；t4 web 20 claims / 15 sources。t1/t3/t5 `task_timeout` |
+| 报告 | 《HYPE 近一个月上涨归因分析：政策准入与回购买盘共振》；正文可点击 `[n]`；点「来源 1」后面板与引用均为 `aria-current=true` |
+| 图表 | 价格 bitcoin / ethereum / hyperliquid 各 31 天 + TVL · HYPE · 31 天 |
+| 认知类型 | claims 26 条：22 事实 / 4 分析 |
+| 耗时 / 成本 | 399.0s；$0.091 |
+
+**通过的验收句**：有结构化数字（TVL、手续费）、有图、有可点击引用。3 个超时任务写进数据限制，符合降级设计。
+
+#### 问 3「查询 HYPE 的 TVL、交易量和资金变化」— 部分通过
+
+会话 `01a07f77-fed2-74f1-8b9c-cd39c6b486d6`。
+
+| 项 | 结果 |
+| --- | --- |
+| 意图 | crypto · HYPE |
+| 计划 | 3 个 crypto 任务（TVL / 交易量 / 资金变化） |
+| 成功任务 | t1 TVL：8 claims / 1 来源（DefiLlama）。t2 交易量、t3 资金流 `task_timeout` |
+| 报告 | 《Hyperliquid TVL、交易量与资金流研究报告（截至 2026-09-08）》；TVL ≈ $68.92B、90 天 +17.27%；`[1]` 可点击，点来源后面板高亮 |
+| 图表 | 「价格 · hyperliquid · 90 天」「TVL · HYPE · 89 天」 |
+| 资金流 | t3 **确实打了** `get_whale_activity` / `get_exchange_flow` / `get_token_holders`，三条都是 `unsupported`（Activity 可见）。但任务超时后 finding 被丢弃，报告数据限制只写「资金变化数据未由任务提供」，没有把 UNSUPPORTED 原文带进 Writer |
+| 耗时 / 成本 | 231.1s；$0.035 |
+
+**部分通过**：TVL 有数、有图、有引用。交易量工具其实成功了（`get_dex_volume` / `get_chain_activity`）却因超时没进报告。资金流进「数据限制」是对的，路径不是设计里的 data_gaps 抄送。
+
+#### 本次暴露、挡住完整验收的问题
+
+1. **单任务 120s 在 4 路并行 DeepSeek 下不够。** 工具常常几十秒内返回；剩下的时间耗在等下一轮 LLM。超时取消后 `assemble_finding` 不会跑，已登记的 sources / 结构化数字作废（图表除外，因为 `METRIC_FOUND` 由工具代码直接发）。
+2. **超时任务的 `unsupported` 进不了报告 data_gaps。** 第三问 Activity 里能看见三条免费源缺口，报告里看不到。
+3. **`get_chain_overview` 对 Hyperliquid 链名 `not_found`。** 协议 TVL 走 `get_tvl(protocol=hyperliquid)` 是有的；不要让 Agent 把链 overview 失败理解成「没有 TVL」。
+
+不在本次验收里改超时或 salvage。完整通过要等这三条有着落后再重跑第一问（以及最好第三问）。
+
+### Phase 3 阶段小结 🟡（2026-09-08）
+
+任务表 11/11 完成。Crypto 从「只会搜网页」补齐了免费档能拿到的结构化数据：CoinGecko 行情与供应、DefiLlama TVL/fees/volume、Hyperliquid 24h 成交与持仓；holders / whale / flow 明确 `UNSUPPORTED`。图表链路（`METRIC_FOUND` → Recharts）三问都画出了价格 / TVL。冲突检测本轮三问未触发。
+
+三问真实验收未完全通过：第一问 0/5 超时；并行 DeepSeek + 120s 会丢掉已经取到的数据。不要把 ScriptedModel 绿当成端到端绿。
+
+美股能力是 Phase 4，但下一刀应先处理超时，而不是开 FMP。Fact Checker 与跨 Agent merge 是 Phase 5。
 
 ---
 
@@ -650,6 +711,7 @@ Crypto 从「只会搜网页」补齐了免费档能拿到的结构化数据：C
 | D17 | ~~`web_fetch` DNS 无超时，Web Agent 对失败 URL 空转到任务超时~~ → resolver 5s 超时 + prompt 禁止重试同一失败地址                                                                             | 已偿还（2026-09-08）               | ✅   |
 | D18 | ~~开发态 `useTicker` hydration 不一致，挡住第一次「开始研究」~~ → idle 与 server snapshot 同为 0                                                                                           | 已偿还（2026-09-08）               | ✅   |
 | D19 | ~~`sources` / `claims` 只在事件流里，刷新丢 Source Panel~~ → BFF 投影 + `GET .../events` 回放。进行中会话续订仍是 D4/P6-6                                                                  | 已偿还（2026-09-08）               | ✅   |
+| D20 | 单任务 120s 超时会丢弃已成功的工具结果：Writer 看不到 finding，`unsupported` 也进不了 data_gaps；图表仍在是因为 `METRIC_FOUND` 由工具直接发。4 路并行 DeepSeek 时几乎必现 | Phase 3 验收后优先 | ⬜   |
 
 ### D14 偿还记录 — GitHub Actions 首次远端运行（2026-09-07）
 
