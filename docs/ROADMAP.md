@@ -6,7 +6,7 @@
 > **每完成一个任务就更新此表的状态**；每完成一个阶段，跑 `[DP §26]` 的收尾清单并写阶段小结。
 
 - 最后更新：2026-09-08
-- 当前阶段：**Phase 2 已完成**（P2-1 ~ P2-10）
+- 当前阶段：**Phase 2 阶段验收已通过**；下一阶段 P3
 
 ### 已确认的前置决策（2026-09-07）
 
@@ -138,7 +138,7 @@ hash 跨会话稳定，说明 §9.8 的缓存前缀约束真的守住了；95.4%
 | P2-9  | 引用完整性确定性校验 + output guardrail + 一次修正重试 `[DP §15.4]`                                                       | P2-8        | ✅   | 故意注入坏引用能被检出并修正                |
 | P2-10 | 前端：Report 渲染（sanitize + `[n]` 可点击）+ Source Panel（悬浮预览 excerpt/domain/时间）+ 认知类型徽标                  | P2-8, P1-12 | ✅   | 点 `[1]` 高亮对应来源                       |
 
-**阶段验收**：提问「HYPE 最近有什么重要进展？」能产出带真实可点击引用、区分事实/分析的 Markdown 报告。
+**阶段验收 ✅**（2026-09-08 真实跑通）：提问「HYPE 最近有什么重要进展？」产出带真实可点击引用的 Markdown 报告。详见下方验收记录。
 
 ---
 
@@ -455,6 +455,29 @@ Agent / Tool 只依赖 `SearchProvider` 协议，Tavily 是第一个实现。换
 悬浮卡用手写 `group-hover` / `group-focus-within`，没有为此引入 Radix Tooltip（碰撞检测仍是简单绝对定位）。数据缺口固定渲染为末节「数据限制」。
 
 **阶段小结**：Phase 2 打通「能搜、能读、能引用」。来源由 tool 层登记、会话级去重编号，Writer 只使用代码分配的 `[n]`，坏引用会被检出并修正或降级。前端终于能点引用看到出处。下一阶段是 Crypto 结构化数据（P3）。
+
+### Phase 2 阶段验收 ✅（2026-09-08）
+
+在浏览器提问「HYPE 最近有什么重要进展？」，DeepSeek + 真实 Tavily，会话 `01a07ecf-dc5e-73cd-af0c-8cf01caf619d`。
+
+| 项 | 结果 |
+| --- | --- |
+| 意图 | crypto · HYPE |
+| 计划 | 5 任务（2 web / 3 crypto 占位），一次通过、零修复 |
+| 搜索 | 6 次 Tavily `news_search`/`web_search` 均 200；登记 39 条 `SOURCE_FOUND`，报告引用 9 条（StockTitan 10-K、BigGo、CryptoSlate、CoinMarketCap、Fortune 等） |
+| 报告 | 《HYPE 近期重要进展研究报告（截至 2026-09-08）》，正文 `[n]` 共 47 处可点击锚点 |
+| 引用交互 | 点「来源 1」后该引用与 Source Panel 对应行均为 `aria-current=true` |
+| 认知类型 | `REPORT_COMPLETED.claims` 15 条：11 事实 / 2 分析 / 2 观点 |
+| 耗时 / 成本 | 312.5s（约 5.2 min）；$0.177（高峰时段 DeepSeek） |
+
+**通过的验收句**：真实网页来源、可点击 `[n]`、事实与分析在 claims 里分开了。Crypto 三个任务 0ms 空 finding 是 P3 未做，报告写进了「数据限制」，符合预期。
+
+**本次暴露、不挡验收的问题**（留给后续修，不重跑这次会话）：
+
+1. **Writer 没填 `section.claim_ids`**。章节标题旁的认知类型徽标因此没亮——前端只按 `claim_ids` 取 claims，空数组就等于没徽标。正文里模型自己写了「分析：」前缀，事件里类型是对的，但徽标链路没接上。应改成代码回填，不要让 LLM 抄 claim id。
+2. **5 任务里 1 个 Web Research 超时**（`task_timeout` 120s）。Agent 对 SSRF 拦下的 URL 调了 `web_fetch`（`blocked`），任务没在失败后收束。另一路 Web Research 1:04 产出 15 条陈述 / 13 来源，报告仍写完。
+3. **开发态 hydration 告警**（`Button`）。Next overlay 挡住了第一次点击「开始研究」，`requestSubmit()` 仍能提交。生产 build 未必复现，但首页不该弹这个。
+4. **`sources` / `claims` 表仍是空的**。来源和陈述只在事件流与报告 JSON 里；刷新页面会丢 Source Panel。落库是 P6 历史会话的事，本次按事件流验收。
 
 ---
 
