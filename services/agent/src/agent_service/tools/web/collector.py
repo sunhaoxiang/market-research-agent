@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING
 from agent_service.schemas.common import SourceType
 from agent_service.schemas.tools import ToolError, ToolResult
 from agent_service.sources.registry import SourceRegistry
+from agent_service.tools.series_metrics import emit_series_metrics
 from agent_service.tools.web.models import WebPageData, WebSearchData
 from agent_service.tools.web.untrusted import strip_isolation_tags
 
@@ -120,10 +121,12 @@ def stamp_refs[T](collector: SourceCollector, result: ToolResult[T]) -> ToolResu
 
 
 def stamp_for_agent[T](deps: ToolDeps, result: ToolResult[T]) -> ToolResult[T]:
-    """Agent 路径：登记来源。invoke 不走这里。"""
+    """Agent 路径：登记来源，并把 TVL/价格序列打成 METRIC_FOUND。"""
     if deps.sources is None:
         return result
-    return stamp_refs(deps.sources, result)
+    stamped = stamp_refs(deps.sources, result)
+    emit_series_metrics(deps.sources, stamped)
+    return stamped
 
 
 def _structured_url(data: object) -> str | None:

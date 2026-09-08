@@ -6,7 +6,7 @@
 > **每完成一个任务就更新此表的状态**；每完成一个阶段，跑 `[DP §26]` 的收尾清单并写阶段小结。
 
 - 最后更新：2026-09-08
-- 当前阶段：**P3-10 数值冲突检测已完成**；下一任务 P3-11 前端 METRIC_FOUND 图表。
+- 当前阶段：**P3-11 报告内嵌价格 / TVL 图表已完成**；下一任务 P4-1 FMP provider。
 
 ### 已确认的前置决策（2026-09-07）
 
@@ -39,7 +39,7 @@
 | P0    | 项目初始化                      | 10     | ✅   | Monorepo / 工具链 / DB / CI      |
 | P1    | Agent 骨架 + 多模型 + Streaming | 13     | ✅   | **端到端最小闭环**               |
 | P2    | Web Research + Citation         | 10     | ✅   | Source / Claim / 带引用报告          |
-| P3    | Crypto 数据能力                 | 11     | ⬜   | 市场 / TVL / Tokenomics / 链上   |
+| P3    | Crypto 数据能力                 | 11     | ✅   | 市场 / TVL / Tokenomics / 链上   |
 | P4    | 美股数据能力                    | 11     | ⬜   | 行情 / 财务 / 估值 / SEC         |
 | P5    | Multi-Agent 完整编排            | 9      | ⬜   | Fact Checker / 并行 / 报告结构   |
 | P5.5  | **MVP 验收**                    | 1      | ⬜   | 见 `[DP §21.1]`                  |
@@ -158,7 +158,7 @@ hash 跨会话稳定，说明 §9.8 的缓存前缀约束真的守住了；95.4%
 | P3-8  | 链上数据源选型调研 + 可行子集实现（`get_chain_activity` 等），受限项写入风险登记 `[DP §23 R4]`   | P3-2            | ✅   | 覆盖度结论见 [`docs/onchain-coverage.md`](./onchain-coverage.md) |
 | P3-9  | Crypto Research Agent + prompt（整合 crypto/defi/onchain/web tools）                             | P3-4~P3-8, P2-6 | ✅   | 对 3 个样例 crypto 问题产出完整 finding |
 | P3-10 | 数值冲突检测：多源同指标差异 → `CONFLICT_DETECTED` + 报告并列展示 `[DP §23 R9]`                  | P3-9            | ✅   | 注入冲突数据能被检出                    |
-| P3-11 | 前端：`METRIC_FOUND` 驱动的 Recharts 图表（价格 / TVL 走势）内嵌报告                             | P3-9, P2-10     | ⬜   | 报告中显示 30d TVL 曲线                 |
+| P3-11 | 前端：`METRIC_FOUND` 驱动的 Recharts 图表（价格 / TVL 走势）内嵌报告                             | P3-9, P2-10     | ✅   | 报告中显示 30d TVL 曲线                 |
 
 **阶段验收**：「介绍一下 HYPE」「分析 HYPE 最近一个月上涨的原因」「查询 HYPE 的 TVL、交易量和资金变化」三个问题都能产出带数据、图表和引用的报告。
 
@@ -608,6 +608,20 @@ Merge 阶段的纯代码检测，不让 LLM 判断两个数字算不算冲突。
 Writer 的 user 消息带上冲突清单，prompt 要求并列写出；前端从事件归约出 `conflicts`，报告在摘要后用黄色警示条展示。Claim 合并与 Fact Checker 仍是 P5-4 / P5-5。
 
 验收：注入 CoinGecko 12 亿 / DefiLlama 18 亿 TVL，事件与警示条都能检出，平均值不会出现。
+
+### P3-11 — 报告内嵌价格 / TVL 图表 ✅（2026-09-08）
+
+图表只认 `METRIC_FOUND` 里带 `as_of` 的 `tvl` / `price` 点，按标的与来源分组，至少两点才画线。Recharts 内嵌报告（摘要 / 冲突条之后）；工具还在跑、报告未出时也能先长出曲线。
+
+不让 LLM 抄 30 个点：`get_tvl` / `get_price_history` 成功后由代码按序列发 `METRIC_FOUND`。前端按 `(name, 标的, 单位, 来源, as_of)` 去重，所以 AgentFinding 里再写一个快照也不会画成两条线。
+
+验收：注入跨 30 天的 31 个 TVL 点，报告出现「TVL · HYPE · 30 天」曲线。三个样例问题的真实端到端带图跑，仍取决于当时工具有没有返回序列。
+
+### Phase 3 阶段小结 ✅（2026-09-08）
+
+Crypto 从「只会搜网页」补齐了免费档能拿到的结构化数据：CoinGecko 行情与供应、DefiLlama TVL/fees/volume、Hyperliquid 24h 成交与持仓；holders / whale / flow 明确 `UNSUPPORTED`。Crypto Research Agent 产出带 metrics 的 finding；多源数值冲突并列展示；报告能画出价格 / TVL 走势。
+
+美股能力是 Phase 4。Fact Checker 与跨 Agent merge 是 Phase 5。
 
 ---
 

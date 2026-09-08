@@ -1,8 +1,9 @@
 "use client";
 
-import type { Claim, Conflict, ResearchReport, Source } from "@mra/shared";
+import type { Claim, Conflict, MetricPoint, ResearchReport, Source } from "@mra/shared";
 
 import { EpistemicBadge, marksForClaims } from "@/components/report/epistemic-badge";
+import { MetricCharts } from "@/components/report/metric-charts";
 import { ReportMarkdown } from "@/components/report/markdown";
 
 type ReportViewerProps = {
@@ -10,6 +11,7 @@ type ReportViewerProps = {
   sources: Source[];
   claims: Claim[];
   conflicts?: Conflict[];
+  metrics?: readonly MetricPoint[];
   activeIndex: number | null;
   onCite: (index: number) => void;
 };
@@ -19,6 +21,7 @@ export function ReportViewer({
   sources,
   claims,
   conflicts = [],
+  metrics = [],
   activeIndex,
   onCite,
 }: ReportViewerProps) {
@@ -68,6 +71,8 @@ export function ReportViewer({
           </ul>
         </aside>
       )}
+
+      <MetricCharts metrics={metrics} />
 
       {report.sections.map((section) => {
         const sectionClaims = section.claim_ids

@@ -6,7 +6,7 @@
 
 import { fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
-import type { Claim, Conflict, ResearchReport, Source } from "@mra/shared";
+import type { Claim, Conflict, MetricPoint, ResearchReport, Source } from "@mra/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ReportViewer } from "@/components/report/report-viewer";
@@ -57,16 +57,31 @@ const REPORT: ResearchReport = {
   data_gaps: ["未找到官方解锁时间表"],
 };
 
+function tvlCurve(): MetricPoint[] {
+  const origin = Date.parse("2026-08-09T00:00:00.000Z");
+  return Array.from({ length: 31 }, (_, index) => ({
+    name: "tvl",
+    label: "TVL",
+    value: 1_400_000_000 + index * 1_000_000,
+    unit: "USD",
+    entity_symbol: "HYPE",
+    as_of: new Date(origin + index * 86_400_000).toISOString(),
+    source_ref: "s1",
+  }));
+}
+
 function Shell({
   report = REPORT,
   sources = [SOURCE],
   claims = [CLAIM],
   conflicts = [],
+  metrics = [],
 }: {
   report?: ResearchReport;
   sources?: Source[];
   claims?: Claim[];
   conflicts?: Conflict[];
+  metrics?: MetricPoint[];
 }) {
   const [active, setActive] = useState<number | null>(null);
   return (
@@ -76,6 +91,7 @@ function Shell({
         sources={sources}
         claims={claims}
         conflicts={conflicts}
+        metrics={metrics}
         activeIndex={active}
         onCite={setActive}
       />
@@ -164,5 +180,14 @@ describe("sanitize 与徽标", () => {
     expect(screen.getByText("coingecko: 1.2e+09 USD")).toBeDefined();
     expect(screen.getByText("defillama: 1.8e+09 USD")).toBeDefined();
     expect(screen.queryByText(/1\.5e/)).toBeNull();
+  });
+
+  it("报告中显示 30 天 TVL 曲线", () => {
+    render(<Shell metrics={tvlCurve()} />);
+
+    expect(screen.getByRole("region", { name: "指标走势" })).toBeDefined();
+    expect(screen.getByRole("figure", { name: /TVL · HYPE · 30 天，31 个数据点/ })).toBeDefined();
+    expect(screen.getByText("TVL · HYPE · 30 天")).toBeDefined();
+    expect(document.querySelector("svg .recharts-line")).not.toBeNull();
   });
 });

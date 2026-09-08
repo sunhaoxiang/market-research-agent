@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 import type { ResearchEvent } from "@mra/shared";
 
+import { MetricCharts } from "@/components/report/metric-charts";
 import { ReportViewer } from "@/components/report/report-viewer";
 import { SourcePanel } from "@/components/sources/source-panel";
 import { Button } from "@/components/ui/button";
@@ -178,6 +179,7 @@ export function ResearchConsole({ models }: { models: ModelOption[] }) {
                 sources={state.sources}
                 claims={state.claims}
                 conflicts={state.conflicts}
+                metrics={state.metrics}
                 activeIndex={activeCitation}
                 onCite={setActiveCitation}
               />
@@ -186,6 +188,7 @@ export function ResearchConsole({ models }: { models: ModelOption[] }) {
                 <h2 className="text-xs font-medium tracking-wide text-zinc-500 uppercase">
                   Report
                 </h2>
+                <MetricCharts metrics={state.metrics} />
                 {state.plan ? (
                   <div className="space-y-3">
                     <p className="text-sm leading-relaxed">{state.plan.interpretation}</p>

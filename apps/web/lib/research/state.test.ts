@@ -513,6 +513,28 @@ describe("冲突", () => {
   });
 });
 
+describe("指标", () => {
+  it("metric_found 按到达顺序累积", () => {
+    const e = script();
+    const first = {
+      name: "tvl",
+      label: "TVL",
+      value: 1.4e9,
+      unit: "USD",
+      entity_symbol: "HYPE",
+      as_of: "2026-08-10T00:00:00.000Z",
+      source_ref: "s1",
+    };
+    const second = { ...first, value: 1.5e9, as_of: "2026-09-08T00:00:00.000Z" };
+    const state = reduceAll([
+      e("metric_found", { metric: first }),
+      e("metric_found", { metric: second }),
+    ]);
+
+    expect(state.metrics).toEqual([first, second]);
+  });
+});
+
 describe("报告", () => {
   it("report_completed 存下报告并为来源补上 [n]", () => {
     const e = script();
