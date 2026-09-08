@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { MetricCharts } from "@/components/report/metric-charts";
 import { ReportViewer } from "@/components/report/report-viewer";
 import { ProcessPanel } from "@/components/research/process-panel";
+import { StageTimeline } from "@/components/research/stage-timeline";
 import { SourcePanel } from "@/components/sources/source-panel";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/field";
@@ -204,6 +205,7 @@ export function ResearchConsole({
           </div>
 
           <SessionHeader state={state} now={now} />
+          <StageTimeline state={state} now={now} />
 
           {state.lastMessage && (
             <p className="text-sm text-zinc-600 dark:text-zinc-400">{state.lastMessage}</p>

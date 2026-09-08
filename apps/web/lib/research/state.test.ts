@@ -115,6 +115,40 @@ describe("会话生命周期", () => {
   });
 });
 
+describe("阶段瀑布（P6-2）", () => {
+  it("stage_changed 打开新片段，下一次阶段关闭上一段", () => {
+    const e = script();
+    const state = reduceAll([
+      e("session_started", { question: "Q", model_id: "m" }),
+      e("stage_changed", { stage: "planning", previous: null }),
+      e("stage_changed", { stage: "researching", previous: "planning" }),
+      e("stage_changed", { stage: "checking", previous: "researching" }),
+    ]);
+
+    expect(state.stages.map((span) => span.stage)).toEqual(["planning", "researching", "checking"]);
+    expect(state.stages[0]?.endedAtMs).toBe(1_800_000_003_000);
+    expect(state.stages[1]?.endedAtMs).toBe(1_800_000_004_000);
+    expect(state.stages[2]?.endedAtMs).toBeNull();
+  });
+
+  it("终态关掉当前阶段", () => {
+    const e = script();
+    const state = reduceAll([
+      e("session_started", { question: "Q", model_id: "m" }),
+      e("stage_changed", { stage: "writing", previous: "checking" }),
+      e("session_completed", {
+        duration_ms: 4000,
+        usage: { input: 1, output: 1, cached: 0 },
+        cost_usd: null,
+      }),
+    ]);
+
+    expect(state.stages).toHaveLength(1);
+    expect(state.stages[0]?.stage).toBe("writing");
+    expect(state.stages[0]?.endedAtMs).toBe(1_800_000_003_000);
+  });
+});
+
 describe("计划先行（§13.2）", () => {
   it("plan_created 一到就画出完整任务树，全部 pending", () => {
     // 这是消除等待焦虑的关键：用户立刻知道要做什么、要多久

@@ -1,15 +1,9 @@
 "use client";
 
 import { AGENT_LABELS } from "@/components/research/activity-panel";
+import { STAGE_LABELS } from "@/lib/research/stages";
 import type { ResearchViewState } from "@/lib/research/state";
 import { cn, formatCost, formatDuration, formatTokens } from "@/lib/utils";
-
-const STAGE_LABELS: Record<string, string> = {
-  planning: "制定计划",
-  researching: "执行研究",
-  checking: "事实核查",
-  writing: "撰写报告",
-};
 
 const STATUS_LOOK: Record<ResearchViewState["status"], { label: string; dot: string }> = {
   idle: { label: "待提问", dot: "bg-zinc-300 dark:bg-zinc-600" },
@@ -26,7 +20,7 @@ export function SessionHeader({ state, now }: { state: ResearchViewState; now: n
     state.durationMs ??
     (state.startedAtMs !== null && now > 0 ? Math.max(0, now - state.startedAtMs) : null);
 
-  const stage = state.status === "running" ? STAGE_LABELS[state.stage ?? ""] : undefined;
+  const stage = state.status === "running" && state.stage ? STAGE_LABELS[state.stage] : undefined;
   const progress = taskProgress(state);
 
   return (

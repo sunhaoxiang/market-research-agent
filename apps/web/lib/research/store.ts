@@ -13,7 +13,13 @@ import { useCallback, useState, useSyncExternalStore } from "react";
 
 import type { ResearchEvent } from "@mra/shared";
 
-import { type ResearchViewState, initialState, reduce, reduceAll } from "@/lib/research/state";
+import {
+  type ResearchViewState,
+  closeOpenStage,
+  initialState,
+  reduce,
+  reduceAll,
+} from "@/lib/research/state";
 
 export type ResearchStore = {
   getSnapshot: () => ResearchViewState;
@@ -49,13 +55,16 @@ export function createResearchStore(from: ResearchViewState = initialState): Res
       if (events.length === 0) return;
       commit(reduceAll(events, snapshot));
     },
-    failStream: (code, message) =>
+    failStream: (code, message) => {
+      const at = Date.now();
       commit({
         ...snapshot,
         status: "failed",
         error: { code, message },
-        completedAtMs: Date.now(),
-      }),
+        completedAtMs: at,
+        stages: closeOpenStage(snapshot.stages, at),
+      });
+    },
     reset: () => commit(initialState),
   };
 }

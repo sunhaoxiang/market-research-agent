@@ -1,0 +1,60 @@
+"use client";
+
+import type { Stage } from "@mra/shared";
+
+import { STAGE_LABELS, resolveStageSpans } from "@/lib/research/stages";
+import type { ResearchViewState } from "@/lib/research/state";
+import { cn, formatDuration } from "@/lib/utils";
+
+const STAGE_TONE: Record<Stage, string> = {
+  planning: "bg-zinc-400 dark:bg-zinc-500",
+  researching: "bg-blue-500",
+  checking: "bg-violet-500",
+  writing: "bg-emerald-500",
+};
+
+/** 太短的阶段也留一点宽度，否则 2 秒的规划会被 10 分钟的研究挤没。 */
+const MIN_SHARE = 0.06;
+
+export function StageTimeline({ state, now }: { state: ResearchViewState; now: number }) {
+  const spans = resolveStageSpans(state, now);
+  if (spans.length === 0) return null;
+
+  const total = spans.reduce((sum, span) => sum + span.durationMs, 0);
+  const weights = spans.map((span) => {
+    if (total <= 0) return 1;
+    return Math.max(span.durationMs / total, MIN_SHARE);
+  });
+
+  return (
+    <section className="space-y-2" aria-label="阶段耗时">
+      <div
+        aria-hidden
+        className="flex h-2 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800"
+      >
+        {spans.map((span, index) => (
+          <div
+            key={`${span.stage}-${span.startedAtMs}`}
+            className={cn(STAGE_TONE[span.stage], span.active && "animate-pulse")}
+            style={{ flexGrow: weights[index], flexBasis: 0 }}
+          />
+        ))}
+      </div>
+
+      <ol className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-zinc-500">
+        {spans.map((span) => (
+          <li key={`${span.stage}-${span.startedAtMs}`} className="flex items-center gap-1.5">
+            <span
+              aria-hidden
+              className={cn("inline-block size-2 rounded-full", STAGE_TONE[span.stage])}
+            />
+            <span>
+              {STAGE_LABELS[span.stage]}
+              {span.active ? " · 进行中" : ""} · {formatDuration(span.durationMs)}
+            </span>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}

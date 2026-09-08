@@ -61,10 +61,19 @@ export type TaskNode = {
 
 export type SessionStatus = "idle" | "running" | "completed" | "failed" | "cancelled";
 
+/** 一次 `stage_changed` 打开、下一次阶段或终态关闭。P6-2 瀑布图的数据。 */
+export type StageSpan = {
+  stage: Stage;
+  startedAtMs: number;
+  endedAtMs: number | null;
+};
+
 export type ResearchViewState = {
   sessionId: string | null;
   status: SessionStatus;
   stage: Stage | null;
+  /** 按发生顺序的阶段片段；当前阶段 `endedAtMs` 为空 */
+  stages: StageSpan[];
   question: string | null;
   modelId: string | null;
   questionType: QuestionType | null;
@@ -97,6 +106,7 @@ export const initialState: ResearchViewState = {
   sessionId: null,
   status: "idle",
   stage: null,
+  stages: [],
   question: null,
   modelId: null,
   questionType: null,
@@ -172,7 +182,11 @@ function applyEvent(state: ResearchViewState, event: ResearchEvent): ResearchVie
       };
 
     case "stage_changed":
-      return { ...state, stage: event.payload.stage };
+      return {
+        ...state,
+        stage: event.payload.stage,
+        stages: openStage(closeOpenStage(state.stages, at), event.payload.stage, at),
+      };
 
     case "intent_classified":
       return {
@@ -334,6 +348,7 @@ function applyEvent(state: ResearchViewState, event: ResearchEvent): ResearchVie
         costUsd: event.payload.cost_usd,
         durationMs: event.payload.duration_ms,
         completedAtMs: at,
+        stages: closeOpenStage(state.stages, at),
       };
 
     case "session_failed":
@@ -343,10 +358,16 @@ function applyEvent(state: ResearchViewState, event: ResearchEvent): ResearchVie
         error: event.payload.error,
         stage: event.payload.stage,
         completedAtMs: at,
+        stages: closeOpenStage(state.stages, at),
       };
 
     case "session_cancelled":
-      return { ...state, status: "cancelled", completedAtMs: at };
+      return {
+        ...state,
+        status: "cancelled",
+        completedAtMs: at,
+        stages: closeOpenStage(state.stages, at),
+      };
 
     default:
       // 未覆盖的类型（心跳、以及尚未单独处理的进度事件）只更新信封。
@@ -354,6 +375,17 @@ function applyEvent(state: ResearchViewState, event: ResearchEvent): ResearchVie
       // `lastMessage` 优雅降级，而不是编译不过或运行时崩掉
       return state;
   }
+}
+
+export function closeOpenStage(stages: StageSpan[], at: number): StageSpan[] {
+  if (stages.length === 0) return stages;
+  const last = stages[stages.length - 1]!;
+  if (last.endedAtMs !== null) return stages;
+  return [...stages.slice(0, -1), { ...last, endedAtMs: Math.max(at, last.startedAtMs) }];
+}
+
+function openStage(stages: StageSpan[], stage: Stage, at: number): StageSpan[] {
+  return [...stages, { stage, startedAtMs: at, endedAtMs: null }];
 }
 
 function attachTasks(state: ResearchViewState, plan: ResearchPlan): ResearchViewState {
