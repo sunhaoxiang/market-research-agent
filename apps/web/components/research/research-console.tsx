@@ -2,10 +2,12 @@
 
 import { useRef, useState } from "react";
 
+import { ReportViewer } from "@/components/report/report-viewer";
+import { SourcePanel } from "@/components/sources/source-panel";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/field";
-import { ResearchStreamError, streamResearch } from "@/lib/sse";
 import { useResearchState, useResearchStore, useTicker } from "@/lib/research/store";
+import { ResearchStreamError, streamResearch } from "@/lib/sse";
 
 import { ActivityPanel } from "./activity-panel";
 import { type ModelOption, ModelSelector } from "./model-selector";
@@ -22,6 +24,7 @@ export function ResearchConsole({ models }: { models: ModelOption[] }) {
   const state = useResearchState(store);
   const [question, setQuestion] = useState("");
   const [modelId, setModelId] = useState("");
+  const [activeCitation, setActiveCitation] = useState<number | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   const running = state.status === "running";
@@ -31,6 +34,7 @@ export function ResearchConsole({ models }: { models: ModelOption[] }) {
     if (!trimmed || running) return;
 
     store.reset();
+    setActiveCitation(null);
     const controller = new AbortController();
     abortRef.current = controller;
 
@@ -140,36 +144,55 @@ export function ResearchConsole({ models }: { models: ModelOption[] }) {
           )}
 
           <div className="grid gap-8 lg:grid-cols-[minmax(0,22rem)_1fr]">
-            <ActivityPanel state={state} now={now} />
-
-            <div className="space-y-3">
-              <h2 className="text-xs font-medium tracking-wide text-zinc-500 uppercase">Report</h2>
-              {state.plan ? (
-                <div className="space-y-3">
-                  <p className="text-sm leading-relaxed">{state.plan.interpretation}</p>
-                  <ol className="list-decimal space-y-1 pl-5 text-sm text-zinc-600 dark:text-zinc-400">
-                    {state.plan.tasks.map((task) => (
-                      <li key={task.id}>{task.objective}</li>
-                    ))}
-                  </ol>
-                  {state.plan.assumptions.length > 0 && (
-                    <div>
-                      <p className="text-xs font-medium text-zinc-500">研究假设</p>
-                      <ul className="list-disc pl-5 text-xs text-zinc-500">
-                        {state.plan.assumptions.map((assumption) => (
-                          <li key={assumption}>{assumption}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  <p className="border-t border-dashed border-zinc-200 pt-3 text-xs text-zinc-400 dark:border-zinc-800">
-                    子 Agent 与报告撰写在 Phase 2-5 接入；当前任务由占位实现驱动，不获取真实数据。
-                  </p>
-                </div>
-              ) : (
-                <p className="text-sm text-zinc-400">计划生成后显示。</p>
-              )}
+            <div className="space-y-4">
+              <ActivityPanel state={state} now={now} />
+              <SourcePanel
+                sources={state.sources}
+                activeIndex={activeCitation}
+                onSelect={setActiveCitation}
+              />
             </div>
+
+            {state.report ? (
+              <ReportViewer
+                report={state.report}
+                sources={state.sources}
+                claims={state.claims}
+                activeIndex={activeCitation}
+                onCite={setActiveCitation}
+              />
+            ) : (
+              <div className="space-y-3">
+                <h2 className="text-xs font-medium tracking-wide text-zinc-500 uppercase">
+                  Report
+                </h2>
+                {state.plan ? (
+                  <div className="space-y-3">
+                    <p className="text-sm leading-relaxed">{state.plan.interpretation}</p>
+                    <ol className="list-decimal space-y-1 pl-5 text-sm text-zinc-600 dark:text-zinc-400">
+                      {state.plan.tasks.map((task) => (
+                        <li key={task.id}>{task.objective}</li>
+                      ))}
+                    </ol>
+                    {state.plan.assumptions.length > 0 && (
+                      <div>
+                        <p className="text-xs font-medium text-zinc-500">研究假设</p>
+                        <ul className="list-disc pl-5 text-xs text-zinc-500">
+                          {state.plan.assumptions.map((assumption) => (
+                            <li key={assumption}>{assumption}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    <p className="border-t border-dashed border-zinc-200 pt-3 text-xs text-zinc-400 dark:border-zinc-800">
+                      {state.stage === "writing" ? "正在撰写研究报告…" : "报告生成后显示。"}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-sm text-zinc-400">计划生成后显示。</p>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -6,7 +6,7 @@
 > **每完成一个任务就更新此表的状态**；每完成一个阶段，跑 `[DP §26]` 的收尾清单并写阶段小结。
 
 - 最后更新：2026-09-08
-- 当前阶段：**Phase 2 进行中**（P2-1 ~ P2-9 已完成）
+- 当前阶段：**Phase 2 已完成**（P2-1 ~ P2-10）
 
 ### 已确认的前置决策（2026-09-07）
 
@@ -38,7 +38,7 @@
 | —     | 开发计划确认                    | 1      | ✅   | 已确认，见上表                   |
 | P0    | 项目初始化                      | 10     | ✅   | Monorepo / 工具链 / DB / CI      |
 | P1    | Agent 骨架 + 多模型 + Streaming | 13     | ✅   | **端到端最小闭环**               |
-| P2    | Web Research + Citation         | 10     | 🟡   | Source / Claim / 报告雏形        |
+| P2    | Web Research + Citation         | 10     | ✅   | Source / Claim / 带引用报告          |
 | P3    | Crypto 数据能力                 | 11     | ⬜   | 市场 / TVL / Tokenomics / 链上   |
 | P4    | 美股数据能力                    | 11     | ⬜   | 行情 / 财务 / 估值 / SEC         |
 | P5    | Multi-Agent 完整编排            | 9      | ⬜   | Fact Checker / 并行 / 报告结构   |
@@ -136,7 +136,7 @@ hash 跨会话稳定，说明 §9.8 的缓存前缀约束真的守住了；95.4%
 | P2-7  | Source 归一化与去重：URL canonical、`reliability` 分级、`SOURCE_FOUND` 事件、引用重新编号 `[DP §15.1-15.2]`               | P2-6        | ✅   | 同一 URL 不同参数被正确合并                 |
 | P2-8  | Report Writer Agent + `ResearchReport` schema + `[n]` 引用生成                                                         | P2-7, P1-4  | ✅   | 产出带引用的 Markdown                       |
 | P2-9  | 引用完整性确定性校验 + output guardrail + 一次修正重试 `[DP §15.4]`                                                       | P2-8        | ✅   | 故意注入坏引用能被检出并修正                |
-| P2-10 | 前端：Report 渲染（sanitize + `[n]` 可点击）+ Source Panel（悬浮预览 excerpt/domain/时间）+ 认知类型徽标                  | P2-8, P1-12 | ⬜   | 点 `[1]` 高亮对应来源                       |
+| P2-10 | 前端：Report 渲染（sanitize + `[n]` 可点击）+ Source Panel（悬浮预览 excerpt/domain/时间）+ 认知类型徽标                  | P2-8, P1-12 | ✅   | 点 `[1]` 高亮对应来源                       |
 
 **阶段验收**：提问「HYPE 最近有什么重要进展？」能产出带真实可点击引用、区分事实/分析的 Markdown 报告。
 
@@ -447,6 +447,14 @@ Agent / Tool 只依赖 `SearchProvider` 协议，Tavily 是第一个实现。换
 纯代码，不让 LLM 判断引用对不对。报告写完后提取正文里的 `[n]`（跳过 markdown 链接 `[n](url)`），必须能对上已编号来源；`SOURCE_BACKED_FACT` 的 `source_ids` 必须落在来源账里；已引用的 URL 须是 http(s)，`http_status == 404` 视为不可用；投资建议只收紧匹配「建议/应当/应该 + 买入…」「强烈买入/卖出」「买入/卖出建议」，避免误伤「买方」「买入价」和「不构成买入建议」。孤儿来源不编号仍由 P2-8 的 `assign_citation_indices` 保证。
 
 第一次 `run_structured` 成功后检查。不过就把具体错误回喂 Writer 再跑一次（两次用量合计、只记一次 `AgentRun`）。第二次仍失败或不是合法 JSON：不让整次研究失败——剥掉对不上的 `[n]`，问题写入 `data_gaps`，发 `citation.integrity` warning，仍然 `REPORT_COMPLETED`。第一次就拿不到 JSON（根本没有报告）仍按 P2-8 失败。
+
+### P2-10 — Report 渲染 + Source Panel ✅（2026-09-08）
+
+报告用 `react-markdown` + `remark-gfm` + `rehype-sanitize` 白名单，裸 `[n]` 转成指向 `#source-n` 的锚点（跳过已经是链接的 `[n](url)`）。点 `[1]` 高亮左侧对应来源并滚入视野；悬停引用或来源行显示 excerpt / domain / 抓取时间。认知类型按后端送来的 `claims` 打徽标：事实无标记，分析蓝、推测黄、预测橙、观点灰——`REPORT_COMPLETED` 因此带上 `claims`，前端不从正文猜。
+
+悬浮卡用手写 `group-hover` / `group-focus-within`，没有为此引入 Radix Tooltip（碰撞检测仍是简单绝对定位）。数据缺口固定渲染为末节「数据限制」。
+
+**阶段小结**：Phase 2 打通「能搜、能读、能引用」。来源由 tool 层登记、会话级去重编号，Writer 只使用代码分配的 `[n]`，坏引用会被检出并修正或降级。前端终于能点引用看到出处。下一阶段是 Crypto 结构化数据（P3）。
 
 ---
 

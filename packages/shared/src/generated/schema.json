@@ -1917,6 +1917,14 @@
           "title": "Sources",
           "type": "array"
         },
+        "claims": {
+          "description": "各任务的陈述，供报告按 section.claim_ids 显示认知类型徽标",
+          "items": {
+            "$ref": "#/$defs/Claim"
+          },
+          "title": "Claims",
+          "type": "array"
+        },
         "citation_count": {
           "default": 0,
           "title": "Citation Count",
@@ -1926,6 +1934,7 @@
       "required": [
         "report",
         "sources",
+        "claims",
         "citation_count"
       ],
       "title": "ReportCompletedPayload",

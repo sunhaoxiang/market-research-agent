@@ -526,12 +526,50 @@ describe("报告", () => {
       e("source_found", {
         source: { ...numbered, citation_index: null },
       }),
-      e("report_completed", { report, sources: [numbered], citation_count: 1 }, "报告已生成"),
+      e(
+        "report_completed",
+        {
+          report,
+          sources: [numbered],
+          claims: [],
+          citation_count: 1,
+        },
+        "报告已生成",
+      ),
     ]);
 
     expect(state.report?.title).toBe("HYPE 近况");
     expect(state.report?.executive_summary).toContain("[1]");
     expect(state.sources[0]!.citation_index).toBe(1);
+    expect(state.claims).toEqual([]);
+  });
+
+  it("report_completed 收下陈述供认知类型徽标使用", () => {
+    const e = script();
+    const claim = {
+      id: "c1",
+      text: "落地时点不确定。",
+      epistemic_type: "analysis" as const,
+      confidence: "medium" as const,
+      source_ids: ["src-1"],
+      as_of: null,
+      task_id: "t1",
+      agent: "web_research",
+      verification: "unverified" as const,
+      verification_note: null,
+      citation_index: null,
+    };
+    const report = {
+      title: "T",
+      executive_summary: "s",
+      sections: [],
+      data_gaps: [],
+    };
+    const state = reduce(
+      initialState,
+      e("report_completed", { report, sources: [], claims: [claim], citation_count: 0 }),
+    );
+    expect(state.claims).toEqual([claim]);
   });
 });
 

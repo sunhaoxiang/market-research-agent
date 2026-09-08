@@ -10,6 +10,7 @@
 
 import type {
   AgentName,
+  Claim,
   Entity,
   ErrorInfo,
   MetricPoint,
@@ -72,6 +73,7 @@ export type ResearchViewState = {
   taskIds: string[];
   tasks: Record<string, TaskNode>;
   sources: Source[];
+  claims: Claim[];
   report: ResearchReport | null;
   metrics: MetricPoint[];
   warnings: { code: string; message: string }[];
@@ -101,6 +103,7 @@ export const initialState: ResearchViewState = {
   taskIds: [],
   tasks: {},
   sources: [],
+  claims: [],
   report: null,
   metrics: [],
   warnings: [],
@@ -300,7 +303,7 @@ function applyEvent(state: ResearchViewState, event: ResearchEvent): ResearchVie
           sources.push(item);
         }
       }
-      return { ...state, report: event.payload.report, sources };
+      return { ...state, report: event.payload.report, sources, claims: [...event.payload.claims] };
     }
 
     case "session_completed":

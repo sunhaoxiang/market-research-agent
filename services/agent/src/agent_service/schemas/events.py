@@ -21,6 +21,7 @@ from typing import Annotated, Literal
 
 from pydantic import Field, TypeAdapter
 
+from agent_service.schemas.claims import Claim
 from agent_service.schemas.common import (
     AgentName,
     QuestionType,
@@ -250,6 +251,10 @@ class ReportCompletedPayload(Schema):
     report: ResearchReport
     sources: list[Source] = Field(default_factory=list)
     """已编 citation_index 的参考文献，供 Source Panel 把 [n] 对上来源。"""
+    claims: list[Claim] = Field(
+        default_factory=list,
+        description="各任务的陈述，供报告按 section.claim_ids 显示认知类型徽标",
+    )
     citation_count: int = 0
 
 

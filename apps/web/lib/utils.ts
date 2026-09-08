@@ -34,3 +34,16 @@ export function formatCost(usd: number | null): string {
   if (usd === 0) return "$0";
   return usd < 0.01 ? `$${usd.toFixed(4)}` : `$${usd.toFixed(2)}`;
 }
+
+/** 来源抓取时间。ISO 字符串，固定 UTC，避免 SSR/客户端时区不一致。 */
+export function formatTimestamp(iso: string | null | undefined): string {
+  if (!iso) return "--";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "--";
+  const yyyy = date.getUTCFullYear();
+  const mm = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(date.getUTCDate()).padStart(2, "0");
+  const hh = String(date.getUTCHours()).padStart(2, "0");
+  const min = String(date.getUTCMinutes()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd} ${hh}:${min} UTC`;
+}

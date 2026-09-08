@@ -543,6 +543,30 @@ export type Sections = ReportSection[];
  */
 export type DataGaps = string[];
 export type Sources = Source[];
+export type Id3 = string;
+export type Text1 = string;
+/**
+ * 认知类型（§15.3）。事实与推测分离的载体。
+ *
+ * 报告主体应以 SOURCE_BACKED_FACT 为主；ANALYSIS / INFERENCE / PREDICTION
+ * 必须出现在带标记的段落中，不得与事实段落混排。
+ */
+export type EpistemicType = "fact" | "source_backed_fact" | "analysis" | "inference" | "prediction" | "opinion";
+export type ConfidenceLevel = "high" | "medium" | "low";
+/**
+ * 指向 Source.id
+ */
+export type SourceIds = string[];
+export type AsOf1 = string | null;
+export type TaskId6 = string | null;
+export type Agent = string | null;
+export type VerificationStatus1 = "unverified" | "verified" | "conflicting" | "unsupported" | "refuted";
+export type VerificationNote = string | null;
+export type CitationIndex1 = number | null;
+/**
+ * 各任务的陈述，供报告按 section.claim_ids 显示认知类型徽标
+ */
+export type Claims = Claim[];
 export type CitationCount = number;
 /**
  * 会话内单调递增，用于顺序保证与断线重连
@@ -567,7 +591,7 @@ export type Ts27 = string;
  */
 export type Message30 = string | null;
 export type Type27 = "agent_run_metrics";
-export type TaskId6 = string | null;
+export type TaskId7 = string | null;
 export type ModelId2 = string;
 export type TaskStatus = "pending" | "running" | "completed" | "failed" | "skipped";
 export type Hash = string;
@@ -599,26 +623,6 @@ export type Ts29 = string;
 export type Message33 = string | null;
 export type Type29 = "heartbeat";
 export type Payload2 = null;
-export type Id3 = string;
-export type Text1 = string;
-/**
- * 认知类型（§15.3）。事实与推测分离的载体。
- *
- * 报告主体应以 SOURCE_BACKED_FACT 为主；ANALYSIS / INFERENCE / PREDICTION
- * 必须出现在带标记的段落中，不得与事实段落混排。
- */
-export type EpistemicType = "fact" | "source_backed_fact" | "analysis" | "inference" | "prediction" | "opinion";
-export type ConfidenceLevel = "high" | "medium" | "low";
-/**
- * 指向 Source.id
- */
-export type SourceIds = string[];
-export type AsOf1 = string | null;
-export type TaskId7 = string | null;
-export type Agent = string | null;
-export type VerificationStatus1 = "unverified" | "verified" | "conflicting" | "unsupported" | "refuted";
-export type VerificationNote = string | null;
-export type CitationIndex1 = number | null;
 /**
  * 一句自包含的陈述，不依赖上下文即可理解
  */
@@ -644,7 +648,7 @@ export type AdditionalSourceRefs = string[];
  * 本任务发现的要点，2-4 句
  */
 export type Summary2 = string;
-export type Claims = ClaimDraft[];
+export type Claims1 = ClaimDraft[];
 export type Metrics = MetricPoint[];
 /**
  * 明确声明拿不到什么数据。这是反幻觉的关键设计——强制显式声明缺失，而不是用推测填补空白
@@ -652,7 +656,7 @@ export type Metrics = MetricPoint[];
 export type DataGaps1 = string[];
 export type TaskId8 = string;
 export type Summary3 = string;
-export type Claims1 = Claim[];
+export type Claims2 = Claim[];
 export type Sources1 = Source[];
 export type Metrics1 = MetricPoint[];
 export type DataGaps2 = string[];
@@ -1129,6 +1133,7 @@ export interface ReportCompletedEvent {
 export interface ReportCompletedPayload {
   report: ResearchReport;
   sources: Sources;
+  claims: Claims;
   citation_count: CitationCount;
 }
 /**
@@ -1145,6 +1150,22 @@ export interface ReportSection {
   title: Title2;
   markdown: Markdown;
   claim_ids: ClaimIds1;
+}
+/**
+ * 编排层补全后的陈述。
+ */
+export interface Claim {
+  id: Id3;
+  text: Text1;
+  epistemic_type: EpistemicType;
+  confidence: ConfidenceLevel;
+  source_ids: SourceIds;
+  as_of: AsOf1;
+  task_id: TaskId6;
+  agent: Agent;
+  verification: VerificationStatus1;
+  verification_note: VerificationNote;
+  citation_index: CitationIndex1;
 }
 export interface UsageUpdatedEvent {
   seq: Seq26;
@@ -1181,7 +1202,7 @@ export interface AgentRunMetricsEvent {
  */
 export interface AgentRunMetricsPayload {
   agent: AgentName1;
-  task_id: TaskId6;
+  task_id: TaskId7;
   model_id: ModelId2;
   status: TaskStatus;
   prompt: PromptDigest | null;
@@ -1218,22 +1239,6 @@ export interface HeartbeatEvent {
   payload: Payload2;
 }
 /**
- * 编排层补全后的陈述。
- */
-export interface Claim {
-  id: Id3;
-  text: Text1;
-  epistemic_type: EpistemicType;
-  confidence: ConfidenceLevel;
-  source_ids: SourceIds;
-  as_of: AsOf1;
-  task_id: TaskId7;
-  agent: Agent;
-  verification: VerificationStatus1;
-  verification_note: VerificationNote;
-  citation_index: CitationIndex1;
-}
-/**
  * LLM 输出的陈述。
  *
  * `epistemic_type` 必填是 §15.3 三重强制机制的第一重（schema 强制）——
@@ -1264,7 +1269,7 @@ export interface ClaimVerification {
  */
 export interface AgentFinding {
   summary: Summary2;
-  claims: Claims;
+  claims: Claims1;
   metrics: Metrics;
   data_gaps: DataGaps1;
 }
@@ -1275,7 +1280,7 @@ export interface ResearchFinding {
   task_id: TaskId8;
   agent: AgentName1;
   summary: Summary3;
-  claims: Claims1;
+  claims: Claims2;
   sources: Sources1;
   metrics: Metrics1;
   data_gaps: DataGaps2;

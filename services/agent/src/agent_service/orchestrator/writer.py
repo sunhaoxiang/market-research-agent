@@ -110,6 +110,7 @@ async def write_report(
         payload=ReportCompletedPayload(
             report=report,
             sources=cited,
+            claims=list(claims),
             citation_count=len(cited),
         ),
         message="报告已生成",

@@ -26,6 +26,7 @@ from agent_service.schemas.common import AgentName, ConfidenceLevel, EpistemicTy
 from agent_service.schemas.events import (
     AgentRunMetricsEvent,
     EventType,
+    ReportCompletedPayload,
     ResearchEvent,
     TokenUsage,
     WarningEvent,
@@ -208,9 +209,9 @@ async def test_write_report_passes_without_retry() -> None:
     metrics = [event for event in events if isinstance(event, AgentRunMetricsEvent)]
     assert len(metrics) == 1
     assert metrics[0].payload.error is None
-
-
-async def test_bad_citation_is_corrected_on_retry() -> None:
+    completed = next(event for event in events if event.type is EventType.REPORT_COMPLETED)
+    assert isinstance(completed.payload, ReportCompletedPayload)
+    assert completed.payload.claims[0].text == state.findings[0].claims[0].text
     """验收：故意注入坏引用能被检出并修正。"""
     source = _source()
     finding = _finding(source)
