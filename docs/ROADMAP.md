@@ -6,7 +6,7 @@
 > **每完成一个任务就更新此表的状态**；每完成一个阶段，跑 `[DP §26]` 的收尾清单并写阶段小结。
 
 - 最后更新：2026-09-08
-- 当前阶段：**Phase 2 进行中**（P2-1、P2-2 已完成）
+- 当前阶段：**Phase 2 进行中**（P2-1 ~ P2-3 已完成）
 
 ### 已确认的前置决策（2026-09-07）
 
@@ -129,7 +129,7 @@ hash 跨会话稳定，说明 §9.8 的缓存前缀约束真的守住了；95.4%
 | ----- | ------------------------------------------------------------------------------------------------------------------------- | ----------- | ---- | ------------------------------------------- |
 | P2-1  | `providers/base.py`：httpx 客户端池 + 分级缓存（SQLite KV）+ 令牌桶限流 + 配额计数 + tenacity 重试 + 自动埋点 `[DP §8.3]` | P1-1        | ✅   | 契约测试覆盖 429/5xx/超时/缓存命中；配额跨重启仍在；缓存命中不耗配额 |
 | P2-2  | `SearchProvider` 抽象 + Tavily 实现（可切 Exa/Brave 的接口设计）                                                          | P2-1        | ✅   | respx 契约测试通过：Bearer 鉴权、body 不含 key、`search_depth=basic`、缓存命中 |
-| P2-3  | `web_fetch` 抓取器：SSRF 防护（DNS→IP 校验、协议/重定向/大小/超时限制）+ trafilatura 正文提取                             | P2-1        | ⬜   | 内网 IP / 超大响应被正确拦截                |
+| P2-3  | `web_fetch` 抓取器：SSRF 防护（DNS→IP 校验、协议/重定向/大小/超时限制）+ trafilatura 正文提取                             | P2-1        | ✅   | 内网 IP / metadata / 超大响应在出网前拦截；重定向到 loopback 不会打到目标 |
 | P2-4  | `tools/web/`：`web_search` / `web_fetch` / `news_search`，全部返回 `ToolResult` + provenance                              | P2-2, P2-3  | ⬜   | `/v1/tools/{name}/invoke` 可单独调用        |
 | P2-5  | Prompt injection 隔离：`<untrusted_web_content>` 包裹 + instructions 声明 + 注入迹象 warning 事件 `[DP §17.1-5]`          | P2-4        | ⬜   | 含注入指令的样例页面不改变 Agent 行为       |
 | P2-6  | Web Research Agent + prompt（产出 `ResearchFinding`，含 claims / sources / data_gaps）                                    | P2-4, P1-10 | ⬜   | 对"HYPE 最近有什么新闻"产出带来源的 finding |
@@ -385,6 +385,14 @@ Agent / Tool 只依赖 `SearchProvider` 协议，Tavily 是第一个实现。换
 - `include_answer=False`：答案由我们自己的 Agent 写，不买 Tavily 的摘要。
 - `include_raw_content=markdown`：这是选 Tavily 的理由（§3.5），默认开。
 - `max_results` 上限 10，避免一次搜索把月配额打穿。
+
+### P2-3 — web_fetch + SSRF ✅（2026-09-08）
+
+不继承 `BaseProvider`：那边默认跟随重定向、并把响应当 JSON 解析。对任意 URL 来说这两件事都是漏洞——`Location` 可以跳到 `169.254.169.254`，HTML 也不是 JSON。缓存和令牌桶仍然复用 Runtime。
+
+每跳独立过关：协议（只允许 http/https）→ 拒绝 URL 中的用户名密码 → 主机名黑名单 → DNS 成 IP → 拒绝私网/loopback/link-local/CGNAT/云 metadata。重定向不会自动跟随，跳到内网的那一跳在发出请求之前就被拦住。HTTPS 降级到 HTTP 直接拒绝。响应先看 `Content-Length`，再按流式字节数封顶 2MB。
+
+正文用 trafilatura 提取；PDF/图片等记 `UNSUPPORTED`。提取失败返回 `text=None`，由 tool 层（P2-4）写进 `data_gaps`，不让模型编。
 
 ---
 

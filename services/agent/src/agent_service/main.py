@@ -19,6 +19,7 @@ from agent_service.api import research as research_api
 from agent_service.config import Settings, get_settings
 from agent_service.models.registry import ModelRegistry, bootstrap_sdk, tracing_status
 from agent_service.observability.logging import configure_logging, get_logger
+from agent_service.providers.fetch import WebFetcher
 from agent_service.providers.runtime import ProviderRuntime
 from agent_service.providers.search import TavilySearchProvider
 
@@ -93,6 +94,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             runtime=runtime, api_key=tavily_key.get_secret_value()
         )
     app.state.search_provider = search_provider
+    app.state.web_fetcher = WebFetcher(runtime)
 
     configured = [p.provider for p in _llm_provider_status(settings) if p.configured]
     log.info(
@@ -113,6 +115,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     search = getattr(app.state, "search_provider", None)
     if search is not None:
         await search.aclose()
+    fetcher = getattr(app.state, "web_fetcher", None)
+    if fetcher is not None:
+        await fetcher.aclose()
     await app.state.provider_runtime.aclose()
     await app.state.registry.aclose()
     log.info("agent_service.shutdown")
@@ -131,6 +136,7 @@ def create_app() -> FastAPI:
     # TestClient(app) 与 `--reload` 首次导入也能正常响应
     app.state.registry = ModelRegistry(get_settings())
     app.state.search_provider = None
+    app.state.web_fetcher = None
 
     @app.get("/v1/health", response_model=HealthResponse, tags=["system"])
     async def health() -> HealthResponse:

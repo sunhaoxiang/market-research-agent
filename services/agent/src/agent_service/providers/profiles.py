@@ -62,6 +62,13 @@ PROFILES: dict[str, ProviderProfile] = {
         rate_per_second=10.0,  # SEC 公平访问建议
         burst=10,
     ),
+    # 不是第三方 API，是我们自己的抓取客户端。礼貌限速，超时比 API 更短：
+    # 卡在一个慢页面上不应拖垮整次研究。
+    "web_fetch": ProviderProfile(
+        rate_per_second=2.0,
+        burst=4,
+        timeout=httpx.Timeout(connect=5.0, read=15.0, write=5.0, pool=5.0),
+    ),
 }
 
 

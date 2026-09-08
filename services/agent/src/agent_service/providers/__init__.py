@@ -11,6 +11,7 @@ from agent_service.providers.base import (
     ProviderStats,
 )
 from agent_service.providers.errors import ProviderError, RetryableProviderError
+from agent_service.providers.fetch import FetchedPage, WebFetcher
 from agent_service.providers.profiles import PROFILES, ProviderProfile, RetryPolicy, profile_for
 from agent_service.providers.runtime import Clock, ProviderRuntime
 from agent_service.providers.search import (
@@ -27,6 +28,7 @@ __all__ = [
     "BaseProvider",
     "CacheTTL",
     "Clock",
+    "FetchedPage",
     "ProviderError",
     "ProviderProfile",
     "ProviderRequest",
@@ -40,5 +42,6 @@ __all__ = [
     "SearchProvider",
     "SearchQuery",
     "TavilySearchProvider",
+    "WebFetcher",
     "profile_for",
 ]
