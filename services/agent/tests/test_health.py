@@ -52,6 +52,7 @@ def test_health_returns_expected_shape(client: TestClient) -> None:
     data_sources = {p["provider"]: p["configured"] for p in body["data_sources"]}
     assert data_sources["defillama"] is True
     assert data_sources["sec_edgar"] is True
+    assert data_sources["coingecko"] is True
 
 
 def test_health_never_leaks_secrets(client: TestClient) -> None:

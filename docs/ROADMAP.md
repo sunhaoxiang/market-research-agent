@@ -6,7 +6,7 @@
 > **每完成一个任务就更新此表的状态**；每完成一个阶段，跑 `[DP §26]` 的收尾清单并写阶段小结。
 
 - 最后更新：2026-09-08
-- 当前阶段：**Phase 2 验收遗留已修**；下一阶段 P3。P6 历史/重连不要另起炉灶，见 Phase 6「已提前落地」。
+- 当前阶段：**P3-1 CoinGecko provider 已完成**；下一任务 P3-2 DefiLlama。P3-3 消歧用已有 `search_coins`。
 
 ### 已确认的前置决策（2026-09-07）
 
@@ -148,10 +148,10 @@ hash 跨会话稳定，说明 §9.8 的缓存前缀约束真的守住了；95.4%
 
 | ID    | 任务                                                                                             | 依赖            | 状态 | 验收                                    |
 | ----- | ------------------------------------------------------------------------------------------------ | --------------- | ---- | --------------------------------------- |
-| P3-1  | CoinGecko provider（限流/缓存/错误映射）                                                         | P2-1            | ⬜   | 契约测试通过                            |
+| P3-1  | CoinGecko provider（限流/缓存/错误映射）                                                         | P2-1            | ✅   | 契约测试通过                            |
 | P3-2  | DefiLlama provider                                                                               | P2-1            | ⬜   | 契约测试通过                            |
-| P3-3  | `resolve_asset`：符号→coin id 消歧（含同名冲突处理，多候选时返回列表让 Agent 选）                | P3-1            | ⬜   | "HYPE" 正确解析到 Hyperliquid           |
-| P3-4  | `tools/crypto/`：`get_crypto_price` / `get_market_data` / `get_price_history`                    | P3-1, P3-3      | ⬜   | 结构化输出 + provenance 完整            |
+| P3-3  | `resolve_asset`：符号→coin id 消歧（含同名冲突处理，多候选时返回列表让 Agent 选）。底层用已有 `search_coins`，不要再包一层 HTTP | P3-1            | ⬜   | "HYPE" 正确解析到 Hyperliquid           |
+| P3-4  | `tools/crypto/`：`get_crypto_price` / `get_market_data` / `get_price_history`。包 `CoinGeckoProvider` 的现成类型，不要再解析一遍 JSON | P3-1, P3-3      | ⬜   | 结构化输出 + provenance 完整            |
 | P3-5  | `tools/system/compute_metrics`：涨跌幅 / CAGR / 波动率 / 百分位（纯 Python）`[DP §8.5]`          | P1-1            | ⬜   | 单元测试含边界值                        |
 | P3-6  | `tools/defi/`：`get_tvl` / `get_protocol_fees_revenue` / `get_dex_volume` / `get_chain_overview` | P3-2            | ⬜   | HYPE/Hyperliquid 数据正确               |
 | P3-7  | `tools/crypto/get_tokenomics`：供应量 / 分配 / 解锁（数据源覆盖度调研 + 缺失明确声明）           | P3-1            | ⬜   | 拿不到的字段进 `data_gaps`              |
@@ -490,6 +490,18 @@ Agent / Tool 只依赖 `SearchProvider` 协议，Tavily 是第一个实现。换
 2. **Web Research 对 SSRF 拦下的 URL 烧满 120s** → `web_fetch` DNS 5s 超时；prompt 要求失败 URL 写入 `data_gaps`、不要重试同一地址。
 3. **开发态 hydration 告警挡住第一次「开始研究」** → `useTicker` 在 idle 时与 server snapshot 一样返回 0。
 4. **`sources` / `claims` 表是空的，刷新丢 Source Panel** → BFF 投影进表；`GET /api/research/{id}/events` + 首页 `?session=` 回放。P6 历史/重连的配合面见 Phase 6「已提前落地」。
+
+### P3-1 — CoinGecko provider ✅（2026-09-08）
+
+继承 `BaseProvider`，不重复实现限流/缓存/429 重试。Demo 档 ~30/min、1 万/月，profile 已按这个数钉死。key 可空（公共限流也能打）；有 key 时走 `x-cg-demo-api-key` 请求头，**不放进 query**——放进 params 会进缓存键。
+
+四个方法是给后面任务用的原语，不要在 tool 层再包一遍 HTTP：
+
+- `search_coins` → **P3-3** `resolve_asset` 的检索面。"HYPE" 能搜到 `hyperliquid` 是 provider 的契约；同名消歧、多候选让 Agent 选是 P3-3。
+- `get_price` / `get_market` / `get_market_chart` → **P3-4** 的三个 crypto tool。200 空 payload（`{}` / `[]`）映射成 `NOT_FOUND`，404/401/403 也是，不要让 Agent 把空对象当成「价格是 null」。
+- 给人点的 URL 是 `coingecko.com/en/coins/{id}`，不是 API 地址。
+
+`/v1/health` 里 CoinGecko 始终 `configured=true`（无 key 也能用）。注入 `ToolDeps`、挂 `/v1/tools/.../invoke` 是 P3-4，本项只把客户端放进 `app.state.coingecko`。
 
 ---
 

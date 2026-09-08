@@ -20,6 +20,7 @@ from agent_service.api import tools as tools_api
 from agent_service.config import Settings, get_settings
 from agent_service.models.registry import ModelRegistry, bootstrap_sdk, tracing_status
 from agent_service.observability.logging import configure_logging, get_logger
+from agent_service.providers.crypto import CoinGeckoProvider
 from agent_service.providers.fetch import WebFetcher
 from agent_service.providers.runtime import ProviderRuntime
 from agent_service.providers.search import TavilySearchProvider
@@ -66,7 +67,8 @@ def _llm_provider_status(settings: Settings) -> list[ProviderStatus]:
 def _data_source_status(settings: Settings) -> list[ProviderStatus]:
     return [
         ProviderStatus(provider="tavily", configured=settings.tavily_api_key is not None),
-        ProviderStatus(provider="coingecko", configured=settings.coingecko_api_key is not None),
+        # Demo 档无 key 也能打公共限流，所以始终可用；有 key 只是额度更高
+        ProviderStatus(provider="coingecko", configured=True),
         ProviderStatus(provider="fmp", configured=settings.fmp_api_key is not None),
         # 这两个不需要 key
         ProviderStatus(provider="defillama", configured=True),
@@ -96,6 +98,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         )
     app.state.search_provider = search_provider
     app.state.web_fetcher = WebFetcher(runtime)
+    # Demo 档无 key 也能打公共限流；tool 层（P3-4）再注入 ToolDeps
+    cg_key = settings.coingecko_api_key
+    app.state.coingecko = CoinGeckoProvider(
+        runtime=runtime,
+        api_key=None if cg_key is None else cg_key.get_secret_value(),
+    )
 
     configured = [p.provider for p in _llm_provider_status(settings) if p.configured]
     log.info(
@@ -119,6 +127,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     fetcher = getattr(app.state, "web_fetcher", None)
     if fetcher is not None:
         await fetcher.aclose()
+    coingecko = getattr(app.state, "coingecko", None)
+    if coingecko is not None:
+        await coingecko.aclose()
     await app.state.provider_runtime.aclose()
     await app.state.registry.aclose()
     log.info("agent_service.shutdown")
@@ -138,6 +149,7 @@ def create_app() -> FastAPI:
     app.state.registry = ModelRegistry(get_settings())
     app.state.search_provider = None
     app.state.web_fetcher = None
+    app.state.coingecko = None
 
     @app.get("/v1/health", response_model=HealthResponse, tags=["system"])
     async def health() -> HealthResponse:
