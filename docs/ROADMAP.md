@@ -6,7 +6,7 @@
 > **每完成一个任务就更新此表的状态**；每完成一个阶段，跑 `[DP §26]` 的收尾清单并写阶段小结。
 
 - 最后更新：2026-09-08
-- 当前阶段：**Phase 2 进行中**（P2-1 ~ P2-7 已完成）
+- 当前阶段：**Phase 2 进行中**（P2-1 ~ P2-8 已完成）
 
 ### 已确认的前置决策（2026-09-07）
 
@@ -134,7 +134,7 @@ hash 跨会话稳定，说明 §9.8 的缓存前缀约束真的守住了；95.4%
 | P2-5  | Prompt injection 隔离：`<untrusted_web_content>` 包裹 + instructions 声明 + 注入迹象 warning 事件 `[DP §23 R5]`           | P2-4        | ✅   | 注入句只出现在隔离标签内；命中发 `web.prompt_injection` warning；Scripted Agent 答复不被页面里的 PWNED 改写 |
 | P2-6  | Web Research Agent + prompt（产出 `ResearchFinding`，含 claims / sources / data_gaps）                                    | P2-4, P1-10 | ✅   | 对"HYPE 最近有什么新闻"产出带来源的 finding |
 | P2-7  | Source 归一化与去重：URL canonical、`reliability` 分级、`SOURCE_FOUND` 事件、引用重新编号 `[DP §15.1-15.2]`               | P2-6        | ✅   | 同一 URL 不同参数被正确合并                 |
-| P2-8  | Report Writer Agent v1 + `ResearchReport` schema + `[n]` 引用生成                                                         | P2-7, P1-4  | ⬜   | 产出带引用的 Markdown                       |
+| P2-8  | Report Writer Agent + `ResearchReport` schema + `[n]` 引用生成                                                         | P2-7, P1-4  | ✅   | 产出带引用的 Markdown                       |
 | P2-9  | 引用完整性确定性校验 + output guardrail + 一次修正重试 `[DP §15.4]`                                                       | P2-8        | ⬜   | 故意注入坏引用能被检出并修正                |
 | P2-10 | 前端：Report 渲染（sanitize + `[n]` 可点击）+ Source Panel（悬浮预览 excerpt/domain/时间）+ 认知类型徽标                  | P2-8, P1-12 | ⬜   | 点 `[1]` 高亮对应来源                       |
 
@@ -434,7 +434,13 @@ Agent / Tool 只依赖 `SearchProvider` 协议，Tavily 是第一个实现。换
 
 每个任务仍只把自己见过的来源写进 finding；跨任务共用同一份账本，所以第二个任务的新 URL 会接着编号而不是从 s1 重来。前端 reducer 按 id / canonical 去重，避免重放事件时 Source Panel 长出重复行。
 
-`citation_index`（报告里的 `[n]`）留给 P2-8 / P2-9：孤儿来源不进最终编号。
+`citation_index`（报告里的 `[n]`）已在 P2-8 落地：孤儿来源不进最终编号。P2-9 再做引用完整性校验。
+
+### P2-8 — Report Writer Agent ✅（2026-09-08）
+
+第一个会写报告的 Agent。`[n]` 编号由代码按「是否被 claim 引用 × 登记顺序」分配，模型只在 Markdown 里使用这些编号——让它自己编序号会和来源账对不上。无工具，走 `ModelRole.WRITING`；Fact Checker 仍是后续阶段，本项直接把 findings 交给 Writer。
+
+失败没有降级（§7.2）：没有报告就等于没有交付物，会话记 `SESSION_FAILED`。各任务的 `data_gaps` 由编排层合并进报告，不依赖模型自觉抄全。前端 reducer 收下 `REPORT_COMPLETED`，并把 `citation_index` 补回 Source Panel 用的来源列表。可点击的 `[n]` 渲染是 P2-10；坏引用的检出与修正是 P2-9。
 
 ---
 

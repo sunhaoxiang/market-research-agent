@@ -542,6 +542,7 @@ export type Sections = ReportSection[];
  * 汇总各任务的 data_gaps，进入报告的「数据限制」章节
  */
 export type DataGaps = string[];
+export type Sources = Source[];
 export type CitationCount = number;
 /**
  * 会话内单调递增，用于顺序保证与断线重连
@@ -652,7 +653,7 @@ export type DataGaps1 = string[];
 export type TaskId8 = string;
 export type Summary3 = string;
 export type Claims1 = Claim[];
-export type Sources = Source[];
+export type Sources1 = Source[];
 export type Metrics1 = MetricPoint[];
 export type DataGaps2 = string[];
 /**
@@ -1127,6 +1128,7 @@ export interface ReportCompletedEvent {
 }
 export interface ReportCompletedPayload {
   report: ResearchReport;
+  sources: Sources;
   citation_count: CitationCount;
 }
 /**
@@ -1274,7 +1276,7 @@ export interface ResearchFinding {
   agent: AgentName1;
   summary: Summary3;
   claims: Claims1;
-  sources: Sources;
+  sources: Sources1;
   metrics: Metrics1;
   data_gaps: DataGaps2;
   tool_errors: ToolErrors;

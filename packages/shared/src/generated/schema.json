@@ -1910,6 +1910,13 @@
         "report": {
           "$ref": "#/$defs/ResearchReport"
         },
+        "sources": {
+          "items": {
+            "$ref": "#/$defs/Source"
+          },
+          "title": "Sources",
+          "type": "array"
+        },
         "citation_count": {
           "default": 0,
           "title": "Citation Count",
@@ -1918,6 +1925,7 @@
       },
       "required": [
         "report",
+        "sources",
         "citation_count"
       ],
       "title": "ReportCompletedPayload",

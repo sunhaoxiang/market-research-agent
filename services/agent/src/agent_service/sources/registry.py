@@ -92,6 +92,11 @@ class SourceRegistry:
     def sources(self) -> list[Source]:
         return [self._by_canonical[key] for key in self._order]
 
+    def replace_all(self, sources: list[Source]) -> None:
+        """用已编号的副本替换账本。顺序必须与登记顺序一致。"""
+        self._by_canonical = {item.url_canonical: item for item in sources}
+        self._order = [item.url_canonical for item in sources]
+
     def _enrich(
         self,
         existing: Source,

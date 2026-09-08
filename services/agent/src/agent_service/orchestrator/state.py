@@ -40,6 +40,7 @@ if TYPE_CHECKING:
     from agent_service.orchestrator.plan_validation import ValidatedPlan
     from agent_service.schemas.common import AgentName
     from agent_service.schemas.findings import ResearchFinding
+    from agent_service.schemas.report import ResearchReport
 
 log = structlog.get_logger(__name__)
 
@@ -105,6 +106,7 @@ class ResearchState:
         self.plan: ValidatedPlan | None = None
         self.task_status: dict[str, TaskStatus] = {}
         self.findings: list[ResearchFinding] = []
+        self.report: ResearchReport | None = None
         self.usage = TokenUsage()
         self.cost_usd: float | None = None
         """None 表示尚未产生任何**已知定价**的调用。见 `record_run`。"""

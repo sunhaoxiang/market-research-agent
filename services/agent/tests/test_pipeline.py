@@ -18,6 +18,7 @@ from agents import Usage
 from agents.testing import ScriptedModel, assistant_message
 from pydantic import SecretStr
 
+from agent_service.agents.report_writer import ReportWriterAgent, build_report_writer
 from agent_service.agents.research_manager import PlannerAgent, build_research_manager
 from agent_service.models.registry import ModelRegistry
 from agent_service.observability.event_bus import EventBus
@@ -106,6 +107,49 @@ def _planner(
     )
 
 
+def _report_json(**overrides: Any) -> str:
+    body: dict[str, Any] = {
+        "title": "Hyperliquid 研究",
+        "executive_summary": "协议收入相关数据仍不完整，当前仅有占位结论。",
+        "sections": [
+            {
+                "id": "Overview",
+                "title": "概述",
+                "markdown": "研究尚未拿到完整的市场数据。",
+                "claim_ids": [],
+            },
+            {
+                "id": "Risks",
+                "title": "风险",
+                "markdown": "子 Agent 尚未实现，结论受限。",
+                "claim_ids": [],
+            },
+        ],
+        "data_gaps": [],
+    }
+    body.update(overrides)
+    return json.dumps(body, ensure_ascii=False)
+
+
+def _writer(*replies: str, per_call: Usage | None = None) -> ReportWriterAgent:
+    registry = ModelRegistry(
+        IsolatedSettings(
+            providers=IsolatedProviderCredentials(deepseek_api_key=SecretStr("sk-test"))
+        )
+    )
+    built = build_report_writer(registry)
+    scripted = ScriptedModel(
+        [[assistant_message(reply)] for reply in replies or (_report_json(),)],
+        default_usage=per_call,
+    )
+    return ReportWriterAgent(
+        agent=built.agent.clone(model=scripted),
+        strategy=built.strategy,
+        entry=built.entry,
+        prompt=built.prompt,
+    )
+
+
 @dataclass
 class StubRunner:
     """最小可用的 TaskRunner。"""
@@ -157,6 +201,7 @@ async def test_full_run_reaches_completion() -> None:
         "Hyperliquid 怎么样？",
         planner=_planner(_plan_json()),
         runner=runner,
+        writer=_writer(),
         limits=_limits(),
         bus=bus,
         now=_NOW,
@@ -166,6 +211,8 @@ async def test_full_run_reaches_completion() -> None:
     assert runner.started == ["t1", "t2"]
     assert [finding.task_id for finding in outcome.findings] == ["t1", "t2"]
     assert set(outcome.state.task_status.values()) == {TaskStatus.COMPLETED}
+    assert outcome.report is not None
+    assert outcome.report.title
 
 
 async def test_event_sequence_covers_the_whole_flow() -> None:
@@ -179,6 +226,7 @@ async def test_event_sequence_covers_the_whole_flow() -> None:
         "Hyperliquid 怎么样？",
         planner=_planner(_plan_json()),
         runner=StubRunner(),
+        writer=_writer(),
         limits=_limits(),
         bus=bus,
         now=_NOW,
@@ -192,8 +240,12 @@ async def test_event_sequence_covers_the_whole_flow() -> None:
         EventType.STAGE_CHANGED,  # planning
         EventType.INTENT_CLASSIFIED,
         EventType.PLAN_CREATED,
-        EventType.AGENT_RUN_METRICS,  # planner 这次 run 的埋点
+        EventType.AGENT_RUN_METRICS,  # planner
         EventType.STAGE_CHANGED,  # researching
+        EventType.STAGE_CHANGED,  # writing
+        EventType.REPORT_STARTED,
+        EventType.AGENT_RUN_METRICS,  # report writer
+        EventType.REPORT_COMPLETED,
         EventType.SESSION_COMPLETED,
     ]
     assert types.count(EventType.AGENT_STARTED) == 2
@@ -207,6 +259,7 @@ async def test_every_task_is_started_before_it_completes() -> None:
         "Hyperliquid 怎么样？",
         planner=_planner(_plan_json()),
         runner=StubRunner(),
+        writer=_writer(),
         limits=_limits(),
         bus=bus,
         now=_NOW,
@@ -229,6 +282,7 @@ async def test_stages_advance_in_order() -> None:
         "Hyperliquid 怎么样？",
         planner=_planner(_plan_json()),
         runner=StubRunner(),
+        writer=_writer(),
         limits=_limits(),
         bus=bus,
         now=_NOW,
@@ -239,9 +293,14 @@ async def test_stages_advance_in_order() -> None:
         if event.type is EventType.STAGE_CHANGED
     ]
 
-    assert [payload.stage for payload in stages] == [Stage.PLANNING, Stage.RESEARCHING]
+    assert [payload.stage for payload in stages] == [
+        Stage.PLANNING,
+        Stage.RESEARCHING,
+        Stage.WRITING,
+    ]
     assert stages[0].previous is None
     assert stages[1].previous is Stage.PLANNING
+    assert stages[2].previous is Stage.RESEARCHING
 
 
 async def test_planner_usage_is_accounted() -> None:
@@ -251,6 +310,7 @@ async def test_planner_usage_is_accounted() -> None:
         "Hyperliquid 怎么样？",
         planner=_planner(_plan_json()),
         runner=StubRunner(),
+        writer=_writer(),
         limits=_limits(),
         bus=bus,
         now=_NOW,
@@ -267,6 +327,7 @@ async def test_session_id_is_generated_when_not_supplied() -> None:
         "Hyperliquid 怎么样？",
         planner=_planner(_plan_json()),
         runner=StubRunner(),
+        writer=_writer(),
         limits=_limits(),
         bus=_bus(),
         now=_NOW,
@@ -287,6 +348,7 @@ async def test_task_failure_still_completes_the_session() -> None:
         "Hyperliquid 怎么样？",
         planner=_planner(_plan_json()),
         runner=StubRunner(failures={"t1": RuntimeError("上游 429")}),
+        writer=_writer(),
         limits=_limits(),
         bus=bus,
         now=_NOW,
@@ -306,6 +368,7 @@ async def test_completion_message_discloses_partial_results() -> None:
         "Hyperliquid 怎么样？",
         planner=_planner(_plan_json()),
         runner=StubRunner(failures={"t1": RuntimeError("上游 429")}),
+        writer=_writer(),
         limits=_limits(),
         bus=bus,
         now=_NOW,
@@ -321,6 +384,7 @@ async def test_rejected_plan_fails_the_session() -> None:
         "你好",
         planner=_planner(_plan_json(tasks=[])),
         runner=StubRunner(),
+        writer=_writer(),
         limits=_limits(),
         bus=bus,
         now=_NOW,
@@ -346,6 +410,7 @@ async def test_planner_run_is_metered_even_when_the_plan_is_rejected() -> None:
         "你好",
         planner=_planner(_plan_json(tasks=[]), per_call=Usage(input_tokens=800, output_tokens=200)),
         runner=StubRunner(),
+        writer=_writer(),
         limits=_limits(),
         bus=bus,
         now=_NOW,
@@ -366,12 +431,17 @@ async def test_planner_run_records_prompt_and_model() -> None:
         "Hyperliquid 怎么样？",
         planner=_planner(_plan_json(), per_call=Usage(input_tokens=1000, output_tokens=300)),
         runner=StubRunner(),
+        writer=_writer(),
         limits=_limits(),
         bus=bus,
         now=_NOW,
     )
 
-    (metrics,) = [e for e in await _drain(bus) if isinstance(e, AgentRunMetricsEvent)]
+    (metrics,) = [
+        e
+        for e in await _drain(bus)
+        if isinstance(e, AgentRunMetricsEvent) and e.payload.agent is AgentName.RESEARCH_MANAGER
+    ]
     assert metrics.payload.agent is AgentName.RESEARCH_MANAGER
     assert metrics.payload.model_id == "deepseek:deepseek-v4-pro"
     # 规划不属于计划里的任何任务，所以没有 task_id
@@ -392,12 +462,17 @@ async def test_retried_planning_reports_the_total_usage() -> None:
             per_call=Usage(input_tokens=1000, output_tokens=300),
         ),
         runner=StubRunner(),
+        writer=_writer(),
         limits=_limits(),
         bus=bus,
         now=_NOW,
     )
 
-    (metrics,) = [e for e in await _drain(bus) if isinstance(e, AgentRunMetricsEvent)]
+    (metrics,) = [
+        e
+        for e in await _drain(bus)
+        if isinstance(e, AgentRunMetricsEvent) and e.payload.agent is AgentName.RESEARCH_MANAGER
+    ]
     assert metrics.payload.usage == TokenUsage(input=2000, output=600)
 
 
@@ -414,6 +489,7 @@ async def test_unexpected_error_still_emits_a_terminal_event() -> None:
         "Hyperliquid 怎么样？",
         planner=_planner(_plan_json()),
         runner=ExplodingRunner(),
+        writer=_writer(),
         limits=_limits(),
         bus=bus,
         now=_NOW,
@@ -432,6 +508,7 @@ async def test_exactly_one_terminal_event_is_emitted() -> None:
         "Hyperliquid 怎么样？",
         planner=_planner(_plan_json()),
         runner=StubRunner(failures={"t1": RuntimeError("挂了")}),
+        writer=_writer(),
         limits=_limits(),
         bus=bus,
         now=_NOW,
@@ -450,6 +527,7 @@ async def test_cancellation_emits_cancelled_and_propagates() -> None:
             "Hyperliquid 怎么样？",
             planner=_planner(_plan_json()),
             runner=StubRunner(failures={"t1": asyncio.CancelledError()}),
+            writer=_writer(),
             limits=_limits(),
             bus=bus,
             now=_NOW,
@@ -457,3 +535,24 @@ async def test_cancellation_emits_cancelled_and_propagates() -> None:
 
     events = await _drain(bus)
     assert events[-1].type is EventType.SESSION_CANCELLED
+
+
+async def test_report_writer_failure_fails_the_session() -> None:
+    """§7.2：Report Writer 没有降级形态。"""
+    bus = _bus()
+    outcome = await run_research(
+        "Hyperliquid 怎么样？",
+        planner=_planner(_plan_json()),
+        runner=StubRunner(),
+        writer=_writer("这不是 JSON", "还不是", "仍然不是"),
+        limits=_limits(),
+        bus=bus,
+        now=_NOW,
+    )
+
+    assert not outcome.succeeded
+    assert outcome.report is None
+    events = await _drain(bus)
+    assert events[-1].type is EventType.SESSION_FAILED
+    assert _payload(events[-1], SessionFailedPayload).stage is Stage.WRITING
+    assert _payload(events[-1], SessionFailedPayload).error.code == "structured_output"

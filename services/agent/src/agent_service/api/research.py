@@ -20,6 +20,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+from agent_service.agents.report_writer import build_report_writer
 from agent_service.agents.research_manager import build_research_manager
 from agent_service.agents.runner import SubAgentRunner
 from agent_service.api.auth import require_internal_token
@@ -77,6 +78,7 @@ async def stream_research(request: ResearchRequest, http_request: Request) -> St
 
     try:
         planner = build_research_manager(registry, limits, model_id=request.model_id)
+        writer = build_report_writer(registry)
     except UnknownModelError as error:
         raise _http_error(status.HTTP_400_BAD_REQUEST, "UNKNOWN_MODEL", str(error)) from error
     except ProviderUnavailableError as error:
@@ -110,6 +112,7 @@ async def stream_research(request: ResearchRequest, http_request: Request) -> St
                     request.question,
                     planner=planner,
                     runner=runner,
+                    writer=writer,
                     limits=limits,
                     bus=bus,
                     session_id=session_id,

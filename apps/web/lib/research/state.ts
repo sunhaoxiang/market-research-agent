@@ -16,6 +16,7 @@ import type {
   QuestionType,
   ResearchEvent,
   ResearchPlan,
+  ResearchReport,
   Source,
   Stage,
   TokenUsage,
@@ -71,6 +72,7 @@ export type ResearchViewState = {
   taskIds: string[];
   tasks: Record<string, TaskNode>;
   sources: Source[];
+  report: ResearchReport | null;
   metrics: MetricPoint[];
   warnings: { code: string; message: string }[];
   usage: TokenUsage;
@@ -99,6 +101,7 @@ export const initialState: ResearchViewState = {
   taskIds: [],
   tasks: {},
   sources: [],
+  report: null,
   metrics: [],
   warnings: [],
   usage: { input: 0, output: 0, cached: 0 },
@@ -288,6 +291,18 @@ function applyEvent(state: ResearchViewState, event: ResearchEvent): ResearchVie
         warnings: [...state.warnings, { code: event.payload.code, message: event.payload.message }],
       };
 
+    case "report_completed": {
+      const numbered = event.payload.sources;
+      const byId = new Map(numbered.map((item) => [item.id, item]));
+      const sources = state.sources.map((item) => byId.get(item.id) ?? item);
+      for (const item of numbered) {
+        if (!sources.some((existing) => existing.id === item.id)) {
+          sources.push(item);
+        }
+      }
+      return { ...state, report: event.payload.report, sources };
+    }
+
     case "session_completed":
       return {
         ...state,
@@ -311,7 +326,7 @@ function applyEvent(state: ResearchViewState, event: ResearchEvent): ResearchVie
       return { ...state, status: "cancelled", completedAtMs: at };
 
     default:
-      // 未覆盖的类型（心跳、以及 Phase 5 才产生的报告/核查事件）只更新信封。
+      // 未覆盖的类型（心跳、以及尚未接入的核查事件）只更新信封。
       // 刻意不做 exhaustive 检查：后端先上线新事件类型时，旧前端应当靠
       // `lastMessage` 优雅降级，而不是编译不过或运行时崩掉
       return state;

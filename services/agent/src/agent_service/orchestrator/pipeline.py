@@ -1,10 +1,9 @@
-"""研究会话全流程（§7.1，P1-10）。
+"""研究会话全流程（§7.1，P1-10 / P2-8）。
 
-当前覆盖 §7.1 的步骤 1-4（意图/规划/校验/执行）。Source 按 url_canonical
-去重、编 ref、发 SOURCE_FOUND 已在执行中由 `SourceRegistry` 完成（P2-7）。
-步骤 5-9 其余部分（事实核查、补充研究、报告撰写、输出护栏）在 Phase 5
-接入，届时在 `researching` 之后追加 `checking` / `writing` 两个阶段——
-`Stage` 枚举与状态机已经为它们留好位置。
+当前覆盖 §7.1 的步骤 1-4 与步骤 8（意图/规划/校验/执行/撰写）。
+Source 按 url_canonical 去重已在执行中由 `SourceRegistry` 完成（P2-7）。
+步骤 6-7、9（事实核查、补充研究、输出护栏）在后续阶段接入。
+`Stage` 枚举已经为 `checking` 留好位置。
 
 **这一层唯一的职责是「保证事件流一定终止」。** 无论正常完成、规划失败、
 被取消还是撞上未预期的异常，都必须恰好发出一个终态事件（§12 / §14.1）：
@@ -27,6 +26,7 @@ from agent_service.orchestrator.executor import execute_plan
 from agent_service.orchestrator.plan_validation import PlanRejectedError
 from agent_service.orchestrator.planner import PlanningResult, create_plan
 from agent_service.orchestrator.state import AgentRun, ResearchState
+from agent_service.orchestrator.writer import write_report
 from agent_service.schemas.common import AgentName, Stage, TaskStatus
 from agent_service.schemas.events import (
     ErrorInfo,
@@ -42,11 +42,13 @@ from agent_service.schemas.events import (
 from agent_service.utils.ids import new_id
 
 if TYPE_CHECKING:
+    from agent_service.agents.report_writer import ReportWriterAgent
     from agent_service.agents.research_manager import PlannerAgent
     from agent_service.config import ExecutionLimits
     from agent_service.observability.event_bus import EventBus
     from agent_service.orchestrator.executor import TaskRunner
     from agent_service.schemas.findings import ResearchFinding
+    from agent_service.schemas.report import ResearchReport
 
 log = structlog.get_logger(__name__)
 
@@ -55,8 +57,8 @@ log = structlog.get_logger(__name__)
 class ResearchOutcome:
     """一次会话的最终结果。
 
-    `findings` 现在直接返回给调用方；Phase 5 起它会先流向事实核查与
-    Report Writer，本对象再补上 `report` 字段。
+    `findings` 与 `report` 一并返回。Fact Checker 接入后，findings 会先
+    流向核查，再交给 Report Writer。
     """
 
     session_id: str
@@ -67,12 +69,17 @@ class ResearchOutcome:
     def findings(self) -> list[ResearchFinding]:
         return self.state.findings
 
+    @property
+    def report(self) -> ResearchReport | None:
+        return self.state.report
+
 
 async def run_research(
     question: str,
     *,
     planner: PlannerAgent,
     runner: TaskRunner,
+    writer: ReportWriterAgent,
     limits: ExecutionLimits,
     bus: EventBus,
     session_id: str | None = None,
@@ -98,13 +105,14 @@ async def run_research(
     )
 
     try:
-        await _plan_and_execute(state, planner=planner, runner=runner, limits=limits, now=now)
+        await _plan_and_execute(
+            state, planner=planner, runner=runner, writer=writer, limits=limits, now=now
+        )
     except PlanRejectedError as error:
         # 规划失败没有降级形态：没有计划就没有任务可执行（§7.2）
         return _fail(state, code="plan_rejected", message=error.reason)
     except StructuredOutputError as error:
-        # 同上：拿不到合法计划就没有可执行的任务。单独一个分支只为给出更准确的
-        # 错误码——"模型输出无法解析" 与 "计划语义不合法" 的排查方向完全不同
+        # Planner 与 Report Writer 都没有降级形态（§7.2）。用 stage 区分是哪一步。
         return _fail(state, code="structured_output", message=str(error))
     except asyncio.CancelledError:
         bus.emit(
@@ -135,6 +143,7 @@ async def _plan_and_execute(
     *,
     planner: PlannerAgent,
     runner: TaskRunner,
+    writer: ReportWriterAgent,
     limits: ExecutionLimits,
     now: datetime | None,
 ) -> None:
@@ -150,6 +159,9 @@ async def _plan_and_execute(
         # 规划已经花掉的时间要从预算里扣掉，否则总耗时会超出 total_timeout_s
         deadline_s=state.remaining_s(limits.total_timeout_s),
     )
+
+    state.advance_to(Stage.WRITING)
+    await write_report(state, writer, now=now)
 
 
 async def _plan(

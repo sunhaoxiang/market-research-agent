@@ -18,6 +18,7 @@ from fastapi.testclient import TestClient
 from pydantic import SecretStr
 
 from agent_service.agents.placeholder import NOT_IMPLEMENTED_GAP, PlaceholderRunner
+from agent_service.agents.report_writer import ReportWriterAgent, build_report_writer
 from agent_service.agents.research_manager import PlannerAgent, build_research_manager
 from agent_service.api import research as research_api
 from agent_service.api.sse import encode_comment, encode_event
@@ -86,6 +87,40 @@ def _scripted_planner(*replies: str) -> PlannerAgent:
     )
 
 
+def _report_json() -> str:
+    return json.dumps(
+        {
+            "title": "Hyperliquid 研究",
+            "executive_summary": "当前仅有占位结论。",
+            "sections": [
+                {
+                    "id": "Overview",
+                    "title": "概述",
+                    "markdown": "子 Agent 尚未实现。",
+                    "claim_ids": [],
+                }
+            ],
+            "data_gaps": ["子 Agent 尚未实现"],
+        },
+        ensure_ascii=False,
+    )
+
+
+def _scripted_writer() -> ReportWriterAgent:
+    registry = ModelRegistry(
+        IsolatedSettings(
+            providers=IsolatedProviderCredentials(deepseek_api_key=SecretStr("sk-test"))
+        )
+    )
+    built = build_report_writer(registry)
+    return ReportWriterAgent(
+        agent=built.agent.clone(model=ScriptedModel([[assistant_message(_report_json())]])),
+        strategy=built.strategy,
+        entry=built.entry,
+        prompt=built.prompt,
+    )
+
+
 @pytest.fixture
 def only_deepseek(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     """把配置钉死成「只充了 DeepSeek」。
@@ -115,6 +150,11 @@ def client(only_deepseek: None, monkeypatch: pytest.MonkeyPatch) -> TestClient:
         research_api,
         "build_research_manager",
         lambda registry, limits, model_id=None: _scripted_planner(_plan_json()),
+    )
+    monkeypatch.setattr(
+        research_api,
+        "build_report_writer",
+        lambda registry, model_id=None: _scripted_writer(),
     )
     return TestClient(create_app())
 
@@ -290,6 +330,7 @@ def test_stream_delivers_the_whole_session(client: TestClient) -> None:
     assert types[-1] == EventType.SESSION_COMPLETED
     assert EventType.PLAN_CREATED in types
     assert EventType.AGENT_COMPLETED in types
+    assert EventType.REPORT_COMPLETED in types
 
 
 def test_seq_is_gapless_and_matches_the_sse_id(client: TestClient) -> None:

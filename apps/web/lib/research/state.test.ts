@@ -490,6 +490,51 @@ describe("来源", () => {
   });
 });
 
+describe("报告", () => {
+  it("report_completed 存下报告并为来源补上 [n]", () => {
+    const e = script();
+    const numbered = {
+      id: "src-1",
+      ref: "s1",
+      url: "https://theblock.co/post/1",
+      url_canonical: "https://theblock.co/post/1",
+      title: "Fee share",
+      domain: "theblock.co",
+      source_type: "news" as const,
+      provider: "tavily",
+      reliability: "secondary" as const,
+      published_at: null,
+      retrieved_at: "2026-09-08T12:00:00.000Z",
+      excerpt: "holders",
+      citation_index: 1,
+      http_status: null,
+    };
+    const report = {
+      title: "HYPE 近况",
+      executive_summary: "正在讨论手续费分享。[1]",
+      sections: [
+        {
+          id: "Overview",
+          title: "概述",
+          markdown: "Hyperliquid 正在讨论手续费分享。[1]",
+          claim_ids: [],
+        },
+      ],
+      data_gaps: [],
+    };
+    const state = reduceAll([
+      e("source_found", {
+        source: { ...numbered, citation_index: null },
+      }),
+      e("report_completed", { report, sources: [numbered], citation_count: 1 }, "报告已生成"),
+    ]);
+
+    expect(state.report?.title).toBe("HYPE 近况");
+    expect(state.report?.executive_summary).toContain("[1]");
+    expect(state.sources[0]!.citation_index).toBe(1);
+  });
+});
+
 describe("信封字段", () => {
   it("message 直接可显示，未覆盖的事件类型也能靠它降级", () => {
     // §12.3 的冗余设计：前端不必为每种类型都写文案

@@ -248,6 +248,8 @@ class ReportSectionDeltaPayload(Schema):
 
 class ReportCompletedPayload(Schema):
     report: ResearchReport
+    sources: list[Source] = Field(default_factory=list)
+    """已编 citation_index 的参考文献，供 Source Panel 把 [n] 对上来源。"""
     citation_count: int = 0
 
 
