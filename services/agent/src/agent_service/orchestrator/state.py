@@ -39,7 +39,7 @@ if TYPE_CHECKING:
     from agent_service.observability.prompts import PromptFingerprint
     from agent_service.orchestrator.plan_validation import ValidatedPlan
     from agent_service.schemas.common import AgentName
-    from agent_service.schemas.findings import Conflict, ResearchFinding
+    from agent_service.schemas.findings import Conflict, FactCheckResult, ResearchFinding
     from agent_service.schemas.report import ResearchReport
 
 log = structlog.get_logger(__name__)
@@ -107,6 +107,7 @@ class ResearchState:
         self.task_status: dict[str, TaskStatus] = {}
         self.findings: list[ResearchFinding] = []
         self.conflicts: list[Conflict] = []
+        self.fact_check: FactCheckResult | None = None
         self.report: ResearchReport | None = None
         self.usage = TokenUsage()
         self.cost_usd: float | None = None

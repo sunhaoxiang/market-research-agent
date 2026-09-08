@@ -5,7 +5,8 @@ web / crypto / stock 已装成可被编排层调用的专职 Agent，结果回�
 不是 Research Manager——Manager 仍然没有工具（决策 A）。Handoff 会转移
 控制权且不返回，用不了「多路并行 + 汇总」。
 
-fact_checker 仍走占位（P5-5）。
+计划里若仍出现 fact_checker 任务，继续走占位——核查由 pipeline 在 Merge
+之后调用专职 Agent，不要把它规划进任务树。
 """
 
 from __future__ import annotations
@@ -81,7 +82,7 @@ class _Assembled:
 
 
 class SubAgentRunner:
-    """`TaskRunner`：把三个研究 Agent 装进一次会话，fact_checker 仍是占位。"""
+    """`TaskRunner`：三个研究 Agent 可调用；计划里的 fact_checker 仍是占位。"""
 
     def __init__(
         self,

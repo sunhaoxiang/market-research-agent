@@ -20,6 +20,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+from agent_service.agents.fact_checker import build_fact_checker
 from agent_service.agents.report_writer import build_report_writer
 from agent_service.agents.research_manager import build_research_manager
 from agent_service.agents.runner import SubAgentRunner
@@ -80,6 +81,7 @@ async def stream_research(request: ResearchRequest, http_request: Request) -> St
     try:
         planner = build_research_manager(registry, limits, model_id=request.model_id)
         writer = build_report_writer(registry)
+        fact_checker = build_fact_checker(registry)
     except UnknownModelError as error:
         raise _http_error(status.HTTP_400_BAD_REQUEST, "UNKNOWN_MODEL", str(error)) from error
     except ProviderUnavailableError as error:
@@ -94,17 +96,20 @@ async def stream_research(request: ResearchRequest, http_request: Request) -> St
 
     bus = EventBus(session_id)
     runtime = getattr(http_request.app.state, "provider_runtime", None)
+    clock = None if runtime is None else runtime.clock
+    search = getattr(http_request.app.state, "search_provider", None)
+    fetcher = getattr(http_request.app.state, "web_fetcher", None)
     runner = SubAgentRunner(
         registry,
         limits=limits,
-        search=getattr(http_request.app.state, "search_provider", None),
-        fetcher=getattr(http_request.app.state, "web_fetcher", None),
+        search=search,
+        fetcher=fetcher,
         coingecko=getattr(http_request.app.state, "coingecko", None),
         defillama=getattr(http_request.app.state, "defillama", None),
         hyperliquid=getattr(http_request.app.state, "hyperliquid", None),
         sec_edgar=getattr(http_request.app.state, "sec_edgar", None),
         fmp=getattr(http_request.app.state, "fmp", None),
-        clock=None if runtime is None else runtime.clock,
+        clock=clock,
         fallback_model_id=planner.model_id,
     )
 
@@ -124,10 +129,14 @@ async def stream_research(request: ResearchRequest, http_request: Request) -> St
                     planner=planner,
                     runner=runner,
                     writer=writer,
+                    fact_checker=fact_checker,
                     limits=limits,
                     bus=bus,
                     session_id=session_id,
                     classifier=classifier,
+                    search=search,
+                    fetcher=fetcher,
+                    clock=clock,
                 )
             ),
             session_id=session_id,

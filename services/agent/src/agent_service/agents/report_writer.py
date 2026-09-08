@@ -16,7 +16,7 @@ from agents import Agent, ModelSettings
 from agent_service.models.structured_output import build_strategy
 from agent_service.observability.prompts import PromptFingerprint, fingerprint
 from agent_service.prompts import load_prompt
-from agent_service.schemas.common import AgentName, ModelRole
+from agent_service.schemas.common import AgentName, ModelRole, VerificationStatus
 from agent_service.schemas.report import ResearchReport
 from agent_service.sources.citations import bibliography
 
@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from agent_service.models.catalog import ModelEntry
     from agent_service.models.registry import ModelRegistry
     from agent_service.models.structured_output import StructuredOutputStrategy
-    from agent_service.schemas.findings import Conflict, ResearchFinding
+    from agent_service.schemas.findings import Conflict, FactCheckResult, ResearchFinding
     from agent_service.schemas.sources import Source
 
 PROMPT_NAME = "report_writer"
@@ -69,6 +69,7 @@ def report_writer_user_message(
     section_ids: tuple[str, ...] = (),
     conflicts: Sequence[Conflict] = (),
     comparison_table: str | None = None,
+    fact_check: FactCheckResult | None = None,
     now: datetime | None = None,
 ) -> str:
     """日期、问题、发现都放 user 消息，避免污染 system prompt 缓存前缀。"""
@@ -91,6 +92,9 @@ def report_writer_user_message(
     conflict_block = _conflicts_block(conflicts)
     if conflict_block is not None:
         parts.append(conflict_block)
+    check_block = _fact_check_block(fact_check)
+    if check_block is not None:
+        parts.append(check_block)
     if comparison_table:
         parts.append("对比表（Comparison 章节必须原样纳入，不要改数字）：\n" + comparison_table)
     parts.append("请根据以上发现撰写结构化报告。")
@@ -120,7 +124,10 @@ def _findings_block(findings: list[ResearchFinding], cited: dict[str, Source]) -
                 for sid in claim.source_ids
                 if sid in cited and cited[sid].citation_index is not None
             )
-            label = f"{claim.epistemic_type.value} / {claim.confidence.value}"
+            bits = [claim.epistemic_type.value, claim.confidence.value]
+            if claim.verification is not VerificationStatus.UNVERIFIED:
+                bits.append(claim.verification.value)
+            label = " / ".join(bits)
             chunks.append(f"- [{label}] {claim.text} {marks}".rstrip())
         if finding.metrics:
             chunks.append(
@@ -141,6 +148,28 @@ def _conflicts_block(conflicts: Sequence[Conflict]) -> str | None:
         lines.append(f"- {item.description}")
         if item.values:
             lines.append("  " + "；".join(item.values))
+    return "\n".join(lines)
+
+
+def _fact_check_block(result: FactCheckResult | None) -> str | None:
+    if result is None:
+        return None
+    lines: list[str] = []
+    if result.verifications:
+        lines.append(
+            "事实核查（refuted / unsupported 不得写成确定事实；"
+            "verified 可按事实写；conflicting 并列各源）："
+        )
+        for item in result.verifications:
+            note = f"：{item.note}" if item.note else ""
+            lines.append(f"- {item.claim_id} → {item.verification.value}{note}")
+    if result.notes:
+        if not lines:
+            lines.append("事实核查备注：")
+        for note in result.notes:
+            lines.append(f"- {note}")
+    if not lines:
+        return None
     return "\n".join(lines)
 
 

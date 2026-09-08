@@ -291,6 +291,20 @@ function applyEvent(state: ResearchViewState, event: ResearchEvent): ResearchVie
     case "conflict_detected":
       return { ...state, conflicts: [...state.conflicts, event.payload.conflict] };
 
+    case "claim_verified":
+      return {
+        ...state,
+        claims: state.claims.map((claim) =>
+          claim.id === event.payload.claim_id
+            ? {
+                ...claim,
+                verification: event.payload.verification,
+                verification_note: event.payload.note,
+              }
+            : claim,
+        ),
+      };
+
     case "usage_updated":
       return { ...state, usage: event.payload.usage, costUsd: event.payload.cost_usd };
 
@@ -335,7 +349,7 @@ function applyEvent(state: ResearchViewState, event: ResearchEvent): ResearchVie
       return { ...state, status: "cancelled", completedAtMs: at };
 
     default:
-      // 未覆盖的类型（心跳、以及尚未接入的核查事件）只更新信封。
+      // 未覆盖的类型（心跳、以及尚未单独处理的进度事件）只更新信封。
       // 刻意不做 exhaustive 检查：后端先上线新事件类型时，旧前端应当靠
       // `lastMessage` 优雅降级，而不是编译不过或运行时崩掉
       return state;

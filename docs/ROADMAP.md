@@ -6,7 +6,7 @@
 > **每完成一个任务就更新此表的状态**；每完成一个阶段，跑 `[DP §26]` 的收尾清单并写阶段小结。
 
 - 最后更新：2026-09-08
-- 当前阶段：**P5-4 已完成**；下一任务 P5-5。
+- 当前阶段：**P5-5 已完成**；下一任务 P5-6。
 
 ### 已确认的前置决策（2026-09-07）
 
@@ -196,7 +196,7 @@ hash 跨会话稳定，说明 §9.8 的缓存前缀约束真的守住了；95.4%
 | P5-2 | Agents-as-Tools 装配：Manager 通过工具调用子 Agent，结果回编排层 `[DP 决策 B]`                             | P3-9, P4-10, P2-6 | ✅   | 单次研究可同时用到 crypto + web             |
 | P5-3 | 完整并行 fan-out：依赖分层 + `asyncio.gather` + 单任务超时 + 部分失败降级。**开工先带 D22**：超时 salvage 已拉到的 SEC 三表/季报要进对比表 `metrics` | P5-2              | ✅   | 1 个任务失败不影响整体出报告；salvage 数字能进对比表 |
 | P5-4 | Merge & Dedup 阶段：source 归一、claim 合并、冲突汇总                                                      | P5-3, P3-10       | ✅   | 跨 Agent 的重复来源被合并                   |
-| P5-5 | Fact Checker Agent（干净上下文，只看 claims + sources，可复检索）+ 校验事件流                              | P5-4              | ⬜   | 能识别注入的错误声明                        |
+| P5-5 | Fact Checker Agent（干净上下文，只看 claims + sources，可复检索）+ 校验事件流                              | P5-4              | ✅   | 能识别注入的错误声明                        |
 | P5-6 | Gap Check + 最多 1 轮补充研究（`PLAN_UPDATED`）                                                            | P5-5              | ⬜   | 缺关键数据时能补一轮                        |
 | P5-7 | Report Writer v2：动态 `report_sections`、Executive Summary、Bull/Bear Case、Risks、数据限制章节、免责声明。**`claim_ids` 继续由 `attach_section_claims` 代码回填**，不要改回让模型抄 id | P5-6, P2-8        | ⬜   | 不同问题类型报告结构不同                        |
 | P5-8 | 全流程 workflow 测试（ScriptedModel）：正常 / 工具失败 / 超时 / 冲突 / 引用缺失 / schema 解析失败 6 条路径 | P5-7, P1-8        | ⬜   | 全部确定性通过                              |
@@ -216,7 +216,7 @@ ticker 只匹配原文大写独立词，避免 `sol` / `meta` / `hype` 误伤。
 
 按决策 A，Research Manager **仍然没有工具**，只出 `ResearchPlan`。给它挂 `agent.as_tool()` 会变成「规划阶段就做研究」的 LLM 循环，和「先画出任务树再点亮」的 UX 冲突。
 
-决策 B 的落地是：`SubAgentRunner` 把 crypto / web / stock 装成编排层可调用的专职 Agent，Python 执行器 fan-out，结构化 `ResearchFinding` 回到编排层再交给 Writer。Handoff 会转移控制权且不返回，用不了并行汇总。`fact_checker` 仍是占位（P5-5）。
+决策 B 的落地是：`SubAgentRunner` 把 crypto / web / stock 装成编排层可调用的专职 Agent，Python 执行器 fan-out，结构化 `ResearchFinding` 回到编排层再交给 Writer。Handoff 会转移控制权且不返回，用不了并行汇总。计划里的 `fact_checker` 仍是占位；核查由 pipeline 在 Merge 之后调用（P5-5）。
 
 规划 prompt 写明：结构化数据与网页分开，一次研究里两者可以同时出现、默认并行。验收是 ScriptedModel：一份含 `crypto_research` + `web_research` 的计划，两次 finding 都进了 `outcome.findings` 和 `AGENT_STARTED`。不是真跑 DeepSeek。
 
@@ -224,7 +224,7 @@ ticker 只匹配原文大写独立词，避免 `sol` / `meta` / `hype` 误伤。
 
 分层、`asyncio.gather`、单任务超时、部分失败降级在 P1-10 已经落地。本任务补的是真 Agent 超时路径：tool 成功时把营收 / 净利 / EPS / 估值 / 行情从结构化结果抽成 `metrics`，记在 collector 上；`salvage_finding` 带进 Writer。对比表只读 `finding.metrics`，以前超时取消时 LLM 没写出数字，AVGO 列就是空的。
 
-不要只改 `TASK_TIMEOUT_S`。数字对齐仍是代码的事，不让模型在 salvage 里补。执行器仍是：一层内并行、一层失败不影响其它任务、超时 finding 留给 Writer、会话照常出报告。`fact_checker` 仍占位（P5-5）。
+不要只改 `TASK_TIMEOUT_S`。数字对齐仍是代码的事，不让模型在 salvage 里补。执行器仍是：一层内并行、一层失败不影响其它任务、超时 finding 留给 Writer、会话照常出报告。计划任务里的 `fact_checker` 仍占位。
 
 验收是 ScriptedModel / 替身 runner：三只股票一层 fan-out，一只超时 salvage 仍有营收，对比表三列都在；另一只任务直接失败时会话仍 `SESSION_COMPLETED`。不是真跑 DeepSeek，也没有重跑 Phase 4 四问。
 
@@ -232,9 +232,21 @@ ticker 只匹配原文大写独立词，避免 `sol` / `meta` / `hype` 误伤。
 
 执行结束、撰写之前跑纯代码的步骤 5。会话内 `SourceRegistry` 在 tool 登记时已经按 canonical URL 去重（P2-7）；Merge 处理 findings 里带着的重复副本——两个 Agent 各自 `Source()` 同一篇文章（跟踪参数不同、id 不同）会收成一条，claim 的 `source_ids` 改指向幸存者，缺的 title / 更长摘录补上。
 
-字面重复的陈述（空白/大小写）折到先出现的那条，来源并集；FACT 有来源则升成 `source_backed_fact`。分析/推测不和事实对折。数值冲突检测仍是 P3-10 的 1% 相对差，**不取平均**，写进 `state.conflicts` 给 Writer。不进入 `checking` 阶段——那是 Fact Checker（P5-5）。
+字面重复的陈述（空白/大小写）折到先出现的那条，来源并集；FACT 有来源则升成 `source_backed_fact`。分析/推测不和事实对折。数值冲突检测仍是 P3-10 的 1% 相对差，**不取平均**，写进 `state.conflicts` 给 Writer。不进入 `checking` 阶段——那是 Fact Checker（P5-5，已还）。
 
 验收：crypto + web 各带同一 TheBlock 链接的 Scripted 替身 runner，账本只剩一条来源；注入的 TVL 冲突仍发 `CONFLICT_DETECTED`。
+
+### P5-5 — Fact Checker ✅（2026-09-08）
+
+独立 Agent，干净上下文：user 消息只有待核 `Claim[]` + `Source[]` 和日期，不看用户原问题、任务摘要或产出 claim 时的推理。工具只有 `web_search` / `web_fetch`（拼 `untrusted_web`）。`ModelRole.BALANCED`，一次 LLM 调用。
+
+调用方是 **pipeline**（Merge 之后、Writer 之前），不是计划任务。Planner prompt 禁止出现 `fact_checker`；计划里若仍出现则继续占位，避免跑两遍。
+
+D6：只核验 `FACT` / `SOURCE_BACKED_FACT`，跳过分析/推测/预测/观点。无此类陈述时仍进入 `checking`、发 `FACT_CHECK_STARTED {0}`，不打模型。失败（结构化输出 / 超时 / 异常）发 WARNING，会话继续写报告——§7.2 只有 Planner / Writer 失败才整次研究失败。
+
+复检索的来源 intern 进同一会话 `SourceRegistry`（s1/s2 连续），`additional_source_refs` 映射到 `source.id` 后并进 claim。Writer 的 user 消息带核查结果；`refuted` / `unsupported` 不得写成确定事实。
+
+验收是 ScriptedModel：注入「HYPE TVL 为 1 美元」的 `source_backed_fact` → `verification=refuted`，事件流有 `FACT_CHECK_STARTED` / `CLAIM_VERIFIED`。不是真跑 DeepSeek。
 
 ### P5.5 — MVP 验收 ⬜
 
@@ -639,7 +651,7 @@ tool 只包已有 `get_market`，不另打 HTTP、不解析 JSON。`allocations`
 
 Merge 阶段的纯代码检测，不让 LLM 判断两个数字算不算冲突。同一指标（`name` + 标的 + 单位 + UTC 数据日）相对差超过 1% → `CONFLICT_DETECTED`，`values` 列出各源 `provider` 与原值，**不取平均**。不同日期是时间序列，不是冲突。
 
-Writer 的 user 消息带上冲突清单，prompt 要求并列写出；前端从事件归约出 `conflicts`，报告在摘要后用黄色警示条展示。Claim 合并见 P5-4；Fact Checker 仍是 P5-5。
+Writer 的 user 消息带上冲突清单，prompt 要求并列写出；前端从事件归约出 `conflicts`，报告在摘要后用黄色警示条展示。Claim 合并见 P5-4；Fact Checker 见 P5-5。
 
 验收：注入 CoinGecko 12 亿 / DefiLlama 18 亿 TVL，事件与警示条都能检出，平均值不会出现。
 
@@ -861,7 +873,7 @@ HTML 仍按 accession **永久缓存**（`CacheTTL.PERMANENT`），不把整份 
 - 三表优先 SEC XBRL；章节用 `outline` + `offset` 续取，不要整份 10-K。
 - `quality.missing_fields` / `unsupported` / `ok=false` → `data_gaps`。空字段不是 0。
 - 不要把 STOCK / FINANCIALS / SEC 工具挂到 Crypto / Web Research Agent。
-- 占位 runner 只剩 `fact_checker`。Plan 层并行任务 + 报告对比表格是 **P4-11**；本项 Agent 可以对多 ticker 调工具，但不做编排层对比表。
+- 占位 runner 只剩计划任务里的 `fact_checker`。Plan 层并行任务 + 报告对比表格是 **P4-11**；本项 Agent 可以对多 ticker 调工具，但不做编排层对比表。
 - 验收用 ScriptedModel 覆盖四问，不是真跑 DeepSeek 端到端。阶段验收四问已于 2026-09-08 真跑，见下方记录。
 
 验收四问（finding，非完整报告）：「NVDA 是做什么的」「分析 NVDA 最近一季财报」「NVDA 估值贵不贵」「比较 NVDA、AMD、AVGO」。最近一季有 10-Q 时用季报（fake Q2 营收 46.743B）；年报路径仍钉 FY2025 营收 130,497,000,000（P4-5 / P4-8）。

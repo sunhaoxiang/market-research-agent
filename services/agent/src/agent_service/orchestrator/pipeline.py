@@ -1,11 +1,9 @@
-"""研究会话全流程（§7.1，P1-10 / P2-8 / P5-4）。
+"""研究会话全流程（§7.1，P1-10 / P2-8 / P5-4 / P5-5）。
 
-当前覆盖 §7.1 的步骤 1-5 与步骤 8（意图/规划/校验/执行/Merge & Dedup/撰写）。
-步骤 5 在执行之后跑：按 url_canonical 合并跨 Agent 来源、折叠重复陈述、
-汇总数值冲突。会话内 SourceRegistry 仍在 tool 登记时去重（P2-7）；Merge
-负责 findings 里漏进来的重复副本。
-步骤 6-7、9（事实核查、补充研究、输出护栏）在后续阶段接入。
-`Stage` 枚举已经为 `checking` 留好位置。
+当前覆盖 §7.1 的步骤 1-6 与步骤 8（意图/规划/校验/执行/Merge & Dedup/
+事实核查/撰写）。步骤 6 在 Merge 之后跑：Fact Checker 只看 claims + sources，
+失败降级为 WARNING，不让整次研究失败。
+步骤 7、9（补充研究、输出护栏）在后续阶段接入。
 
 **这一层唯一的职责是「保证事件流一定终止」。** 无论正常完成、规划失败、
 被取消还是撞上未预期的异常，都必须恰好发出一个终态事件（§12 / §14.1）：
@@ -24,6 +22,7 @@ from typing import TYPE_CHECKING
 import structlog
 
 from agent_service.models.structured_output import StructuredOutputError
+from agent_service.orchestrator.checker import check_facts
 from agent_service.orchestrator.executor import execute_plan
 from agent_service.orchestrator.intent import Intent, IntentClassifier, classify_intent
 from agent_service.orchestrator.merge import merge_research
@@ -46,11 +45,15 @@ from agent_service.schemas.events import (
 from agent_service.utils.ids import new_id
 
 if TYPE_CHECKING:
+    from agent_service.agents.fact_checker import FactCheckerAgent
     from agent_service.agents.report_writer import ReportWriterAgent
     from agent_service.agents.research_manager import PlannerAgent
     from agent_service.config import ExecutionLimits
     from agent_service.observability.event_bus import EventBus
     from agent_service.orchestrator.executor import TaskRunner
+    from agent_service.providers.fetch import PageFetcher
+    from agent_service.providers.runtime import Clock
+    from agent_service.providers.search import SearchProvider
     from agent_service.schemas.findings import ResearchFinding
     from agent_service.schemas.report import ResearchReport
 
@@ -61,8 +64,8 @@ log = structlog.get_logger(__name__)
 class ResearchOutcome:
     """一次会话的最终结果。
 
-    `findings` 与 `report` 一并返回。Fact Checker 接入后，findings 会先
-    流向核查，再交给 Report Writer。
+    `findings` 与 `report` 一并返回。Fact Checker 在撰写前把 verification
+    写回 findings；失败则 WARNING 并继续写报告。
     """
 
     session_id: str
@@ -89,6 +92,10 @@ async def run_research(
     session_id: str | None = None,
     now: datetime | None = None,
     classifier: IntentClassifier | None = None,
+    fact_checker: FactCheckerAgent | None = None,
+    search: SearchProvider | None = None,
+    fetcher: PageFetcher | None = None,
+    clock: Clock | None = None,
 ) -> ResearchOutcome:
     """跑完一次研究。
 
@@ -118,6 +125,10 @@ async def run_research(
             limits=limits,
             now=now,
             classifier=classifier,
+            fact_checker=fact_checker,
+            search=search,
+            fetcher=fetcher,
+            clock=clock,
         )
     except PlanRejectedError as error:
         # 规划失败没有降级形态：没有计划就没有任务可执行（§7.2）
@@ -158,6 +169,10 @@ async def _plan_and_execute(
     limits: ExecutionLimits,
     now: datetime | None,
     classifier: IntentClassifier | None,
+    fact_checker: FactCheckerAgent | None,
+    search: SearchProvider | None,
+    fetcher: PageFetcher | None,
+    clock: Clock | None,
 ) -> None:
     state.advance_to(Stage.PLANNING)
     intent = await classify_intent(state.question, classifier=classifier, bus=state.bus)
@@ -173,6 +188,18 @@ async def _plan_and_execute(
         deadline_s=state.remaining_s(limits.total_timeout_s),
     )
     merge_research(state)
+
+    if fact_checker is not None:
+        state.advance_to(Stage.CHECKING)
+        await check_facts(
+            state,
+            fact_checker,
+            limits=limits,
+            search=search,
+            fetcher=fetcher,
+            clock=clock,
+            now=now,
+        )
 
     state.advance_to(Stage.WRITING)
     await write_report(state, writer, now=now)

@@ -1,6 +1,6 @@
-"""报告撰写阶段（§7.1 步骤 8，P2-8 / P2-9）。
+"""报告撰写阶段（§7.1 步骤 8，P2-8 / P2-9 / P5-5）。
 
-Fact Checker 仍是 Phase 5；这里直接把 findings 交给 Report Writer。
+Fact Checker 的裁定已经写回 claims，并通过 `state.fact_check` 进入 user 消息。
 第一次拿不到合法 JSON：没有报告就等于没有交付物，会话失败（§7.2）。
 引用完整性不过：已有第一份报告，回喂改一次；再不过则降级标注，不让整次研究失败。
 """
@@ -79,6 +79,7 @@ async def write_report(
         section_ids=section_ids,
         conflicts=state.conflicts,
         comparison_table=table,
+        fact_check=state.fact_check,
         now=moment,
     )
 

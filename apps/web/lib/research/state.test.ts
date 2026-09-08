@@ -616,6 +616,39 @@ describe("报告", () => {
     );
     expect(state.claims).toEqual([claim]);
   });
+
+  it("claim_verified 回写已有陈述的裁定", () => {
+    const e = script();
+    const claim = {
+      id: "c1",
+      text: "HYPE 的 TVL 为 1 美元。",
+      epistemic_type: "source_backed_fact" as const,
+      confidence: "high" as const,
+      source_ids: ["src-1"],
+      as_of: null,
+      task_id: "t1",
+      agent: "crypto_research",
+      verification: "unverified" as const,
+      verification_note: null,
+      citation_index: null,
+    };
+    const report = {
+      title: "T",
+      executive_summary: "s",
+      sections: [],
+      data_gaps: [],
+    };
+    const state = reduceAll([
+      e("report_completed", { report, sources: [], claims: [claim], citation_count: 0 }),
+      e(
+        "claim_verified",
+        { claim_id: "c1", verification: "refuted", note: "数量级不对" },
+        "陈述裁定为证伪",
+      ),
+    ]);
+    expect(state.claims[0]?.verification).toBe("refuted");
+    expect(state.claims[0]?.verification_note).toBe("数量级不对");
+  });
 });
 
 describe("信封字段", () => {

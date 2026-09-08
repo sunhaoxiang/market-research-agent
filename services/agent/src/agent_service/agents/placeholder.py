@@ -1,8 +1,8 @@
-"""尚未实现的子 Agent 占位（fact_checker）。
+"""尚未实现的子 Agent 占位（计划任务里误出现的 fact_checker）。
 
 `web_research` / `crypto_research` / `stock_research` 已由 P5-2 装进
-`SubAgentRunner`。其余任务仍走这里，好让编排层在接手前就能发出
-agent_started / agent_completed。
+`SubAgentRunner`。Fact Checker 由 pipeline 在 Merge 之后调用，不是计划任务。
+规划若仍把 `fact_checker` 写进任务树，走这里以免再跑一遍核查。
 
 **它刻意不假装成功。** `data_gaps` 写明尚未实现，缺口会走进报告的
 「数据限制」章节，而不是一段编造的 summary。

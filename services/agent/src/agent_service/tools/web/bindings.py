@@ -86,3 +86,5 @@ def _for_agent[T](deps: ToolDeps, result: ToolResult[T]) -> ToolResult[T]:
 
 
 WEB_TOOLS: list[Tool] = [web_search, news_search, web_fetch]
+# 复核只用搜索和抓取。不要挂 news_search 或 STOCK/FINANCIALS/SEC（§6.2）。
+FACT_CHECKER_TOOLS: list[Tool] = [web_search, web_fetch]

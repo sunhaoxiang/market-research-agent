@@ -84,7 +84,7 @@ class AgentRunTranslator:
         bus: EventBus,
         *,
         agent: AgentName,
-        task_id: str,
+        task_id: str | None,
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
         self._bus = bus

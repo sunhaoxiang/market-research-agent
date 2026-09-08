@@ -18,6 +18,7 @@ from fastapi.testclient import TestClient
 from pydantic import SecretStr
 
 from agent_service.agents.crypto_research import CryptoResearchAgent, build_crypto_research
+from agent_service.agents.fact_checker import FactCheckerAgent, build_fact_checker
 from agent_service.agents.placeholder import NOT_IMPLEMENTED_GAP, PlaceholderRunner
 from agent_service.agents.report_writer import ReportWriterAgent, build_report_writer
 from agent_service.agents.research_manager import PlannerAgent, build_research_manager
@@ -150,6 +151,25 @@ def _scripted_stock() -> StockResearchAgent:
     )
 
 
+def _check_json() -> str:
+    return json.dumps({"verifications": [], "conflicts": [], "notes": []}, ensure_ascii=False)
+
+
+def _scripted_checker() -> FactCheckerAgent:
+    registry = ModelRegistry(
+        IsolatedSettings(
+            providers=IsolatedProviderCredentials(deepseek_api_key=SecretStr("sk-test"))
+        )
+    )
+    built = build_fact_checker(registry)
+    return FactCheckerAgent(
+        agent=built.agent.clone(model=ScriptedModel([[assistant_message(_check_json())]])),
+        strategy=built.strategy,
+        entry=built.entry,
+        prompt=built.prompt,
+    )
+
+
 def _scripted_writer() -> ReportWriterAgent:
     registry = ModelRegistry(
         IsolatedSettings(
@@ -199,6 +219,11 @@ def client(only_deepseek: None, monkeypatch: pytest.MonkeyPatch) -> TestClient:
         research_api,
         "build_report_writer",
         lambda registry, model_id=None: _scripted_writer(),
+    )
+    monkeypatch.setattr(
+        research_api,
+        "build_fact_checker",
+        lambda registry, model_id=None: _scripted_checker(),
     )
     monkeypatch.setattr(
         "agent_service.agents.runner.build_crypto_research",
@@ -419,7 +444,7 @@ def test_placeholder_still_drives_the_agent_lifecycle(
     """占位 runner 也要产生完整的 started/progress/completed。
 
     前端 Activity Panel（P1-12）要靠这三个事件验证渲染，缺一个就没法开工。
-    web / crypto / stock 已接真工具，这里用仍走占位的 fact_checker。
+    计划任务里的 fact_checker 仍走占位；pipeline 的核查阶段是另一条路径。
     """
     del client
     monkeypatch.setattr(

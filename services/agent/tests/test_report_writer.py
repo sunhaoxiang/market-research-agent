@@ -23,7 +23,13 @@ from agent_service.orchestrator.comparison import build_comparison_table
 from agent_service.orchestrator.state import ResearchState
 from agent_service.orchestrator.writer import write_report
 from agent_service.schemas.claims import Claim
-from agent_service.schemas.common import AgentName, ConfidenceLevel, EpistemicType, SourceType
+from agent_service.schemas.common import (
+    AgentName,
+    ConfidenceLevel,
+    EpistemicType,
+    SourceType,
+    VerificationStatus,
+)
 from agent_service.schemas.entities import MetricPoint
 from agent_service.schemas.events import (
     AgentRunMetricsEvent,
@@ -33,7 +39,12 @@ from agent_service.schemas.events import (
     TokenUsage,
     WarningEvent,
 )
-from agent_service.schemas.findings import Conflict, ResearchFinding
+from agent_service.schemas.findings import (
+    ClaimVerification,
+    Conflict,
+    FactCheckResult,
+    ResearchFinding,
+)
 from agent_service.schemas.report import ResearchReport
 from agent_service.schemas.sources import Source
 from agent_service.sources.citations import assign_citation_indices
@@ -97,6 +108,34 @@ def test_user_message_uses_citation_numbers_not_urls() -> None:
     assert "2026-09-08" in text
     built = build_report_writer(_registry())
     assert "2026-09-08" not in str(built.agent.instructions)
+
+
+def test_user_message_includes_fact_check() -> None:
+    raw = _source()
+    numbered = assign_citation_indices([raw], _finding(raw).claims)
+    finding = _finding(numbered[0])
+    claim_id = finding.claims[0].id
+    text = report_writer_user_message(
+        "HYPE 最近有什么新闻",
+        [finding],
+        numbered,
+        fact_check=FactCheckResult(
+            verifications=[
+                ClaimVerification(
+                    claim_id=claim_id,
+                    verification=VerificationStatus.REFUTED,
+                    note="来源并不支持该数字",
+                )
+            ]
+        ),
+        now=_NOW,
+    )
+    assert "事实核查" in text
+    assert "refuted" in text
+    assert claim_id in text
+    built = build_report_writer(_registry())
+    assert "refuted" in str(built.agent.instructions)
+    assert "不要当确定事实写进正文" in str(built.agent.instructions)
 
 
 def test_report_writer_prompt_hash_is_stable() -> None:
