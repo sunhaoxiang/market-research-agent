@@ -6,7 +6,7 @@
 > **每完成一个任务就更新此表的状态**；每完成一个阶段，跑 `[DP §26]` 的收尾清单并写阶段小结。
 
 - 最后更新：2026-09-08
-- 当前阶段：**P4-11 完成**。Phase 4 任务已齐，阶段验收四问待真跑。
+- 当前阶段：**Phase 4 阶段验收已通过**；下一阶段 P5。
 
 ### 已确认的前置决策（2026-09-07）
 
@@ -40,7 +40,7 @@
 | P1    | Agent 骨架 + 多模型 + Streaming | 13     | ✅   | **端到端最小闭环**               |
 | P2    | Web Research + Citation         | 10     | ✅   | Source / Claim / 带引用报告          |
 | P3    | Crypto 数据能力                 | 11     | ✅   | 市场 / TVL / Tokenomics / 链上   |
-| P4    | 美股数据能力                    | 11     | 🟡   | 任务已齐，阶段验收四问待真跑     |
+| P4    | 美股数据能力                    | 11     | ✅   | 四问真跑已出带财务与 SEC 引用的报告 |
 | P5    | Multi-Agent 完整编排            | 9      | ⬜   | Fact Checker / 并行 / 报告结构   |
 | P5.5  | **MVP 验收**                    | 1      | ⬜   | 见 `[DP §21.1]`                  |
 | P6    | 高级 UX + 历史 + 可观察性       | 11     | ⬜   | Activity 完善 / History / /debug |
@@ -182,7 +182,7 @@ hash 跨会话稳定，说明 §9.8 的缓存前缀约束真的守住了；95.4%
 | P4-10 | Stock Research Agent + prompt                                                                                              | P4-4~P4-9    | ✅   | 对 4 个样例股票问题产出完整 finding |
 | P4-11 | 多标的对比支持：Plan 层生成依赖任务 + 报告对比表格                                                                         | P4-10, P1-10 | ✅   | 「比较 NVDA/AMD/AVGO 基本面」可用   |
 
-**阶段验收**：「NVDA 是做什么的」「分析 NVDA 最近一季财报」「NVDA 估值贵不贵」「比较 NVDA、AMD、AVGO」四个问题都能产出带财务数据与 SEC 引用的报告。
+**阶段验收 ✅**（2026-09-08 真实跑通）：四问都产出了带财务数据与 SEC 引用的报告。第四问对比表缺 AVGO 列（任务超时 + FMP 402），详见下方验收记录。
 
 ---
 
@@ -828,7 +828,7 @@ HTML 仍按 accession **永久缓存**（`CacheTTL.PERMANENT`），不把整份 
 - `quality.missing_fields` / `unsupported` / `ok=false` → `data_gaps`。空字段不是 0。
 - 不要把 STOCK / FINANCIALS / SEC 工具挂到 Crypto / Web Research Agent。
 - 占位 runner 只剩 `fact_checker`。Plan 层并行任务 + 报告对比表格是 **P4-11**；本项 Agent 可以对多 ticker 调工具，但不做编排层对比表。
-- 验收用 ScriptedModel 覆盖四问，不是真跑 DeepSeek 端到端。阶段验收四问仍待 P4-11 / 真跑。
+- 验收用 ScriptedModel 覆盖四问，不是真跑 DeepSeek 端到端。阶段验收四问已于 2026-09-08 真跑，见下方记录。
 
 验收四问（finding，非完整报告）：「NVDA 是做什么的」「分析 NVDA 最近一季财报」「NVDA 估值贵不贵」「比较 NVDA、AMD、AVGO」。最近一季有 10-Q 时用季报（fake Q2 营收 46.743B）；年报路径仍钉 FY2025 营收 130,497,000,000（P4-5 / P4-8）。
 
@@ -840,7 +840,77 @@ Plan 层：`compare` 问题按标的拆取数任务（同层并行），再加�
 
 依赖任务会在 user 消息里看到上游 summary **和** 指标，避免对比任务把所有 tool 再打一遍。
 
-验收用 ScriptedModel：三路并行 + 一层依赖的计划能校验分层；Writer 漏表时报告仍有 NVDA/AMD/AVGO 数字表。不是真跑 DeepSeek 端到端。阶段验收四问仍待真跑。
+验收用 ScriptedModel：三路并行 + 一层依赖的计划能校验分层；Writer 漏表时报告仍有 NVDA/AMD/AVGO 数字表。不是真跑 DeepSeek 端到端。阶段验收四问已于 2026-09-08 真跑。
+
+### Phase 4 阶段验收 ✅（2026-09-08）
+
+浏览器 + DeepSeek + 真实 SEC / FMP / Tavily。热重载后 `/v1/health` 的 `fmp=true`。四问都落库，可 `?session=` 回放。点「来源 1 / 2」后面板与正文引用均为 `aria-current=true`。对比表由 `remark-gfm` 渲染成 HTML `<table>`。
+
+#### 问 1「NVDA 是做什么的」— 通过
+
+会话 `01a080b5-9a85-74e1-a5e4-69bb626c4706`。
+
+| 项 | 结果 |
+| --- | --- |
+| 意图 | stock · NVDA |
+| 计划 | 1 个 stock_research 任务，一次通过 |
+| 工具 | `resolve_ticker` / `get_company_profile`（FMP）/ `get_earnings_summary` / `get_xbrl_facts` / `get_filing_section`（10-Q Item 2）均成功；`section=mda` 对 10-Q 抽不出 Item 7，已写进数据限制 |
+| 报告 | 《NVIDIA Corporation（NVDA）：公司是做什么的？》；Compute & Networking / Graphics；FY2027 Q2 营收 962.21 亿美元；`[1]` FMP 简介、`[2]` 10-Q |
+| 冲突 | `CONFLICT_DETECTED`：FY27 Q2 总营收 9.6221e10 vs 1.77837e11（同为 sec_edgar，未取平均） |
+| 耗时 / 成本 | 223.7s；$0.054 |
+
+#### 问 2「分析 NVDA 最近一季财报」— 通过
+
+会话 `01a080ba-e7b5-7625-b455-1ac3561923b8`。
+
+| 项 | 结果 |
+| --- | --- |
+| 计划 | 4 任务（3 stock + 1 web），**4/4 成功** |
+| 报告 | 《NVIDIA 2027财年第二季度财报分析》；Q2 营收 962.21 亿美元（同比约 +106%，上年同期 467.43 亿）、数据中心 890 亿、GAAP EPS 2.46；Q3 指引 1080 亿（新闻稿）；TTM PE 28.98（FMP） |
+| 引用 | `[1]`/`[2]` SEC 公司页与 10-Q `nvda-20260726.htm`；另有 NVIDIA IR 新闻稿与 Tavily 来源，正文 `[n]` 至 21 |
+| 缺口 | `get_valuation_history` `upstream_error`（后证实为 FMP HTTP 402） |
+| 耗时 / 成本 | 453.2s；$0.289 |
+
+#### 问 3「NVDA 估值贵不贵」— 通过
+
+会话 `01a080c2-d204-7759-8d76-5bfbec3ba389`。
+
+| 项 | 结果 |
+| --- | --- |
+| 计划 | 4 任务。t3 同业（AMD/AVGO/TSM）超时；**3/4 成功** |
+| 报告 | 《NVIDIA（NVDA）估值分析：当前贵不贵》；FMP TTM PE 28.98 / PS 18.42 / EV·EBITDA 23.95；历史分位来自网页（FinanceCharts 等），不是 `get_valuation_history` |
+| 引用 | `[1]`/`[2]` SEC；`[3]` FMP；点「来源 1」高亮 |
+| 冲突 | Forward P/E 与 PEG 多源并列（Zacks vs ChartMill 等），未取平均 |
+| 耗时 / 成本 | 562.2s；$0.235 |
+
+#### 问 4「比较 NVDA、AMD、AVGO」— 部分通过
+
+会话 `01a080cd-289b-751a-9c14-ffe4647a6513`。
+
+| 项 | 结果 |
+| --- | --- |
+| 意图 | compare · NVDA, AMD, AVGO |
+| 计划 | 4 任务：t1–t3 按标的并行取数，t4 `depends_on` 对比；`report_sections` 含 Comparison |
+| 成功任务 | **2/4**。NVDA 1:21、AMD 1:34。AVGO 与对比任务均 `task_timeout`（180s） |
+| 报告 | 《NVDA、AMD、AVGO 比较研究报告》；GFM 对比表有 NVDA/AMD 营收、净利、EPS、YoY、市值、股价、EV/EBITDA；AVGO 未入表，正文用新闻稿约 640 亿美元营收补述 |
+| 引用 | `[1]` AMD SEC、`[2]` NVDA SEC、`[5]`/`[6]` AVGO SEC；点「来源 2」高亮 |
+| FMP | NVDA/AMD 的 quote 与 TTM 成功；AVGO 起 `get_valuation_metrics` / `get_stock_quote` / `get_valuation_history` 均为 **HTTP 402** |
+| 耗时 / 成本 | 583.2s；$0.062 |
+
+**通过的验收句**：四问都有财务数字和可点击的 SEC 引用。第四问三列表不完整，不挡「能产出报告」这一条，但同口径三列对比仍缺。
+
+#### 本次暴露、不挡验收的问题
+
+1. **FMP HTTP 402。** `/ratios`（历史分位）从问 2 起就 402；问 4 后半段 `/quote`、`/ratios-ttm` 也对 AVGO 402。错误被映射成泛化 `upstream_error`，不是 `QUOTA_EXHAUSTED` / `UNSUPPORTED`。Agent 改搜网页，把 180s 烧完。见 **D21**。
+2. **超时 salvage 的 SEC 数字没进对比表。** AVGO 超时前已经 `get_income_statement` / `get_earnings_summary` 成功，表里仍只有 NVDA/AMD。见 **D22**。
+3. **问 1 的营收冲突（96.221B vs 177.837B）** 是同一 SEC 源的两个 XBRL 口径，冲突检测按设计并列，未取平均。可能是单季 vs YTD。
+4. **`get_filing_section(section=mda)` 对 10-Q 抽不出 Item 7**，Agent 改用 Item 2，缺口进了数据限制。
+
+### Phase 4 阶段小结 ✅（2026-09-08）
+
+任务表 11/11 完成。美股从「没有结构化数据」补齐了 SEC XBRL 三表 / 章节 / 季报摘要，以及 FMP 行情、公司简介、TTM 估值。对比问题会拆成按标的并行 + 依赖对比任务，报告里能长出 GFM 表。
+
+不要把 ScriptedModel 绿当成端到端绿——真跑才暴露 FMP 402 与 180s 超时。Fact Checker 与跨 Agent merge 是 Phase 5。
 
 ---
 
@@ -870,6 +940,8 @@ Plan 层：`compare` 问题按标的拆取数任务（同层并行），再加�
 | D18 | ~~开发态 `useTicker` hydration 不一致，挡住第一次「开始研究」~~ → idle 与 server snapshot 同为 0                                                                                           | 已偿还（2026-09-08）               | ✅   |
 | D19 | ~~`sources` / `claims` 只在事件流里，刷新丢 Source Panel~~ → BFF 投影 + `GET .../events` 回放。进行中会话续订仍是 D4/P6-6                                                                  | 已偿还（2026-09-08）               | ✅   |
 | D20 | ~~单任务 120s 超时会丢弃已成功的工具结果~~ → 超时 salvage finding；并发 4→2、单任务 180s、总预算 600s | 已偿还（2026-09-08） | ✅   |
+| D21 | FMP HTTP 402（`/ratios` 历史分位；额度紧张时 `/quote` `/ratios-ttm` 也会）被映射成泛化 `upstream_error`，Agent 改搜网页把 180s 烧完 | P5 / 按需 | ⬜   |
+| D22 | 超时 salvage 已拉到的 SEC 三表/季报没有进对比表 `metrics`，AVGO 列因此缺失 | P5 | ⬜   |
 
 ### D14 偿还记录 — GitHub Actions 首次远端运行（2026-09-07）
 
