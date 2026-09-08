@@ -112,16 +112,18 @@ def salvage_finding(
     timeout_s: float,
     empty_sources_gap: str = EMPTY_WEB_SOURCES_GAP,
 ) -> ResearchFinding:
-    """超时取消时，把已登记的来源和工具缺口留给 Writer。
+    """超时取消时，把已登记的来源、工具缺口和已抽出的数字留给 Writer。
 
     没有 LLM 草稿就没有数字 claims；来源仍做成可引用陈述，否则
     `assign_citation_indices` 不会给孤儿来源发 [n]。对比表读的是
-    `metrics`，这里目前不填——D22，跟 P5-3 一起还。
+    `metrics`：tool 成功时 collector 已从结构化结果抽出营收/净利等，
+    超时不能把这些数字丢掉（D22）。
     """
     gap = TIMEOUT_INCOMPLETE_GAP.format(timeout_s=timeout_s)
     draft = AgentFinding(
         summary=gap,
         claims=_salvage_claims(collector.sources()),
+        metrics=list(collector.metrics),
         data_gaps=[gap],
     )
     return assemble_finding(task, draft, collector, empty_sources_gap=empty_sources_gap)

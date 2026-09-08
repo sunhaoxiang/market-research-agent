@@ -159,6 +159,9 @@ class StubRunner:
     """最小可用的 TaskRunner。"""
 
     failures: dict[str, BaseException] = field(default_factory=dict)
+    delays: dict[str, float] = field(default_factory=dict)
+    results: dict[str, ResearchFinding] = field(default_factory=dict)
+    salvages: dict[str, ResearchFinding] = field(default_factory=dict)
     started: list[str] = field(default_factory=list)
 
     def model_id_for(self, agent: AgentName) -> str:
@@ -168,8 +171,19 @@ class StubRunner:
     async def run(self, context: TaskContext, state: ResearchState) -> ResearchFinding:
         del state
         self.started.append(context.task.id)
+        delay = self.delays.get(context.task.id, 0.0)
+        if delay:
+            try:
+                await asyncio.sleep(delay)
+            except asyncio.CancelledError:
+                salvage = self.salvages.get(context.task.id)
+                if salvage is not None:
+                    context.salvage.finding = salvage
+                raise
         if context.task.id in self.failures:
             raise self.failures[context.task.id]
+        if context.task.id in self.results:
+            return self.results[context.task.id]
         return ResearchFinding(
             task_id=context.task.id,
             agent=context.task.agent,
@@ -371,6 +385,97 @@ async def test_task_failure_still_completes_the_session() -> None:
     types = [event.type for event in await _drain(bus)]
     assert EventType.AGENT_FAILED in types
     assert types[-1] is EventType.SESSION_COMPLETED
+
+
+async def test_timeout_salvage_metrics_reach_the_comparison_table() -> None:
+    """一层里一只超时仍出报告，salvage 数字能进对比表（P5-3 / D22）。"""
+
+    def _revenue(task_id: str, symbol: str, value: float) -> ResearchFinding:
+        return ResearchFinding(
+            task_id=task_id,
+            agent=AgentName.STOCK_RESEARCH,
+            summary=f"{symbol} 基本面",
+            metrics=[
+                MetricPoint(
+                    name="revenue",
+                    label="营收",
+                    value=value,
+                    unit="USD",
+                    entity_symbol=symbol,
+                )
+            ],
+        )
+
+    plan = _plan_json(
+        question_type="compare",
+        interpretation="比较 NVDA、AMD、AVGO 基本面",
+        tasks=[
+            {
+                "id": "t1",
+                "agent": "stock_research",
+                "objective": "取 NVDA 最近一季营收",
+                "entities": [],
+                "suggested_tools": [],
+                "depends_on": [],
+                "priority": 0,
+            },
+            {
+                "id": "t2",
+                "agent": "stock_research",
+                "objective": "取 AMD 最近一季营收",
+                "entities": [],
+                "suggested_tools": [],
+                "depends_on": [],
+                "priority": 0,
+            },
+            {
+                "id": "t3",
+                "agent": "stock_research",
+                "objective": "取 AVGO 最近一季营收",
+                "entities": [],
+                "suggested_tools": [],
+                "depends_on": [],
+                "priority": 0,
+            },
+        ],
+        report_sections=["Comparison"],
+    )
+    report = _report_json(
+        title="NVDA / AMD / AVGO 对比",
+        executive_summary="三家规模不同。",
+        sections=[
+            {
+                "id": "Comparison",
+                "title": "对比",
+                "markdown": "以下为基本面对照。",
+                "claim_ids": [],
+            }
+        ],
+    )
+    bus = _bus()
+    outcome = await run_research(
+        "比较 NVDA、AMD、AVGO",
+        planner=_planner(plan),
+        runner=StubRunner(
+            delays={"t3": 5.0},
+            results={
+                "t1": _revenue("t1", "NVDA", 46_743_000_000.0),
+                "t2": _revenue("t2", "AMD", 7_400_000_000.0),
+            },
+            salvages={"t3": _revenue("t3", "AVGO", 15_952_000_000.0)},
+        ),
+        writer=_writer(report),
+        limits=_limits(task_timeout_s=0.05),
+        bus=bus,
+        now=_NOW,
+    )
+
+    assert outcome.succeeded
+    assert outcome.state.task_status["t3"] is TaskStatus.FAILED
+    assert outcome.report is not None
+    markdown = outcome.report.sections[0].markdown
+    assert "| 指标 | NVDA | AMD | AVGO |" in markdown
+    assert "15,952,000,000" in markdown
 
 
 async def test_completion_message_discloses_partial_results() -> None:

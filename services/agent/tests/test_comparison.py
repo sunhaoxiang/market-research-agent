@@ -66,6 +66,27 @@ def test_table_compares_overlapping_metrics_across_tickers() -> None:
     assert "15,000,000,000" in table
 
 
+def test_salvage_metrics_fill_the_missing_ticker_column() -> None:
+    """超时任务没有 LLM 草稿时，collector 抽出的数字仍要能长出第三列（D22）。"""
+    salvaged = ResearchFinding(
+        task_id="t3",
+        agent=AgentName.STOCK_RESEARCH,
+        summary="任务超过 180s 未完成",
+        metrics=[_metric("revenue", 15_952_000_000.0, "AVGO", label="营收")],
+        data_gaps=["任务超过 180s 未完成，未能输出结构化发现。"],
+    )
+    table = build_comparison_table(
+        [
+            _finding("t1", [_metric("revenue", 46_743_000_000.0, "NVDA", label="营收")]),
+            _finding("t2", [_metric("revenue", 7_400_000_000.0, "AMD", label="营收")]),
+            salvaged,
+        ]
+    )
+    assert table is not None
+    assert table.splitlines()[0] == "| 指标 | NVDA | AMD | AVGO |"
+    assert "15,952,000,000" in table
+
+
 def test_missing_cell_is_dash_not_zero() -> None:
     table = build_comparison_table(
         [

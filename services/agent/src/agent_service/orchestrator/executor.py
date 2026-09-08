@@ -10,9 +10,10 @@
   是因为同层任务已经并发出去了，中途叫停只会得到一堆半成品。
 
 **失败降级是这一层的主要职责**（§7.2）：单个任务失败或超时都不中断流程，
-任务标记为 failed。超时前 runner 若已收集到来源或工具缺口，执行器会把
-salvage finding 留给 Writer，避免「工具成功、报告数据缺失」。整体失败只由
-Planner 或 Report Writer 触发——它们没有降级形态，缺了就没有报告。
+任务标记为 failed。超时前 runner 若已收集到来源、工具缺口或已抽出的
+metrics，执行器会把 salvage finding 留给 Writer，避免「工具成功、报告
+数据缺失」。整体失败只由 Planner 或 Report Writer 触发——它们没有降级
+形态，缺了就没有报告。
 """
 
 from __future__ import annotations
@@ -237,7 +238,7 @@ def _keep_salvage(
     code: str,
     message: str,
 ) -> None:
-    """超时仍把已收集的来源/缺口交给 Writer，任务本身记为失败（§7.2）。"""
+    """超时仍把已收集的来源/缺口/metrics 交给 Writer，任务本身记为失败（§7.2）。"""
     if missing_upstream:
         finding = _disclose_missing_upstream(finding, missing_upstream)
     state.findings.append(finding)

@@ -60,7 +60,7 @@ from agent_service.schemas.entities import MetricPoint
 from agent_service.schemas.events import EventType
 from agent_service.schemas.findings import ResearchFinding
 from agent_service.schemas.plan import ResearchTask
-from agent_service.schemas.tools import DataProvenance, ToolError, ToolErrorCode
+from agent_service.schemas.tools import DataProvenance, ToolError, ToolErrorCode, ToolResult
 from agent_service.sources.registry import SourceRegistry
 from agent_service.testing import (
     IsolatedExecutionLimits,
@@ -68,7 +68,8 @@ from agent_service.testing import (
     IsolatedSettings,
 )
 from agent_service.tools.deps import ToolDeps
-from agent_service.tools.web.collector import SourceCollector
+from agent_service.tools.financials.models import IncomePeriodData, IncomeStatementData
+from agent_service.tools.web.collector import SourceCollector, stamp_for_agent
 
 _NOW = datetime(2026, 9, 8, 12, 0, tzinfo=UTC)
 _CIK = "0001045810"
@@ -731,6 +732,47 @@ def test_salvage_finding_keeps_stock_sources() -> None:
     assert finding.tool_errors[0].code is ToolErrorCode.NOT_FOUND
 
 
+def test_salvage_finding_keeps_stamped_financial_metrics() -> None:
+    """超时前已成功的利润表数字必须进 metrics，对比表才能长出该列（D22）。"""
+    collector = SourceCollector()
+    stamp_for_agent(
+        ToolDeps(sources=collector),
+        ToolResult.success(
+            IncomeStatementData(
+                ticker="AVGO",
+                cik="0001730168",
+                period="quarterly",
+                source="sec_xbrl",
+                rows=[
+                    IncomePeriodData(
+                        period_end=date(2025, 8, 3),
+                        revenue=15_952_000_000.0,
+                        net_income=4_140_000_000.0,
+                        eps_diluted=8.72,
+                    )
+                ],
+                url="https://www.sec.gov/edgar/browse/?CIK=0001730168",
+            ),
+            DataProvenance(
+                provider="sec_edgar",
+                endpoint="/api/xbrl/companyfacts",
+                retrieved_at=_NOW,
+            ),
+        ),
+    )
+    finding = salvage_finding(
+        _task("分析 AVGO 最近一季财报"),
+        collector,
+        timeout_s=180,
+        empty_sources_gap=EMPTY_STOCK_SOURCES_GAP,
+    )
+    by_name = {item.name: item for item in finding.metrics}
+    assert by_name["revenue"].entity_symbol == "AVGO"
+    assert by_name["revenue"].value == 15_952_000_000.0
+    assert by_name["net_income"].value == 4_140_000_000.0
+    assert by_name["eps_diluted"].value == 8.72
+
+
 async def test_stock_runner_salvages_collector_on_cancel(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -739,13 +781,30 @@ async def test_stock_runner_salvages_collector_on_cancel(
         assert isinstance(deps, ToolDeps)
         sources = deps.sources
         assert sources is not None
-        sources.add(
-            url=_PAGE,
-            title="NVIDIA CORP",
-            excerpt=None,
-            provider="sec_edgar",
-            retrieved_at=_NOW,
-            source_type=SourceType.API,
+        stamp_for_agent(
+            deps,
+            ToolResult.success(
+                IncomeStatementData(
+                    ticker="NVDA",
+                    cik=_CIK,
+                    period="quarterly",
+                    source="sec_xbrl",
+                    rows=[
+                        IncomePeriodData(
+                            period_end=date(2025, 7, 27),
+                            revenue=_Q2_REVENUE,
+                            net_income=26_422_000_000.0,
+                            eps_diluted=1.05,
+                        )
+                    ],
+                    url=_PAGE,
+                ),
+                DataProvenance(
+                    provider="sec_edgar",
+                    endpoint="/api/xbrl/companyfacts",
+                    retrieved_at=_NOW,
+                ),
+            ),
         )
         await asyncio.Event().wait()
 
@@ -766,6 +825,9 @@ async def test_stock_runner_salvages_collector_on_cancel(
     saved = context.salvage.finding
     assert saved is not None
     assert saved.sources[0].url == _PAGE
+    by_name = {item.name: item for item in saved.metrics}
+    assert by_name["revenue"].entity_symbol == "NVDA"
+    assert by_name["revenue"].value == _Q2_REVENUE
 
 
 async def test_sub_agent_runner_placeholders_only_fact_checker() -> None:

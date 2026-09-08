@@ -12,10 +12,12 @@ from dataclasses import dataclass, field
 import pytest
 
 from agent_service.observability.event_bus import EventBus
+from agent_service.orchestrator.comparison import build_comparison_table
 from agent_service.orchestrator.executor import TaskContext, execute_plan
 from agent_service.orchestrator.plan_validation import validate_plan
 from agent_service.orchestrator.state import ResearchState
 from agent_service.schemas.common import AgentName, QuestionType, TaskStatus
+from agent_service.schemas.entities import MetricPoint
 from agent_service.schemas.events import (
     AgentFailedPayload,
     EventType,
@@ -261,6 +263,48 @@ async def test_timeout_keeps_salvaged_finding_for_the_writer() -> None:
     events = await _drain(state.bus)
     failed = [event for event in events if event.type is EventType.AGENT_FAILED]
     assert _payload(failed[0], AgentFailedPayload).error.code == "task_timeout"
+
+
+async def test_timeout_salvage_metrics_enter_the_comparison_table() -> None:
+    """一层里一只超时，已抽出的营收仍要进对比表（P5-3 / D22）。"""
+
+    def _revenue(symbol: str, value: float) -> MetricPoint:
+        return MetricPoint(
+            name="revenue",
+            label="营收",
+            value=value,
+            unit="USD",
+            entity_symbol=symbol,
+        )
+
+    class MixedRunner(RecordingRunner):
+        async def run(self, context: TaskContext, state: ResearchState) -> ResearchFinding:
+            try:
+                finding = await super().run(context, state)
+            except asyncio.CancelledError:
+                context.salvage.finding = ResearchFinding(
+                    task_id=context.task.id,
+                    agent=context.task.agent,
+                    summary="salvaged",
+                    metrics=[_revenue("AVGO", 15_952_000_000.0)],
+                )
+                raise
+            by_task = {"t1": ("NVDA", 46_743_000_000.0), "t2": ("AMD", 7_400_000_000.0)}
+            symbol, value = by_task[context.task.id]
+            return finding.model_copy(update={"metrics": [_revenue(symbol, value)]})
+
+    state = _state(_task("t1"), _task("t2"), _task("t3"))
+    runner = MixedRunner(delays={"t3": 5.0})
+
+    await execute_plan(state, runner=runner, limits=_limits(task_timeout_s=0.02), deadline_s=60.0)
+
+    assert state.task_status["t1"] is TaskStatus.COMPLETED
+    assert state.task_status["t2"] is TaskStatus.COMPLETED
+    assert state.task_status["t3"] is TaskStatus.FAILED
+    table = build_comparison_table(state.findings)
+    assert table is not None
+    assert table.splitlines()[0] == "| 指标 | NVDA | AMD | AVGO |"
+    assert "15,952,000,000" in table
 
 
 async def test_dependent_task_still_runs_after_its_dependency_failed() -> None:

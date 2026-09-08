@@ -12,9 +12,11 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from agent_service.schemas.common import SourceType
+from agent_service.schemas.entities import MetricPoint
 from agent_service.schemas.tools import ToolError, ToolResult
 from agent_service.sources.registry import SourceRegistry
 from agent_service.tools.series_metrics import emit_series_metrics
+from agent_service.tools.snapshot_metrics import remember_tool_metrics
 from agent_service.tools.web.models import WebPageData, WebSearchData
 from agent_service.tools.web.untrusted import strip_isolation_tags
 
@@ -28,6 +30,7 @@ class SourceCollector:
     registry: SourceRegistry = field(default_factory=SourceRegistry)
     _seen: list[str] = field(default_factory=list)
     errors: list[ToolError] = field(default_factory=list)
+    metrics: list[MetricPoint] = field(default_factory=list)
 
     def add(
         self,
@@ -121,11 +124,12 @@ def stamp_refs[T](collector: SourceCollector, result: ToolResult[T]) -> ToolResu
 
 
 def stamp_for_agent[T](deps: ToolDeps, result: ToolResult[T]) -> ToolResult[T]:
-    """Agent 路径：登记来源，并把 TVL/价格序列打成 METRIC_FOUND。"""
+    """Agent 路径：登记来源，序列打成 METRIC_FOUND，标量留给超时 salvage。"""
     if deps.sources is None:
         return result
     stamped = stamp_refs(deps.sources, result)
     emit_series_metrics(deps.sources, stamped)
+    remember_tool_metrics(deps.sources, stamped)
     return stamped
 
 

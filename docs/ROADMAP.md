@@ -6,7 +6,7 @@
 > **每完成一个任务就更新此表的状态**；每完成一个阶段，跑 `[DP §26]` 的收尾清单并写阶段小结。
 
 - 最后更新：2026-09-08
-- 当前阶段：**P5-2 已完成**；下一任务 P5-3（开工先带 D22）。
+- 当前阶段：**P5-3 已完成**；下一任务 P5-4。
 
 ### 已确认的前置决策（2026-09-07）
 
@@ -194,7 +194,7 @@ hash 跨会话稳定，说明 §9.8 的缓存前缀约束真的守住了；95.4%
 | ---- | ---------------------------------------------------------------------------------------------------------- | ----------------- | ---- | ------------------------------------------- |
 | P5-1 | 意图分类层（词典/正则短路 + FAST 模型兜底）`[DP §25.1]`                                                    | P1-9              | ✅   | 常见问题不走 LLM 也能正确分类               |
 | P5-2 | Agents-as-Tools 装配：Manager 通过工具调用子 Agent，结果回编排层 `[DP 决策 B]`                             | P3-9, P4-10, P2-6 | ✅   | 单次研究可同时用到 crypto + web             |
-| P5-3 | 完整并行 fan-out：依赖分层 + `asyncio.gather` + 单任务超时 + 部分失败降级。**开工先带 D22**：超时 salvage 已拉到的 SEC 三表/季报要进对比表 `metrics` | P5-2              | ⬜   | 1 个任务失败不影响整体出报告；salvage 数字能进对比表 |
+| P5-3 | 完整并行 fan-out：依赖分层 + `asyncio.gather` + 单任务超时 + 部分失败降级。**开工先带 D22**：超时 salvage 已拉到的 SEC 三表/季报要进对比表 `metrics` | P5-2              | ✅   | 1 个任务失败不影响整体出报告；salvage 数字能进对比表 |
 | P5-4 | Merge & Dedup 阶段：source 归一、claim 合并、冲突汇总                                                      | P5-3, P3-10       | ⬜   | 跨 Agent 的重复来源被合并                   |
 | P5-5 | Fact Checker Agent（干净上下文，只看 claims + sources，可复检索）+ 校验事件流                              | P5-4              | ⬜   | 能识别注入的错误声明                        |
 | P5-6 | Gap Check + 最多 1 轮补充研究（`PLAN_UPDATED`）                                                            | P5-5              | ⬜   | 缺关键数据时能补一轮                        |
@@ -220,7 +220,13 @@ ticker 只匹配原文大写独立词，避免 `sol` / `meta` / `hype` 误伤。
 
 规划 prompt 写明：结构化数据与网页分开，一次研究里两者可以同时出现、默认并行。验收是 ScriptedModel：一份含 `crypto_research` + `web_research` 的计划，两次 finding 都进了 `outcome.findings` 和 `AGENT_STARTED`。不是真跑 DeepSeek。
 
-P5-3 开工备忘：**D22** — 超时 salvage 没有把已成功的 SEC 数字写成 `metrics`，对比表 AVGO 列因此缺失。不要只改超时秒数。
+### P5-3 — 完整并行 fan-out + D22 ✅（2026-09-08）
+
+分层、`asyncio.gather`、单任务超时、部分失败降级在 P1-10 已经落地。本任务补的是真 Agent 超时路径：tool 成功时把营收 / 净利 / EPS / 估值 / 行情从结构化结果抽成 `metrics`，记在 collector 上；`salvage_finding` 带进 Writer。对比表只读 `finding.metrics`，以前超时取消时 LLM 没写出数字，AVGO 列就是空的。
+
+不要只改 `TASK_TIMEOUT_S`。数字对齐仍是代码的事，不让模型在 salvage 里补。执行器仍是：一层内并行、一层失败不影响其它任务、超时 finding 留给 Writer、会话照常出报告。`fact_checker` 仍占位（P5-5）。
+
+验收是 ScriptedModel / 替身 runner：三只股票一层 fan-out，一只超时 salvage 仍有营收，对比表三列都在；另一只任务直接失败时会话仍 `SESSION_COMPLETED`。不是真跑 DeepSeek，也没有重跑 Phase 4 四问。
 
 ### P5.5 — MVP 验收 ⬜
 
@@ -922,7 +928,7 @@ Plan 层：`compare` 问题按标的拆取数任务（同层并行），再加�
 #### 本次暴露、不挡验收的问题
 
 1. **FMP HTTP 402。** `/ratios`（历史分位）从问 2 起就 402；问 4 后半段 `/quote`、`/ratios-ttm` 也对 AVGO 402。错误被映射成泛化 `upstream_error`，不是 `QUOTA_EXHAUSTED` / `UNSUPPORTED`。Agent 改搜网页，把 180s 烧完。见 **D21**。
-2. **超时 salvage 的 SEC 数字没进对比表。** AVGO 超时前已经 `get_income_statement` / `get_earnings_summary` 成功，表里仍只有 NVDA/AMD。见 **D22**。
+2. **超时 salvage 的 SEC 数字没进对比表。** AVGO 超时前已经 `get_income_statement` / `get_earnings_summary` 成功，表里仍只有 NVDA/AMD。见 **D22**（P5-3 已在代码路径偿还；未重跑本问）。
 3. **问 1 的营收冲突（96.221B vs 177.837B）** 是同一 SEC 源的两个 XBRL 口径，冲突检测按设计并列，未取平均。可能是单季 vs YTD。
 4. **`get_filing_section(section=mda)` 对 10-Q 抽不出 Item 7**，Agent 改用 Item 2，缺口进了数据限制。
 
@@ -961,11 +967,15 @@ Plan 层：`compare` 问题按标的拆取数任务（同层并行），再加�
 | D19 | ~~`sources` / `claims` 只在事件流里，刷新丢 Source Panel~~ → BFF 投影 + `GET .../events` 回放。进行中会话续订仍是 D4/P6-6                                                                  | 已偿还（2026-09-08）               | ✅   |
 | D20 | ~~单任务 120s 超时会丢弃已成功的工具结果~~ → 超时 salvage finding；并发 4→2、单任务 180s、总预算 600s | 已偿还（2026-09-08） | ✅   |
 | D21 | ~~FMP HTTP 402 被映射成泛化 `upstream_error`，Agent 改搜网页把 180s 烧完~~ → `/ratios` 历史分位 → `UNSUPPORTED`；`/quote` `/ratios-ttm` 等 → `QUOTA_EXHAUSTED`。Stock prompt 禁止为此搜网页凑数 | 已偿还（2026-09-08） | ✅   |
-| D22 | 超时 salvage 已拉到的 SEC 三表/季报没有进对比表 `metrics`，AVGO 列因此缺失。P5-3 开工时一起还，不要只改超时秒数 | P5-3 | ⬜   |
+| D22 | ~~超时 salvage 已拉到的 SEC 三表/季报没有进对比表 `metrics`，AVGO 列因此缺失~~ → tool 成功时抽出标量 metrics，超时 salvage 带进对比表。不要只改超时秒数 | P5-3 | ✅   |
 
 ### D21 — FMP HTTP 402 映射 ✅（2026-09-08）
 
 基类把 4xx 一律标成 `UPSTREAM_ERROR` 且丢掉 body。FMP 的 402 不是瞬时故障：历史 `/ratios`（分位）→ `UNSUPPORTED`；`/quote`、`/ratios-ttm` 等免费档接口 → `QUOTA_EXHAUSTED`。Stock prompt 禁止为此搜网页凑 PE / 报价。未重跑 Phase 4 四问。
+
+### D22 — 超时 salvage 的财务数字进对比表 ✅（2026-09-08）
+
+对比表只读 `finding.metrics`。超时取消时 LLM 还没写出 AgentFinding，salvage 以前只保留来源和 `data_gaps`。tool 成功时现在从利润表 / 季报摘要 / TTM 估值 / 行情抽出标量，记在 collector 上，salvage 带进 Writer。未重跑 Phase 4 四问。
 
 ### D14 偿还记录 — GitHub Actions 首次远端运行（2026-09-07）
 
