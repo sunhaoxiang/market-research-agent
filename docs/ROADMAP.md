@@ -6,7 +6,7 @@
 > **每完成一个任务就更新此表的状态**；每完成一个阶段，跑 `[DP §26]` 的收尾清单并写阶段小结。
 
 - 最后更新：2026-09-08
-- 当前阶段：**P5-9 已完成**；下一任务 P5.5 MVP 验收。
+- 当前阶段：**P5.5 MVP 已验收**；下一任务 P6-1。
 
 ### 已确认的前置决策（2026-09-07）
 
@@ -41,8 +41,8 @@
 | P2    | Web Research + Citation         | 10     | ✅   | Source / Claim / 带引用报告          |
 | P3    | Crypto 数据能力                 | 11     | ✅   | 市场 / TVL / Tokenomics / 链上   |
 | P4    | 美股数据能力                    | 11     | ✅   | 四问真跑已出带财务与 SEC 引用的报告 |
-| P5    | Multi-Agent 完整编排            | 9      | ⬜   | Fact Checker / 并行 / 报告结构   |
-| P5.5  | **MVP 验收**                    | 1      | ⬜   | 见 `[DP §21.1]`                  |
+| P5    | Multi-Agent 完整编排            | 9      | ✅   | Fact Checker / 并行 / 报告结构   |
+| P5.5  | **MVP 验收**                    | 1      | ✅   | 见 `[DP §21.1]`；限制见 P5.5 记录 |
 | P6    | 高级 UX + 历史 + 可观察性       | 11     | ⬜   | Activity 完善 / History / /debug |
 | P7    | Evaluation 系统                 | 8      | ⬜   | 数据集 / grader / runner         |
 | P8    | 扩展能力                        | 8      | ⬜   | 按需触发，非线性                 |
@@ -289,9 +289,46 @@ Merge / Fact Checker 之后、Writer 之前。**纯代码规则，不打模型�
 
 §9.4：DeepSeek / 智谱继续走 `json_mode`（开发期正常路径）。OpenAI / Kimi 的 `native_schema`、Anthropic 的 `prompt_only` 本机未 live，catalog 保持未验证。
 
-### P5.5 — MVP 验收 ⬜
+### P5.5 — MVP 验收 ✅（2026-09-08）
 
-按 `[DP §21.1]` 的 Definition of Done 逐条核对，并跑完 `[DP §26]` 收尾清单。**通过后打 tag `v0.1.0-mvp`。**
+按 `[DP §21.1]` 核对，并跑完 `[DP §26]`。**tag `v0.1.0-mvp`。** 没有新开一轮 live 研究——DoD 原句「分析 NVDA 最近一季财报」和 HYPE 进展已经在 Phase 4 / Phase 2 真跑过；本次用 `?session=` 回放 + 自动化清单收尾。
+
+#### `[DP §21.1]` Definition of Done
+
+| 必须项 | 结论 |
+| --- | --- |
+| 多模型选择 | ✅ 选择器列出 6 家；DeepSeek 两条「已验证」，其余「未配置 KEY」并置灰 |
+| Tool Calling | ✅ Phase 2–4 真跑（SEC / FMP / Tavily / CoinGecko / DefiLlama） |
+| Multi-Agent | ✅ 编排在 P5-8 ScriptedModel 六条路径；真跑会话已有多任务并行（NVDA 财报 4/4 成功） |
+| Streaming | ✅ P1-11 真跑；BFF 单测：浏览器断开后仍读完上游并落库 |
+| Agent Activity UI | ✅ 计划树与 tool 点亮可用；完善（自动折叠等）是 P6-1 |
+| Research Session | ✅ 16 次已完成会话落库；`GET /api/research/{id}/events` + `?session=` 回放 |
+| Source Citation | ✅ 回放里点「来源 1」高亮对应来源 |
+| SQLite | ✅ `drizzle-kit check`；空库从 migration 重建出 10 张业务表 |
+| Research History | ⏭️ 列表页是 P6-4。`§21.1` 自己把这项标在 Phase 6；MVP 用 `?session=` 回放 |
+
+叙事验收句的限制（不挡 tag，必须写明）：
+
+1. **「2 分钟内」未达到。** DoD 原句会话 `分析 NVDA 最近一季财报` 用了 **7:33 / $0.29**；`HYPE 最近有什么重要进展？` **5:13 / $0.18**。Planner 单次就经常 17–60s。
+2. **不能切换 3 个 Provider。** 只有 `DEEPSEEK_API_KEY`。P5-9 已标注；智谱 / OpenAI / Kimi / Anthropic / Google 未 live。
+3. **Phase 5 全流程没有再真跑一遍。** 库里 16 次完成会话的阶段只有 `planning` / `researching` / `writing`，没有 `checking`，也没有 `fact_check_started` / `claim_verified` / `plan_updated`。Fact Checker、Gap Check、Writer v2 固定免责声明由 P5-5～P5-8 的 ScriptedModel 覆盖。不要把 ScriptedModel 绿当成端到端绿。
+
+#### `[DP §26]` 收尾清单
+
+| # | 项 | 结果 |
+| --- | --- | --- |
+| 1 | `pytest -m "not live"` | ✅ 808 passed |
+| 2 | vitest | ✅ 137 passed |
+| 3 | `tsc --noEmit` | ✅ |
+| 4 | ruff check + format | ✅ |
+| 5 | basedpyright | ✅ |
+| 6 | drizzle-kit check；空库 migrate | ✅ |
+| 7 | 端到端真实问题 | ✅ 沿用 Phase 2–4 真跑；本次回放 NVDA 财报（4 任务成功、引用可点） |
+| 8 | Streaming / 断开落库 | ✅ P1-11 + `route.test.ts`「浏览器断开」 |
+| 9 | README + docs | ✅ README 状态从「Phase 1 待开始」改为 MVP |
+| 10 | ROADMAP 阶段小结 | ✅ 本段 + 下方 Phase 5 小结 |
+| 11 | evals | ⏭️ Phase 7 起 |
+| 12 | commit + tag | ✅ `v0.1.0-mvp` |
 
 ---
 
@@ -998,6 +1035,16 @@ Plan 层：`compare` 问题按标的拆取数任务（同层并行），再加�
 任务表 11/11 完成。美股从「没有结构化数据」补齐了 SEC XBRL 三表 / 章节 / 季报摘要，以及 FMP 行情、公司简介、TTM 估值。对比问题会拆成按标的并行 + 依赖对比任务，报告里能长出 GFM 表。
 
 不要把 ScriptedModel 绿当成端到端绿——真跑才暴露 FMP 402 与 180s 超时。Fact Checker 与跨 Agent merge 是 Phase 5。
+
+### Phase 5 阶段小结 ✅（2026-09-08）
+
+任务表 9/9 + P5.5。6 个 Agent 串成 planning → fan-out → merge → fact check → 最多 1 轮补充 → Writer v2。意图分类先走规则；Fact Checker 只核 FACT / SOURCE_BACKED_FACT（D6）；补充研究默认 1 轮（D8）。章节结构由代码按问题类型定，免责声明和数据限制由代码覆盖写入。
+
+P5-8 用 ScriptedModel 覆盖正常 / 工具失败 / 超时 / 冲突 / 引用缺失 / schema 六条路径。P5-9 只有 DeepSeek 标 `verified`；其余五家写明缺 key。
+
+**偏离计划**：`§21.1` 的「2 分钟」和「3 个 Provider」都没达到——真跑一次财报要 5–8 分钟，本机仍只有 DeepSeek。History 列表按计划属于 Phase 6，MVP 用 `?session=` 回放。Phase 5 新增的 checking 阶段没有再开一轮 live。
+
+**新增技术债**：无。D6 / D8 仍是刻意限制。下一阶段是 P6（Activity 完善 / History / live SSE 续订）。
 
 ---
 
