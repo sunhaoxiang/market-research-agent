@@ -1,4 +1,4 @@
-"""按任务类型分派子 Agent。web / crypto 已接真工具；其余仍走占位。"""
+"""按任务类型分派子 Agent。web / crypto / stock 已接真工具；fact_checker 仍走占位。"""
 
 from __future__ import annotations
 
@@ -15,11 +15,17 @@ from agent_service.agents.crypto_research import (
 )
 from agent_service.agents.findings import (
     EMPTY_CRYPTO_SOURCES_GAP,
+    EMPTY_STOCK_SOURCES_GAP,
     assemble_finding,
     salvage_finding,
 )
 from agent_service.agents.placeholder import PlaceholderRunner
 from agent_service.agents.runtime import run_tool_agent
+from agent_service.agents.stock_research import (
+    StockResearchAgent,
+    build_stock_research,
+    stock_research_user_message,
+)
 from agent_service.agents.web_research import (
     WebResearchAgent,
     build_web_research,
@@ -52,10 +58,11 @@ if TYPE_CHECKING:
     )
 
 type _UserMessage = Callable[..., str]
+type _BuiltAgent = WebResearchAgent | CryptoResearchAgent | StockResearchAgent
 
 
 class SubAgentRunner:
-    """`TaskRunner`：web_research / crypto_research 走真 Agent，其它任务仍是占位。"""
+    """`TaskRunner`：web / crypto / stock 走真 Agent，fact_checker 仍是占位。"""
 
     def __init__(
         self,
@@ -74,6 +81,7 @@ class SubAgentRunner:
     ) -> None:
         self._web = build_web_research(registry)
         self._crypto = build_crypto_research(registry)
+        self._stock = build_stock_research(registry)
         self._placeholder = PlaceholderRunner(fallback_model_id)
         self._limits = limits
         self._search = search
@@ -90,6 +98,8 @@ class SubAgentRunner:
             return self._web.model_id
         if agent is AgentName.CRYPTO_RESEARCH:
             return self._crypto.model_id
+        if agent is AgentName.STOCK_RESEARCH:
+            return self._stock.model_id
         return self._placeholder.model_id_for(agent)
 
     async def run(self, context: TaskContext, state: ResearchState) -> ResearchFinding:
@@ -108,11 +118,19 @@ class SubAgentRunner:
                 user_message=crypto_research_user_message,
                 empty_sources_gap=EMPTY_CRYPTO_SOURCES_GAP,
             )
+        if context.task.agent is AgentName.STOCK_RESEARCH:
+            return await self._run_built(
+                self._stock,
+                context,
+                state,
+                user_message=stock_research_user_message,
+                empty_sources_gap=EMPTY_STOCK_SOURCES_GAP,
+            )
         return await self._placeholder.run(context, state)
 
     async def _run_built(
         self,
-        built: WebResearchAgent | CryptoResearchAgent,
+        built: _BuiltAgent,
         context: TaskContext,
         state: ResearchState,
         *,
@@ -198,7 +216,7 @@ class SubAgentRunner:
 
     def _record(
         self,
-        built: WebResearchAgent | CryptoResearchAgent,
+        built: _BuiltAgent,
         state: ResearchState,
         started: float,
         task: ResearchTask,

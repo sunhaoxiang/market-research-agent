@@ -1,4 +1,4 @@
-"""SEC 申报列表、章节正文、XBRL facts 与财报摘要。P4-10 再接到 Stock Research Agent。"""
+"""SEC 申报列表、章节正文、XBRL facts 与财报摘要。已接到 Stock Research Agent。"""
 
 from agent_service.tools.sec.bindings import (
     SEC_TOOLS,

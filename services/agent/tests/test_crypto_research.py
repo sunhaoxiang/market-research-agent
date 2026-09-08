@@ -553,7 +553,7 @@ async def test_crypto_runner_salvages_collector_on_cancel(
     assert any("没有免费 API" in gap for gap in saved.data_gaps)
 
 
-async def test_sub_agent_runner_still_placeholders_stock() -> None:
+async def test_sub_agent_runner_still_placeholders_fact_checker() -> None:
     runner = SubAgentRunner(
         _registry(),
         limits=IsolatedExecutionLimits(),
@@ -561,8 +561,9 @@ async def test_sub_agent_runner_still_placeholders_stock() -> None:
     )
     bus = EventBus("sess-ph", heartbeat_interval_s=60.0)
     state = ResearchState("sess-ph", "问题", bus=bus)
-    task = ResearchTask(id="t1", agent=AgentName.STOCK_RESEARCH, objective="获取财报")
+    task = ResearchTask(id="t1", agent=AgentName.FACT_CHECKER, objective="核对陈述")
     finding = await runner.run(TaskContext(task=task), state)
     assert finding.data_gaps == [NOT_IMPLEMENTED_GAP]
     assert runner.model_id_for(AgentName.CRYPTO_RESEARCH).startswith("deepseek:")
     assert runner.model_id_for(AgentName.WEB_RESEARCH).startswith("deepseek:")
+    assert runner.model_id_for(AgentName.STOCK_RESEARCH).startswith("deepseek:")

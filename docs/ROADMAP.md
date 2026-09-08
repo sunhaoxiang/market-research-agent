@@ -6,7 +6,7 @@
 > **每完成一个任务就更新此表的状态**；每完成一个阶段，跑 `[DP §26]` 的收尾清单并写阶段小结。
 
 - 最后更新：2026-09-08
-- 当前阶段：**P4-9 完成**。下一任务 P4-10 Stock Research Agent。
+- 当前阶段：**P4-10 完成**。下一任务 P4-11 多标的对比。
 
 ### 已确认的前置决策（2026-09-07）
 
@@ -179,7 +179,7 @@ hash 跨会话稳定，说明 §9.8 的缓存前缀约束真的守住了；95.4%
 | P4-7  | `tools/financials/get_valuation_metrics` + `get_valuation_history`（历史估值分位）                                         | P4-1         | ✅   | "NVDA PE 处于 5 年 X 分位"可回答    |
 | P4-8  | `tools/sec/`：`list_sec_filings` / `get_filing_section`（10-K Item 1A/7、10-Q）/ `get_xbrl_facts` / `get_earnings_summary` | P4-2         | ✅   | 能取出指定章节正文                  |
 | P4-9  | 大文件处理策略：10-K 全文分节 + 按需截取 + 永久缓存（避免爆上下文）                                                        | P4-8         | ✅   | 单次注入上下文可控                  |
-| P4-10 | Stock Research Agent + prompt                                                                                              | P4-4~P4-9    | ⬜   | 对 4 个样例股票问题产出完整 finding |
+| P4-10 | Stock Research Agent + prompt                                                                                              | P4-4~P4-9    | ✅   | 对 4 个样例股票问题产出完整 finding |
 | P4-11 | 多标的对比支持：Plan 层生成依赖任务 + 报告对比表格                                                                         | P4-10, P1-10 | ⬜   | 「比较 NVDA/AMD/AVGO 基本面」可用   |
 
 **阶段验收**：「NVDA 是做什么的」「分析 NVDA 最近一季财报」「NVDA 估值贵不贵」「比较 NVDA、AMD、AVGO」四个问题都能产出带财务数据与 SEC 引用的报告。
@@ -816,6 +816,21 @@ HTML 仍按 accession **永久缓存**（`CacheTTL.PERMANENT`），不把整份 
 - 任意 10-K/10-Q Item 编号都可取（含 9A）；对不上是 `NOT_FOUND`，乱写 section 才是 `INVALID_INPUT`。
 
 不要在本项接 Stock Research Agent（那是 P4-10）。
+
+### P4-10 — Stock Research Agent ✅（2026-09-08）
+
+工具集是 stocks + financials + sec + `compute_metrics` + web。LLM 只输出 `AgentFinding`（短引用 `s1`/`s2`），编排层补全 Source / `claim.source_ids`。`ModelRole.BALANCED`，`temperature=0.3`。含网页工具，所以拼上 `untrusted_web`。日期和 objective 放 user 消息（§9.8）。
+
+几个刻意的边界：
+
+- 先 `resolve_ticker` 再取数。后续 `ticker` 必须是代号（`NVDA`），不要再传公司名。
+- 三表优先 SEC XBRL；章节用 `outline` + `offset` 续取，不要整份 10-K。
+- `quality.missing_fields` / `unsupported` / `ok=false` → `data_gaps`。空字段不是 0。
+- 不要把 STOCK / FINANCIALS / SEC 工具挂到 Crypto / Web Research Agent。
+- 占位 runner 只剩 `fact_checker`。Plan 层并行任务 + 报告对比表格是 **P4-11**；本项 Agent 可以对多 ticker 调工具，但不做编排层对比表。
+- 验收用 ScriptedModel 覆盖四问，不是真跑 DeepSeek 端到端。阶段验收四问仍待 P4-11 / 真跑。
+
+验收四问（finding，非完整报告）：「NVDA 是做什么的」「分析 NVDA 最近一季财报」「NVDA 估值贵不贵」「比较 NVDA、AMD、AVGO」。最近一季有 10-Q 时用季报（fake Q2 营收 46.743B）；年报路径仍钉 FY2025 营收 130,497,000,000（P4-5 / P4-8）。
 
 ---
 

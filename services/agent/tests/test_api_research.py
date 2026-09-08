@@ -21,6 +21,7 @@ from agent_service.agents.crypto_research import CryptoResearchAgent, build_cryp
 from agent_service.agents.placeholder import NOT_IMPLEMENTED_GAP, PlaceholderRunner
 from agent_service.agents.report_writer import ReportWriterAgent, build_report_writer
 from agent_service.agents.research_manager import PlannerAgent, build_research_manager
+from agent_service.agents.stock_research import StockResearchAgent, build_stock_research
 from agent_service.api import research as research_api
 from agent_service.api.sse import encode_comment, encode_event
 from agent_service.config import get_settings
@@ -134,6 +135,21 @@ def _scripted_crypto() -> CryptoResearchAgent:
     )
 
 
+def _scripted_stock() -> StockResearchAgent:
+    registry = ModelRegistry(
+        IsolatedSettings(
+            providers=IsolatedProviderCredentials(deepseek_api_key=SecretStr("sk-test"))
+        )
+    )
+    built = build_stock_research(registry)
+    return StockResearchAgent(
+        agent=built.agent.clone(model=ScriptedModel([[assistant_message(_crypto_finding_json())]])),
+        strategy=built.strategy,
+        entry=built.entry,
+        prompt=built.prompt,
+    )
+
+
 def _scripted_writer() -> ReportWriterAgent:
     registry = ModelRegistry(
         IsolatedSettings(
@@ -187,6 +203,10 @@ def client(only_deepseek: None, monkeypatch: pytest.MonkeyPatch) -> TestClient:
     monkeypatch.setattr(
         "agent_service.agents.runner.build_crypto_research",
         lambda registry, model_id=None: _scripted_crypto(),
+    )
+    monkeypatch.setattr(
+        "agent_service.agents.runner.build_stock_research",
+        lambda registry, model_id=None: _scripted_stock(),
     )
     return TestClient(create_app())
 
@@ -399,7 +419,7 @@ def test_placeholder_still_drives_the_agent_lifecycle(
     """占位 runner 也要产生完整的 started/progress/completed。
 
     前端 Activity Panel（P1-12）要靠这三个事件验证渲染，缺一个就没法开工。
-    crypto_research 已在 P3-9 接真工具，这里用仍走占位的 stock_research。
+    web / crypto / stock 已接真工具，这里用仍走占位的 fact_checker。
     """
     del client
     monkeypatch.setattr(
@@ -410,8 +430,8 @@ def test_placeholder_still_drives_the_agent_lifecycle(
                 tasks=[
                     {
                         "id": "t1",
-                        "agent": "stock_research",
-                        "objective": "获取 NVDA 最近一季营收",
+                        "agent": "fact_checker",
+                        "objective": "核对 NVDA 最近一季营收陈述",
                         "entities": [],
                         "suggested_tools": [],
                         "depends_on": [],
@@ -440,7 +460,7 @@ async def test_placeholder_discloses_that_no_data_was_fetched() -> None:
     """
     bus = EventBus("sess-1", heartbeat_interval_s=60.0)
     state = ResearchState("sess-1", "问题", bus=bus)
-    task = ResearchTask(id="t1", agent=AgentName.STOCK_RESEARCH, objective="获取手续费收入")
+    task = ResearchTask(id="t1", agent=AgentName.FACT_CHECKER, objective="核对营收陈述")
 
     finding = await PlaceholderRunner("deepseek:deepseek-v4-pro").run(
         TaskContext(task=task, upstream=(), missing_upstream=()), state

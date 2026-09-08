@@ -16,6 +16,7 @@ from agent_service.tools.web.collector import SourceCollector
 
 EMPTY_WEB_SOURCES_GAP = "本次任务未获得任何网页来源"
 EMPTY_CRYPTO_SOURCES_GAP = "本次任务未获得任何来源"
+EMPTY_STOCK_SOURCES_GAP = "本次任务未获得任何来源"
 TIMEOUT_INCOMPLETE_GAP = (
     "任务超过 {timeout_s:.0f}s 未完成，未能输出结构化发现。以下来源与工具缺口是超时前已收集的。"
 )

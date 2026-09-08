@@ -1,4 +1,4 @@
-"""给 Agents SDK 用的 `@function_tool` 包装。P4-10 再挂到 Stock Research Agent。"""
+"""给 Agents SDK 用的 `@function_tool` 包装。已挂到 Stock Research Agent。"""
 
 from __future__ import annotations
 
