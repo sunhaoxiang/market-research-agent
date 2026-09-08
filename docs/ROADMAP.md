@@ -238,7 +238,7 @@ ticker 只匹配原文大写独立词，避免 `sol` / `meta` / `hype` 误伤。
 
 ### P5-5 — Fact Checker ✅（2026-09-08）
 
-独立 Agent，干净上下文：user 消息只有待核 `Claim[]` + `Source[]` 和日期，不看用户原问题、任务摘要或产出 claim 时的推理。工具只有 `web_search` / `web_fetch`（拼 `untrusted_web`）。`ModelRole.BALANCED`，一次 LLM 调用。
+独立 Agent，干净上下文：user 消息只有待核 `Claim[]` + `Source[]` 和日期，不看用户原问题、任务摘要或产出 claim 时的推理。工具只有 `web_search` / `web_fetch`（拼 `untrusted_web`）。`ModelRole.BALANCED`。D23：D6 过滤后再按优先级最多核 12 条、每批 8 条；一批超时保留已裁定的批次。
 
 调用方是 **pipeline**（Merge 之后、Writer 之前），不是计划任务。Planner prompt 禁止出现 `fact_checker`；计划里若仍出现则继续占位，避免跑两遍。
 
@@ -348,7 +348,7 @@ Merge / Fact Checker 之后、Writer 之前。**纯代码规则，不打模型�
 
 **通过的验收句**：Phase 5 编排在真 DeepSeek 上能从规划走到报告，Writer v2 章节和免责声明都在。
 
-**这次才暴露的问题**：深研会产出几十条 `source_backed_fact`，Fact Checker 一次塞进去、`task_timeout_s=180` 不够用，等于这次核查没产出。见 **D23**。会话总时长 11 分钟，仍不是「2 分钟」。
+**这次才暴露的问题**：深研会产出几十条 `source_backed_fact`，Fact Checker 一次塞进去、`task_timeout_s=180` 不够用，等于这次核查没产出。见 **D23**（已在代码路径偿还：截断 12 + 拆批；未重跑本问）。会话总时长 11 分钟，仍不是「2 分钟」。
 
 ---
 
@@ -1062,9 +1062,9 @@ Plan 层：`compare` 问题按标的拆取数任务（同层并行），再加�
 
 P5-8 用 ScriptedModel 覆盖正常 / 工具失败 / 超时 / 冲突 / 引用缺失 / schema 六条路径。P5-9 只有 DeepSeek 标 `verified`；其余五家写明缺 key。
 
-**偏离计划**：`§21.1` 的「2 分钟」和「3 个 Provider」都没达到——真跑一次财报/深研要 5–11 分钟，本机仍只有 DeepSeek。History 列表按计划属于 Phase 6，MVP 用 `?session=` 回放。P5.5 后补跑 HYPE 投资研究：checking 出现了，但 62 条陈述让 Fact Checker 180s 超时（D23）。
+**偏离计划**：`§21.1` 的「2 分钟」和「3 个 Provider」都没达到——真跑一次财报/深研要 5–11 分钟，本机仍只有 DeepSeek。History 列表按计划属于 Phase 6，MVP 用 `?session=` 回放。P5.5 后补跑 HYPE 投资研究：checking 出现了，但 62 条陈述让 Fact Checker 180s 超时（D23，已截断并拆批偿还，未重跑）。
 
-**新增技术债**：D23（深研时 Fact Checker 一次核几十条会超时）。D6 / D8 仍是刻意限制。下一阶段是 P6（Activity 完善 / History / live SSE 续订）。
+**新增技术债**：D6 / D8 仍是刻意限制。下一阶段是 P6（Activity 完善 / History / live SSE 续订）。
 
 ---
 
@@ -1096,7 +1096,7 @@ P5-8 用 ScriptedModel 覆盖正常 / 工具失败 / 超时 / 冲突 / 引用缺
 | D20 | ~~单任务 120s 超时会丢弃已成功的工具结果~~ → 超时 salvage finding；并发 4→2、单任务 180s、总预算 600s | 已偿还（2026-09-08） | ✅   |
 | D21 | ~~FMP HTTP 402 被映射成泛化 `upstream_error`，Agent 改搜网页把 180s 烧完~~ → `/ratios` 历史分位 → `UNSUPPORTED`；`/quote` `/ratios-ttm` 等 → `QUOTA_EXHAUSTED`。Stock prompt 禁止为此搜网页凑数 | 已偿还（2026-09-08） | ✅   |
 | D22 | ~~超时 salvage 已拉到的 SEC 三表/季报没有进对比表 `metrics`，AVGO 列因此缺失~~ → tool 成功时抽出标量 metrics，超时 salvage 带进对比表。不要只改超时秒数 | P5-3 | ✅   |
-| D23 | 深研一次可产出 60+ 条 `source_backed_fact`，Fact Checker 单次调用在 `task_timeout_s=180` 内超时，0 条裁定；会话按设计继续写报告 | 按需 | ⬜   |
+| D23 | ~~深研一次可产出 60+ 条 `source_backed_fact`，Fact Checker 单次调用在 `task_timeout_s=180` 内超时，0 条裁定~~ → 按优先级最多核 12 条、每批 8 条、单批 60s；一批超时保留已裁定结果 | 已偿还（2026-09-08） | ✅   |
 
 ### D21 — FMP HTTP 402 映射 ✅（2026-09-08）
 
@@ -1106,9 +1106,11 @@ P5-8 用 ScriptedModel 覆盖正常 / 工具失败 / 超时 / 冲突 / 引用缺
 
 对比表只读 `finding.metrics`。超时取消时 LLM 还没写出 AgentFinding，salvage 以前只保留来源和 `data_gaps`。tool 成功时现在从利润表 / 季报摘要 / TTM 估值 / 行情抽出标量，记在 collector 上，salvage 带进 Writer。未重跑 Phase 4 四问。
 
-### D23 — Fact Checker 深研超时（2026-09-08）
+### D23 — Fact Checker 深研超时 ✅（2026-09-08）
 
-HYPE 投资研究真跑：D6 过滤后仍有 62 条 `source_backed_fact` 进一次 Fact Checker。`timeout_s = min(task_timeout_s, 剩余总预算)` 取到 180s，到点 0 条 `claim_verified`，WARNING 后继续 Writer。降级路径符合 §7.2，但等于这次核查没发生。可选方向：再收一档 high-impact、拆批、或给 checking 单独预算。未改代码。
+HYPE 投资研究真跑：D6 过滤后仍有 62 条 `source_backed_fact` 进一次 Fact Checker。`timeout_s = min(task_timeout_s, 剩余总预算)` 取到 180s，到点 0 条 `claim_verified`，WARNING 后继续 Writer。
+
+偿还：D6 过滤后再按 FACT → 高置信 → 有来源排序，最多核 12 条（超额发 `fact_check.truncated`）；每批 8 条、单批超时 60s；`apply_fact_check` 合并而非覆盖。一批超时或剩余不足 20s 则停止后续批次，已裁定的保留。未重跑 HYPE live。
 
 ### D14 偿还记录 — GitHub Actions 首次远端运行（2026-09-07）
 

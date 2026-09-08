@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 
+import pytest
 from agents.testing import ScriptedModel, assistant_message
 from pydantic import SecretStr
 
@@ -15,12 +16,20 @@ from agent_service.agents.fact_checker import (
 )
 from agent_service.agents.report_writer import ReportWriterAgent, build_report_writer
 from agent_service.agents.research_manager import PlannerAgent, build_research_manager
+from agent_service.agents.runtime import ToolAgentRun
 from agent_service.models.registry import ModelRegistry
 from agent_service.observability.event_bus import EventBus
 from agent_service.orchestrator.checker import (
+    CHECK_BATCH_SIZE,
     FAILED_WARNING_CODE,
+    MAX_CHECK_CLAIMS,
+    SKIPPED_WARNING_CODE,
+    TIMEOUT_WARNING_CODE,
+    TRUNCATED_WARNING_CODE,
     apply_fact_check,
+    check_facts,
     high_impact_claims,
+    select_claims_to_check,
 )
 from agent_service.orchestrator.executor import TaskContext
 from agent_service.orchestrator.pipeline import run_research
@@ -37,9 +46,11 @@ from agent_service.schemas.common import (
 from agent_service.schemas.events import (
     ClaimVerifiedPayload,
     EventType,
+    FactCheckProgressPayload,
     FactCheckStartedPayload,
     ResearchEvent,
     StageChangedPayload,
+    TokenUsage,
     WarningPayload,
 )
 from agent_service.schemas.findings import ClaimVerification, FactCheckResult, ResearchFinding
@@ -105,6 +116,34 @@ def _analysis_claim() -> Claim:
     )
 
 
+def _claim(
+    claim_id: str,
+    *,
+    epistemic: EpistemicType = EpistemicType.SOURCE_BACKED_FACT,
+    confidence: ConfidenceLevel = ConfidenceLevel.LOW,
+    source_ids: list[str] | None = None,
+) -> Claim:
+    return Claim(
+        id=claim_id,
+        text=f"陈述 {claim_id}",
+        epistemic_type=epistemic,
+        confidence=confidence,
+        source_ids=source_ids or [],
+        task_id="t1",
+        agent=AgentName.CRYPTO_RESEARCH.value,
+    )
+
+
+def _finding(claims: list[Claim], sources: list[Source] | None = None) -> ResearchFinding:
+    return ResearchFinding(
+        task_id="t1",
+        agent=AgentName.CRYPTO_RESEARCH,
+        summary="摘要",
+        claims=claims,
+        sources=sources or [],
+    )
+
+
 def _plan_json() -> str:
     return json.dumps(
         {
@@ -159,6 +198,26 @@ def _check_json(*, claim_id: str = _FALSE_CLAIM_ID, verification: str = "refuted
                     "confidence_adjustment": "low",
                     "additional_source_refs": [],
                 }
+            ],
+            "conflicts": [],
+            "notes": [],
+        },
+        ensure_ascii=False,
+    )
+
+
+def _check_json_many(claim_ids: list[str], *, verification: str = "verified") -> str:
+    return json.dumps(
+        {
+            "verifications": [
+                {
+                    "claim_id": claim_id,
+                    "verification": verification,
+                    "note": "核过",
+                    "confidence_adjustment": "high",
+                    "additional_source_refs": [],
+                }
+                for claim_id in claim_ids
             ],
             "conflicts": [],
             "notes": [],
@@ -299,6 +358,52 @@ def test_apply_writes_verification_and_skips_analysis() -> None:
     assert by_id[_ANALYSIS_CLAIM_ID].verification is VerificationStatus.UNVERIFIED
 
 
+def test_apply_merges_batches_instead_of_replacing() -> None:
+    first = _claim("claim-a", confidence=ConfidenceLevel.HIGH)
+    second = _claim("claim-b", confidence=ConfidenceLevel.HIGH)
+    bus = _bus()
+    state = ResearchState("sess-p5-5", "问题", bus=bus)
+    state.findings = [_finding([first, second])]
+    apply_fact_check(
+        state,
+        FactCheckResult(
+            verifications=[
+                ClaimVerification(
+                    claim_id="claim-a",
+                    verification=VerificationStatus.VERIFIED,
+                    note="第一批",
+                )
+            ],
+            notes=["batch-1"],
+        ),
+        allowed={"claim-a"},
+        progress_ids={"claim-a", "claim-b"},
+        progress_total=2,
+    )
+    apply_fact_check(
+        state,
+        FactCheckResult(
+            verifications=[
+                ClaimVerification(
+                    claim_id="claim-b",
+                    verification=VerificationStatus.REFUTED,
+                    note="第二批",
+                )
+            ],
+            notes=["batch-2"],
+        ),
+        allowed={"claim-b"},
+        progress_ids={"claim-a", "claim-b"},
+        progress_total=2,
+    )
+    assert state.fact_check is not None
+    assert [item.claim_id for item in state.fact_check.verifications] == ["claim-a", "claim-b"]
+    assert state.fact_check.notes == ["batch-1", "batch-2"]
+    by_id = {claim.id: claim for finding in state.findings for claim in finding.claims}
+    assert by_id["claim-a"].verification is VerificationStatus.VERIFIED
+    assert by_id["claim-b"].verification is VerificationStatus.REFUTED
+
+
 async def test_injected_false_claim_is_refuted() -> None:
     """验收：能识别注入的错误声明。"""
     source = _source()
@@ -415,3 +520,202 @@ async def test_checker_failure_does_not_fail_the_session() -> None:
     assert any(_payload(event, WarningPayload).code == FAILED_WARNING_CODE for event in warnings)
     assert EventType.SESSION_COMPLETED in [event.type for event in events]
     assert EventType.SESSION_FAILED not in [event.type for event in events]
+
+
+def test_select_ranks_fact_high_over_low_source_backed() -> None:
+    source = _source()
+    lows = [_claim(f"claim-low-{i:02d}", source_ids=[source.id]) for i in range(12)]
+    analysis = _analysis_claim()
+    unsourced_high = _claim(
+        "claim-sbf-high-unsourced",
+        confidence=ConfidenceLevel.HIGH,
+    )
+    sourced_high = _claim(
+        "claim-sbf-high-sourced",
+        confidence=ConfidenceLevel.HIGH,
+        source_ids=[source.id],
+    )
+    fact_high = _claim(
+        "claim-fact-high",
+        epistemic=EpistemicType.FACT,
+        confidence=ConfidenceLevel.HIGH,
+        source_ids=[source.id],
+    )
+    finding = _finding(
+        [*lows, analysis, unsourced_high, sourced_high, fact_high],
+        [source],
+    )
+    selected = select_claims_to_check([finding])
+    assert len(selected) == MAX_CHECK_CLAIMS
+    assert [claim.id for claim in selected[:3]] == [
+        "claim-fact-high",
+        "claim-sbf-high-sourced",
+        "claim-sbf-high-unsourced",
+    ]
+    assert [claim.id for claim in selected[3:]] == [f"claim-low-{i:02d}" for i in range(9)]
+    assert "claim-low-09" not in {claim.id for claim in selected}
+    assert _ANALYSIS_CLAIM_ID not in {claim.id for claim in selected}
+
+
+async def test_truncates_started_count_and_warns() -> None:
+    source = _source()
+    claims = [_claim(f"claim-{i:02d}", source_ids=[source.id]) for i in range(15)]
+    bus = _bus()
+    state = ResearchState("sess-d23", "问题", bus=bus)
+    state.source_registry.replace_all([source])
+    state.findings = [_finding(claims, [source])]
+    selected = [claim.id for claim in select_claims_to_check(state.findings)]
+    assert selected == [f"claim-{i:02d}" for i in range(MAX_CHECK_CLAIMS)]
+    await check_facts(
+        state,
+        _checker(
+            _check_json_many(selected[:CHECK_BATCH_SIZE]),
+            _check_json_many(selected[CHECK_BATCH_SIZE:]),
+        ),
+        limits=_limits(),
+        now=_NOW,
+    )
+    events = await _drain(bus)
+    started = next(event for event in events if event.type is EventType.FACT_CHECK_STARTED)
+    assert _payload(started, FactCheckStartedPayload).claim_count == MAX_CHECK_CLAIMS
+    warnings = [
+        _payload(event, WarningPayload) for event in events if event.type is EventType.WARNING
+    ]
+    truncated = next(item for item in warnings if item.code == TRUNCATED_WARNING_CODE)
+    assert "15" in truncated.message
+    assert "12" in truncated.message
+    by_id = {claim.id: claim for finding in state.findings for claim in finding.claims}
+    assert by_id["claim-00"].verification is VerificationStatus.VERIFIED
+    assert by_id["claim-11"].verification is VerificationStatus.VERIFIED
+    assert by_id["claim-12"].verification is VerificationStatus.UNVERIFIED
+
+
+async def test_check_facts_splits_into_batches() -> None:
+    source = _source()
+    claims = [
+        _claim(f"claim-{i:02d}", confidence=ConfidenceLevel.HIGH, source_ids=[source.id])
+        for i in range(MAX_CHECK_CLAIMS)
+    ]
+    bus = _bus()
+    state = ResearchState("sess-d23", "问题", bus=bus)
+    state.source_registry.replace_all([source])
+    state.findings = [_finding(claims, [source])]
+    ids = [claim.id for claim in claims]
+    await check_facts(
+        state,
+        _checker(
+            _check_json_many(ids[:CHECK_BATCH_SIZE]),
+            _check_json_many(ids[CHECK_BATCH_SIZE:]),
+        ),
+        limits=_limits(),
+        now=_NOW,
+    )
+    by_id = {claim.id: claim for finding in state.findings for claim in finding.claims}
+    assert all(by_id[claim_id].verification is VerificationStatus.VERIFIED for claim_id in ids)
+    assert state.fact_check is not None
+    assert len(state.fact_check.verifications) == MAX_CHECK_CLAIMS
+    events = await _drain(bus)
+    metrics = [
+        event
+        for event in events
+        if event.type is EventType.AGENT_RUN_METRICS
+        and getattr(event.payload, "agent", None) is AgentName.FACT_CHECKER
+    ]
+    assert len(metrics) == 2
+    progress = [
+        _payload(event, FactCheckProgressPayload)
+        for event in events
+        if event.type is EventType.FACT_CHECK_PROGRESS
+    ]
+    assert progress[-1].checked == MAX_CHECK_CLAIMS
+    assert progress[-1].total == MAX_CHECK_CLAIMS
+
+
+async def test_later_batch_timeout_keeps_first_and_skips_rest(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = _source()
+    claims = [
+        _claim(f"claim-{i:02d}", confidence=ConfidenceLevel.HIGH, source_ids=[source.id])
+        for i in range(MAX_CHECK_CLAIMS)
+    ]
+    bus = _bus()
+    state = ResearchState("sess-d23", "问题", bus=bus)
+    state.source_registry.replace_all([source])
+    state.findings = [_finding(claims, [source])]
+    monkeypatch.setattr("agent_service.orchestrator.checker.CHECK_BATCH_SIZE", 4)
+    calls = {"n": 0}
+
+    async def fake_run(*args: object, **kwargs: object) -> ToolAgentRun[FactCheckResult]:
+        del args, kwargs
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return _verified_run([claim.id for claim in claims[:4]])
+        raise TimeoutError
+
+    monkeypatch.setattr("agent_service.orchestrator.checker.run_tool_agent", fake_run)
+    await check_facts(state, _checker(), limits=_limits(), now=_NOW)
+    assert calls["n"] == 2
+    by_id = {claim.id: claim for finding in state.findings for claim in finding.claims}
+    assert by_id["claim-00"].verification is VerificationStatus.VERIFIED
+    assert by_id["claim-03"].verification is VerificationStatus.VERIFIED
+    assert by_id["claim-04"].verification is VerificationStatus.UNVERIFIED
+    events = await _drain(bus)
+    warnings = [
+        _payload(event, WarningPayload) for event in events if event.type is EventType.WARNING
+    ]
+    assert any(item.code == TIMEOUT_WARNING_CODE for item in warnings)
+
+
+async def test_skips_later_batch_when_budget_low(monkeypatch: pytest.MonkeyPatch) -> None:
+    source = _source()
+    claims = [
+        _claim(f"claim-{i:02d}", confidence=ConfidenceLevel.HIGH, source_ids=[source.id])
+        for i in range(MAX_CHECK_CLAIMS)
+    ]
+    bus = _bus()
+    state = ResearchState("sess-d23", "问题", bus=bus)
+    state.source_registry.replace_all([source])
+    state.findings = [_finding(claims, [source])]
+    remaining = [100.0, 100.0, 5.0]
+
+    def fake_remaining(total_timeout_s: float) -> float:
+        del total_timeout_s
+        return remaining.pop(0) if remaining else 5.0
+
+    monkeypatch.setattr(state, "remaining_s", fake_remaining)
+    calls = {"n": 0}
+
+    async def fake_run(*args: object, **kwargs: object) -> ToolAgentRun[FactCheckResult]:
+        del args, kwargs
+        calls["n"] += 1
+        return _verified_run([claim.id for claim in claims[:CHECK_BATCH_SIZE]])
+
+    monkeypatch.setattr("agent_service.orchestrator.checker.run_tool_agent", fake_run)
+    await check_facts(state, _checker(), limits=_limits(), now=_NOW)
+    assert calls["n"] == 1
+    by_id = {claim.id: claim for finding in state.findings for claim in finding.claims}
+    assert by_id["claim-00"].verification is VerificationStatus.VERIFIED
+    assert by_id["claim-08"].verification is VerificationStatus.UNVERIFIED
+    events = await _drain(bus)
+    warnings = [
+        _payload(event, WarningPayload) for event in events if event.type is EventType.WARNING
+    ]
+    assert any(item.code == SKIPPED_WARNING_CODE for item in warnings)
+
+
+def _verified_run(claim_ids: list[str]) -> ToolAgentRun[FactCheckResult]:
+    return ToolAgentRun(
+        output=FactCheckResult(
+            verifications=[
+                ClaimVerification(
+                    claim_id=claim_id,
+                    verification=VerificationStatus.VERIFIED,
+                    note="ok",
+                )
+                for claim_id in claim_ids
+            ]
+        ),
+        attempts=1,
+        usage=TokenUsage(),
+    )
