@@ -141,7 +141,7 @@ def _structured_url(data: object) -> str | None:
 
 
 def _structured_title(data: object) -> str | None:
-    for attr in ("name", "title", "chain", "protocol", "coin_id", "query"):
+    for attr in ("name", "title", "ticker", "symbol", "chain", "protocol", "coin_id", "query"):
         value = getattr(data, attr, None)
         if isinstance(value, str) and value.strip():
             return value

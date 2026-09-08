@@ -97,6 +97,7 @@ async def stream_research(request: ResearchRequest, http_request: Request) -> St
         defillama=getattr(http_request.app.state, "defillama", None),
         hyperliquid=getattr(http_request.app.state, "hyperliquid", None),
         sec_edgar=getattr(http_request.app.state, "sec_edgar", None),
+        fmp=getattr(http_request.app.state, "fmp", None),
         clock=None if runtime is None else runtime.clock,
         fallback_model_id=planner.model_id,
     )

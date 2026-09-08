@@ -41,6 +41,7 @@ def _deps(request: Request) -> ToolDeps:
         defillama=getattr(request.app.state, "defillama", None),
         hyperliquid=getattr(request.app.state, "hyperliquid", None),
         sec_edgar=getattr(request.app.state, "sec_edgar", None),
+        fmp=getattr(request.app.state, "fmp", None),
         clock=None if runtime is None else runtime.clock,
     )
 

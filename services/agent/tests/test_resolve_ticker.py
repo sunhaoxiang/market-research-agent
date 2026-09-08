@@ -192,4 +192,4 @@ async def test_invoke_registry() -> None:
 
 
 def test_function_tool_name_is_stable() -> None:
-    assert [tool.name for tool in STOCK_TOOLS] == ["resolve_ticker"]
+    assert STOCK_TOOLS[0].name == "resolve_ticker"

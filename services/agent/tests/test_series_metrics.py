@@ -11,6 +11,7 @@ from agent_service.sources.registry import SourceRegistry
 from agent_service.tools.crypto.models import CryptoPriceHistoryData, CryptoPricePoint
 from agent_service.tools.defi.models import TvlData, TvlPointData
 from agent_service.tools.series_metrics import emit_series_metrics, metrics_from_tool_data
+from agent_service.tools.stocks.models import StockBarData, StockPriceHistoryData
 from agent_service.tools.web.collector import SourceCollector
 
 _NOW = datetime(2026, 9, 8, tzinfo=UTC)
@@ -57,6 +58,26 @@ def test_price_history_becomes_price_points() -> None:
     assert [item.name for item in points] == ["price", "price"]
     assert points[0].unit == "USD"
     assert points[0].entity_symbol == "hyperliquid"
+
+
+def test_stock_price_history_becomes_price_points() -> None:
+    data = StockPriceHistoryData(
+        ticker="NVDA",
+        days=30,
+        start=_NOW.date() - timedelta(days=30),
+        end=_NOW.date(),
+        bars=[
+            StockBarData(session=(_NOW - timedelta(days=30)).date(), close=100.0),
+            StockBarData(session=_NOW.date(), close=120.5),
+        ],
+        url="https://financialmodelingprep.com/financial-summary/NVDA",
+    )
+    points = metrics_from_tool_data(data, "s3")
+    assert [item.name for item in points] == ["price", "price"]
+    assert points[0].unit == "USD"
+    assert points[0].entity_symbol == "NVDA"
+    assert points[-1].value == 120.5
+    assert points[-1].as_of == datetime(_NOW.year, _NOW.month, _NOW.day, tzinfo=UTC)
 
 
 async def test_emit_series_metrics_sends_metric_found() -> None:

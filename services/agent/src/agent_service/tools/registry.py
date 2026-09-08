@@ -43,7 +43,21 @@ from agent_service.tools.onchain.gaps import (
     run_get_whale_activity,
 )
 from agent_service.tools.onchain.models import ChainActivityData
-from agent_service.tools.stocks.models import ResolveTickerData
+from agent_service.tools.stocks.market import (
+    run_compare_to_index,
+    run_get_company_profile,
+    run_get_peers,
+    run_get_stock_price_history,
+    run_get_stock_quote,
+)
+from agent_service.tools.stocks.models import (
+    IndexCompareData,
+    ResolveTickerData,
+    StockPeersData,
+    StockPriceHistoryData,
+    StockProfileData,
+    StockQuoteData,
+)
 from agent_service.tools.stocks.resolve import run_resolve_ticker
 from agent_service.tools.system.compute import run_compute_metrics
 from agent_service.tools.system.models import ComputeMetricsData, SeriesPoint
@@ -77,6 +91,21 @@ class ResolveAssetArgs(BaseModel):
 
 class ResolveTickerArgs(BaseModel):
     query: str
+
+
+class StockTickerArgs(BaseModel):
+    ticker: str
+
+
+class StockHistoryArgs(BaseModel):
+    ticker: str
+    days: int = 30
+
+
+class CompareToIndexArgs(BaseModel):
+    ticker: str
+    index: str = "SPY"
+    days: int = 30
 
 
 class CryptoPriceArgs(BaseModel):
@@ -181,6 +210,52 @@ async def _resolve_ticker(
     except ValidationError as exc:
         return fail_validation("resolve_ticker", exc)
     return await run_resolve_ticker(deps, query=args.query)
+
+
+async def _get_stock_quote(deps: ToolDeps, arguments: dict[str, Any]) -> ToolResult[StockQuoteData]:
+    try:
+        args = StockTickerArgs.model_validate(arguments)
+    except ValidationError as exc:
+        return fail_validation("get_stock_quote", exc)
+    return await run_get_stock_quote(deps, ticker=args.ticker)
+
+
+async def _get_company_profile(
+    deps: ToolDeps, arguments: dict[str, Any]
+) -> ToolResult[StockProfileData]:
+    try:
+        args = StockTickerArgs.model_validate(arguments)
+    except ValidationError as exc:
+        return fail_validation("get_company_profile", exc)
+    return await run_get_company_profile(deps, ticker=args.ticker)
+
+
+async def _get_stock_price_history(
+    deps: ToolDeps, arguments: dict[str, Any]
+) -> ToolResult[StockPriceHistoryData]:
+    try:
+        args = StockHistoryArgs.model_validate(arguments)
+    except ValidationError as exc:
+        return fail_validation("get_stock_price_history", exc)
+    return await run_get_stock_price_history(deps, ticker=args.ticker, days=args.days)
+
+
+async def _get_peers(deps: ToolDeps, arguments: dict[str, Any]) -> ToolResult[StockPeersData]:
+    try:
+        args = StockTickerArgs.model_validate(arguments)
+    except ValidationError as exc:
+        return fail_validation("get_peers", exc)
+    return await run_get_peers(deps, ticker=args.ticker)
+
+
+async def _compare_to_index(
+    deps: ToolDeps, arguments: dict[str, Any]
+) -> ToolResult[IndexCompareData]:
+    try:
+        args = CompareToIndexArgs.model_validate(arguments)
+    except ValidationError as exc:
+        return fail_validation("compare_to_index", exc)
+    return await run_compare_to_index(deps, ticker=args.ticker, index=args.index, days=args.days)
 
 
 async def _get_crypto_price(
@@ -310,15 +385,20 @@ async def _get_exchange_flow(deps: ToolDeps, arguments: dict[str, Any]) -> ToolR
 
 
 HANDLERS: dict[str, ToolHandler] = {
+    "compare_to_index": _compare_to_index,
     "compute_metrics": _compute_metrics,
     "get_chain_activity": _get_chain_activity,
     "get_chain_overview": _get_chain_overview,
+    "get_company_profile": _get_company_profile,
     "get_crypto_price": _get_crypto_price,
     "get_dex_volume": _get_dex_volume,
     "get_exchange_flow": _get_exchange_flow,
     "get_market_data": _get_market_data,
+    "get_peers": _get_peers,
     "get_price_history": _get_price_history,
     "get_protocol_fees_revenue": _get_protocol_fees_revenue,
+    "get_stock_price_history": _get_stock_price_history,
+    "get_stock_quote": _get_stock_quote,
     "get_token_holders": _get_token_holders,
     "get_tokenomics": _get_tokenomics,
     "get_tvl": _get_tvl,

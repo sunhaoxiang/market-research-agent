@@ -46,6 +46,7 @@ if TYPE_CHECKING:
     from agent_service.tools.deps import (
         CoinGeckoClient,
         DefiLlamaClient,
+        FmpClient,
         HyperliquidClient,
         SecEdgarClient,
     )
@@ -67,6 +68,7 @@ class SubAgentRunner:
         defillama: DefiLlamaClient | None = None,
         hyperliquid: HyperliquidClient | None = None,
         sec_edgar: SecEdgarClient | None = None,
+        fmp: FmpClient | None = None,
         clock: Clock | None = None,
         fallback_model_id: str,
     ) -> None:
@@ -80,6 +82,7 @@ class SubAgentRunner:
         self._defillama = defillama
         self._hyperliquid = hyperliquid
         self._sec_edgar = sec_edgar
+        self._fmp = fmp
         self._clock = clock
 
     def model_id_for(self, agent: AgentName) -> str:
@@ -125,6 +128,7 @@ class SubAgentRunner:
             defillama=self._defillama,
             hyperliquid=self._hyperliquid,
             sec_edgar=self._sec_edgar,
+            fmp=self._fmp,
             clock=self._clock,
             bus=state.bus,
             sources=collector,

@@ -2,13 +2,13 @@
 
 不让 LLM 抄 30 个点：数字来自 tool 已解析的序列，来源短引用沿用 stamp 的 ref。
 本模块由 collector 加载，不能 import defi/crypto bindings（循环依赖），
-所以只认字段形状：`series[].tvl_usd` 或 `prices[].price`。
+所以只认字段形状：`series[].tvl_usd`、`prices[].price` 或 `bars[].close`。
 """
 
 from __future__ import annotations
 
 import math
-from datetime import datetime
+from datetime import UTC, date, datetime
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from agent_service.schemas.entities import MetricPoint
@@ -44,6 +44,18 @@ class _PriceHistory(Protocol):
     coin_id: str
     vs_currency: str
     prices: list[_PricePoint]
+
+
+@runtime_checkable
+class _StockBar(Protocol):
+    session: date
+    close: float
+
+
+@runtime_checkable
+class _StockHistory(Protocol):
+    ticker: str
+    bars: list[_StockBar]
 
 
 def emit_series_metrics[T](collector: SourceCollector, result: ToolResult[T]) -> None:
@@ -85,5 +97,19 @@ def metrics_from_tool_data(data: object, source_ref: str) -> list[MetricPoint]:
             )
             for point in data.prices
             if math.isfinite(point.price)
+        ]
+    if isinstance(data, _StockHistory):
+        return [
+            MetricPoint(
+                name="price",
+                label="价格",
+                value=bar.close,
+                unit="USD",
+                entity_symbol=data.ticker,
+                as_of=datetime(bar.session.year, bar.session.month, bar.session.day, tzinfo=UTC),
+                source_ref=source_ref,
+            )
+            for bar in data.bars
+            if math.isfinite(bar.close)
         ]
     return []

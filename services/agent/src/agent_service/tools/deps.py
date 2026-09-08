@@ -21,6 +21,7 @@ if TYPE_CHECKING:
         FeesRevenue,
         ProtocolTvl,
     )
+    from agent_service.providers.equity import StockHistory, StockPeers, StockProfile, StockQuote
     from agent_service.providers.fetch import PageFetcher
     from agent_service.providers.onchain import PerpMarketSnapshot
     from agent_service.providers.runtime import Clock
@@ -69,6 +70,18 @@ class SecEdgarClient(Protocol):
     async def get_ticker_directory(self) -> TickerDirectory: ...
 
 
+class FmpClient(Protocol):
+    """FMP 在 ToolDeps 上的面。P4-4 行情；P4-7 再加 ratios。假客户端按需实现。"""
+
+    async def get_quote(self, symbol: str) -> StockQuote: ...
+
+    async def get_profile(self, symbol: str) -> StockProfile: ...
+
+    async def get_historical_prices(self, symbol: str, *, days: int = 30) -> StockHistory: ...
+
+    async def get_peers(self, symbol: str) -> StockPeers: ...
+
+
 @dataclass(frozen=True, slots=True)
 class ToolDeps:
     search: SearchProvider | None = None
@@ -77,6 +90,7 @@ class ToolDeps:
     defillama: DefiLlamaClient | None = None
     hyperliquid: HyperliquidClient | None = None
     sec_edgar: SecEdgarClient | None = None
+    fmp: FmpClient | None = None
     clock: Clock | None = None
     bus: EventBus | None = None
     sources: SourceCollector | None = None

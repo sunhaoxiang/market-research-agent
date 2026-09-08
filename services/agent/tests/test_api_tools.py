@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 import pytest
 from fastapi.testclient import TestClient
@@ -12,6 +12,14 @@ from agent_service.config import get_settings
 from agent_service.main import create_app
 from agent_service.providers.crypto import CoinMarket, CoinPrice, CoinSearchHit, CoinSearchPage
 from agent_service.providers.defi import ProtocolTvl, TvlPoint
+from agent_service.providers.equity import (
+    PriceBar,
+    StockHistory,
+    StockPeer,
+    StockPeers,
+    StockProfile,
+    StockQuote,
+)
 from agent_service.providers.onchain import PerpMarketSnapshot
 from agent_service.providers.search import SearchHit, SearchPage
 from agent_service.providers.sec import TickerDirectory, TickerEntry, company_page_url
@@ -186,6 +194,107 @@ class _FakeSecEdgar:
         return None
 
 
+class _FakeFmp:
+    async def get_quote(self, symbol: str) -> StockQuote:
+        return StockQuote(
+            symbol=symbol,
+            name="NVIDIA Corporation",
+            price=120.5,
+            change=2.1,
+            change_pct=1.77,
+            volume=50_000_000.0,
+            day_low=118.0,
+            day_high=122.0,
+            year_low=90.0,
+            year_high=140.0,
+            market_cap=3_000_000_000_000.0,
+            open=119.0,
+            previous_close=118.4,
+            pe=45.2,
+            eps=2.66,
+            exchange="NASDAQ",
+            as_of=datetime(2026, 9, 8, tzinfo=UTC),
+            url=f"https://financialmodelingprep.com/financial-summary/{symbol}",
+            provenance=DataProvenance(
+                provider="fmp",
+                endpoint="/quote",
+                retrieved_at=datetime(2026, 9, 8, tzinfo=UTC),
+            ),
+        )
+
+    async def get_profile(self, symbol: str) -> StockProfile:
+        return StockProfile(
+            symbol=symbol,
+            name="NVIDIA Corporation",
+            description="GPUs",
+            cik="0001045810",
+            exchange="NASDAQ",
+            industry="Semiconductors",
+            sector="Technology",
+            country="US",
+            currency="USD",
+            website="https://www.nvidia.com",
+            ceo="Jensen Huang",
+            ipo_date=None,
+            employees=36_000,
+            market_cap=3_000_000_000_000.0,
+            beta=1.7,
+            is_etf=False,
+            is_actively_trading=True,
+            url=f"https://financialmodelingprep.com/financial-summary/{symbol}",
+            provenance=DataProvenance(
+                provider="fmp",
+                endpoint="/profile",
+                retrieved_at=datetime(2026, 9, 8, tzinfo=UTC),
+            ),
+        )
+
+    async def get_historical_prices(self, symbol: str, *, days: int = 30) -> StockHistory:
+        start = date(2026, 8, 10)
+        end = date(2026, 9, 8)
+        first = 100.0 if symbol == "NVDA" else 400.0
+        last = 120.0 if symbol == "NVDA" else 440.0
+        return StockHistory(
+            symbol=symbol,
+            days=days,
+            start=start,
+            end=end,
+            bars=(
+                PriceBar(session=start, open=None, high=None, low=None, close=first, volume=None),
+                PriceBar(session=end, open=None, high=None, low=None, close=last, volume=None),
+            ),
+            url=f"https://financialmodelingprep.com/financial-summary/{symbol}",
+            provenance=DataProvenance(
+                provider="fmp",
+                endpoint="/historical-price-eod/full",
+                retrieved_at=datetime(2026, 9, 8, tzinfo=UTC),
+            ),
+        )
+
+    async def get_peers(self, symbol: str) -> StockPeers:
+        return StockPeers(
+            symbol=symbol,
+            peers=(
+                StockPeer(
+                    symbol="AMD",
+                    name="Advanced Micro Devices",
+                    price=160.0,
+                    market_cap=260_000_000_000.0,
+                    url="https://financialmodelingprep.com/financial-summary/AMD",
+                ),
+            ),
+            url=f"https://financialmodelingprep.com/financial-summary/{symbol}",
+            provenance=DataProvenance(
+                provider="fmp",
+                endpoint="/stock-peers",
+                retrieved_at=datetime(2026, 9, 8, tzinfo=UTC),
+            ),
+        )
+
+    async def aclose(self) -> None:
+        return None
+
+
 @pytest.fixture
 def isolated_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     for name in _KEY_ENV_VARS:
@@ -205,6 +314,7 @@ def client(isolated_env: None) -> Iterator[TestClient]:
         app.state.defillama = _FakeDefiLlama()
         app.state.hyperliquid = _FakeHyperliquid()
         app.state.sec_edgar = _FakeSecEdgar()
+        app.state.fmp = _FakeFmp()
         yield test_client
 
 
@@ -286,6 +396,67 @@ def test_invoke_resolve_ticker(client: TestClient) -> None:
     assert body["data"]["resolved"]["cik"] == "0001045810"
     assert body["data"]["resolved"]["ticker"] == "NVDA"
     assert body["provenance"]["provider"] == "sec_edgar"
+
+
+def test_invoke_stock_quote(client: TestClient) -> None:
+    response = client.post(
+        "/v1/tools/get_stock_quote/invoke",
+        json={"arguments": {"ticker": "NVDA"}},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["data"]["ticker"] == "NVDA"
+    assert body["data"]["price"] == 120.5
+    assert body["provenance"]["source_url"] == (
+        "https://financialmodelingprep.com/financial-summary/NVDA"
+    )
+
+
+def test_invoke_company_profile(client: TestClient) -> None:
+    response = client.post(
+        "/v1/tools/get_company_profile/invoke",
+        json={"arguments": {"ticker": "NVDA"}},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["data"]["cik"] == "0001045810"
+    assert body["data"]["industry"] == "Semiconductors"
+
+
+def test_invoke_stock_price_history(client: TestClient) -> None:
+    response = client.post(
+        "/v1/tools/get_stock_price_history/invoke",
+        json={"arguments": {"ticker": "NVDA", "days": 30}},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["data"]["ticker"] == "NVDA"
+    assert body["data"]["bars"][-1]["close"] == 120.0
+
+
+def test_invoke_peers(client: TestClient) -> None:
+    response = client.post("/v1/tools/get_peers/invoke", json={"arguments": {"ticker": "NVDA"}})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["data"]["peers"][0]["ticker"] == "AMD"
+
+
+def test_invoke_compare_to_index(client: TestClient) -> None:
+    response = client.post(
+        "/v1/tools/compare_to_index/invoke",
+        json={"arguments": {"ticker": "NVDA"}},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["data"]["index"] == "SPY"
+    assert body["data"]["ticker_return"] == pytest.approx(0.2)
+    assert body["data"]["index_return"] == pytest.approx(0.1)
+    assert body["data"]["excess_return"] == pytest.approx(0.1)
 
 
 def test_invoke_get_tvl(client: TestClient) -> None:
