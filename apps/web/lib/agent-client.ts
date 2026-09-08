@@ -139,3 +139,45 @@ export async function startResearch(input: StartResearchInput): Promise<Response
     cache: "no-store",
   });
 }
+
+export async function cancelResearch(
+  sessionId: string,
+): Promise<AgentServiceResult<{ cancelled: boolean }>> {
+  try {
+    const response = await fetch(
+      `${serverEnv.agentServiceUrl}/v1/research/${encodeURIComponent(sessionId)}/cancel`,
+      {
+        method: "POST",
+        headers: internalHeaders(),
+        cache: "no-store",
+        signal: AbortSignal.timeout(5000),
+      },
+    );
+    const detail: unknown = await response.json().catch(() => null);
+    if (!response.ok) {
+      return { ok: false, error: extractAgentError(detail, response.status) };
+    }
+    return { ok: true, data: detail as { cancelled: boolean } };
+  } catch (error) {
+    const isTimeout = error instanceof Error && error.name === "TimeoutError";
+    return {
+      ok: false,
+      error: {
+        code: isTimeout ? "AGENT_SERVICE_TIMEOUT" : "AGENT_SERVICE_UNAVAILABLE",
+        message: isTimeout
+          ? "取消请求超时"
+          : `无法连接 Agent 服务（${serverEnv.agentServiceUrl}）。是否已启动？`,
+      },
+    };
+  }
+}
+
+function extractAgentError(detail: unknown, status: number): { code: string; message: string } {
+  const outer = detail as { error?: unknown; detail?: { error?: unknown } } | null;
+  const candidate = outer?.error ?? outer?.detail?.error;
+  const error = candidate as { code?: unknown; message?: unknown } | undefined;
+  return {
+    code: typeof error?.code === "string" ? error.code : "AGENT_SERVICE_ERROR",
+    message: typeof error?.message === "string" ? error.message : `Agent 服务返回 ${status}`,
+  };
+}

@@ -11,9 +11,10 @@ type SourcePanelProps = {
   sources: Source[];
   activeIndex: number | null;
   onSelect: (index: number) => void;
+  className?: string;
 };
 
-export function SourcePanel({ sources, activeIndex, onSelect }: SourcePanelProps) {
+export function SourcePanel({ sources, activeIndex, onSelect, className }: SourcePanelProps) {
   const numbered = sources
     .filter((item) => item.citation_index !== null)
     .sort((a, b) => (a.citation_index ?? 0) - (b.citation_index ?? 0));
@@ -29,7 +30,7 @@ export function SourcePanel({ sources, activeIndex, onSelect }: SourcePanelProps
   if (sources.length === 0) return null;
 
   return (
-    <section className="space-y-3 border-t border-zinc-200 pt-4 dark:border-zinc-800">
+    <section className={cn("space-y-3", className)}>
       <h2 className="text-xs font-medium tracking-wide text-zinc-500 uppercase">
         Sources ({sources.length})
       </h2>

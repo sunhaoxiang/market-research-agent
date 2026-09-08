@@ -182,6 +182,7 @@ def create_app() -> FastAPI:
     app.state.hyperliquid = None
     app.state.fmp = None
     app.state.sec_edgar = None
+    app.state.research_runs = research_api.ResearchRuns()
 
     @app.get("/v1/health", response_model=HealthResponse, tags=["system"])
     async def health() -> HealthResponse:

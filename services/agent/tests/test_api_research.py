@@ -542,3 +542,33 @@ async def test_stream_ends_even_if_the_pipeline_crashes() -> None:
 
     assert frames == [encode_comment("stream open")]
     assert bus.closed
+
+
+async def test_research_runs_cancel_forgets_finished_tasks() -> None:
+    runs = research_api.ResearchRuns()
+    task = asyncio.create_task(asyncio.sleep(3600))
+    runs.register("sess-1", task)
+    assert runs.cancel("sess-1") is True
+    await asyncio.sleep(0)
+    assert task.cancelled()
+    assert runs.cancel("sess-1") is False
+
+
+def test_cancel_unknown_session_is_404(client: TestClient) -> None:
+    response = client.post("/v1/research/missing/cancel")
+    assert response.status_code == 404
+    assert response.json()["detail"]["error"]["code"] == "NOT_RUNNING"
+
+
+def test_cancel_endpoint_invokes_registry(client: TestClient) -> None:
+    called: dict[str, str | None] = {"id": None}
+
+    def fake_cancel(session_id: str) -> bool:
+        called["id"] = session_id
+        return True
+
+    client.app.state.research_runs.cancel = fake_cancel  # type: ignore[method-assign]
+    response = client.post("/v1/research/sess-9/cancel")
+    assert response.status_code == 200
+    assert response.json() == {"cancelled": True}
+    assert called["id"] == "sess-9"

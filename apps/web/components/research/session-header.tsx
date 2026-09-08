@@ -1,5 +1,6 @@
 "use client";
 
+import { AGENT_LABELS } from "@/components/research/activity-panel";
 import type { ResearchViewState } from "@/lib/research/state";
 import { cn, formatCost, formatDuration, formatTokens } from "@/lib/utils";
 
@@ -26,6 +27,7 @@ export function SessionHeader({ state, now }: { state: ResearchViewState; now: n
     (state.startedAtMs !== null && now > 0 ? Math.max(0, now - state.startedAtMs) : null);
 
   const stage = state.status === "running" ? STAGE_LABELS[state.stage ?? ""] : undefined;
+  const progress = taskProgress(state);
 
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-500">
@@ -48,6 +50,19 @@ export function SessionHeader({ state, now }: { state: ResearchViewState; now: n
       {state.hasGap && (
         <span className="text-amber-600 dark:text-amber-500">事件有缺失，刷新可查看完整结果</span>
       )}
+
+      {progress ? <span>{progress}</span> : null}
     </div>
   );
+}
+
+function taskProgress(state: ResearchViewState): string | null {
+  const tasks = state.taskIds.map((id) => state.tasks[id]).filter((task) => task !== undefined);
+  if (tasks.length === 0) return null;
+  const settled = tasks.filter(
+    (task) => task.status === "completed" || task.status === "failed" || task.status === "skipped",
+  ).length;
+  const running = tasks.find((task) => task.status === "running");
+  const current = running ? (AGENT_LABELS[running.agent] ?? running.agent) : null;
+  return current ? `${settled}/${tasks.length} · ${current}` : `${settled}/${tasks.length}`;
 }

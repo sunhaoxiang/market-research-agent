@@ -19,13 +19,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as schema from "@/db/schema";
 
 const startResearch = vi.hoisted(() => vi.fn());
+const cancelResearch = vi.hoisted(() => vi.fn());
 const getDb = vi.hoisted(() => vi.fn());
 
-vi.mock("@/lib/agent-client", () => ({ startResearch }));
+vi.mock("@/lib/agent-client", () => ({ startResearch, cancelResearch }));
 vi.mock("@/db/client", () => ({ getDb }));
 
-const { POST } = await import("@/app/api/research/route");
+const { POST, GET: listResearch } = await import("@/app/api/research/route");
 const { GET } = await import("@/app/api/research/[id]/events/route");
+const { DELETE } = await import("@/app/api/research/[id]/route");
 
 type Db = ReturnType<typeof drizzle<typeof schema>>;
 
@@ -39,6 +41,7 @@ beforeEach(() => {
 
   getDb.mockReturnValue(db);
   startResearch.mockReset();
+  cancelResearch.mockReset();
 });
 
 function ask(body: unknown): Promise<Response> {
@@ -535,10 +538,77 @@ describe("事件回放 GET /api/research/{id}/events", () => {
     expect(body.events.map((item) => item.seq)).toEqual([4, 5, 6, 7]);
   });
 
+  it("带上 session 状态，方便前端决定要不要续订", async () => {
+    startResearch.mockResolvedValue(upstreamOf(HAPPY_PATH));
+    const posted = await ask({ question: "Q" });
+    const sessionId = posted.headers.get("X-Session-Id")!;
+    await drain(posted);
+
+    const response = await GET(new Request(`http://localhost/api/research/${sessionId}/events`), {
+      params: Promise.resolve({ id: sessionId }),
+    });
+    const body = (await response.json()) as { status: string };
+    expect(body.status).toBe("completed");
+  });
+
   it("未知 session 返回 404", async () => {
     const response = await GET(new Request("http://localhost/api/research/missing/events"), {
       params: Promise.resolve({ id: "missing" }),
     });
     expect(response.status).toBe(404);
+  });
+});
+
+describe("会话列表 GET /api/research", () => {
+  it("返回分页列表和来源数", async () => {
+    startResearch.mockResolvedValue(upstreamOf(HAPPY_PATH));
+    const posted = await ask({ question: "HYPE 怎么样" });
+    const sessionId = posted.headers.get("X-Session-Id")!;
+    await drain(posted);
+
+    const response = await listResearch(new Request("http://localhost/api/research"));
+    const body = (await response.json()) as {
+      total: number;
+      sessions: Array<{ id: string; question: string; sourceCount: number; status: string }>;
+    };
+    expect(response.status).toBe(200);
+    expect(body.total).toBe(1);
+    expect(body.sessions[0]).toMatchObject({
+      id: sessionId,
+      question: "HYPE 怎么样",
+      status: "completed",
+    });
+  });
+});
+
+describe("取消 DELETE /api/research/{id}", () => {
+  it("进行中的会话转给 Python cancel", async () => {
+    const { createSession } = await import("@/db/queries/sessions");
+    const session = createSession(db, {
+      id: "sess-run",
+      question: "Q",
+      modelId: "deepseek:deepseek-v4-pro",
+      status: "researching",
+      createdAt: Date.now(),
+    });
+    cancelResearch.mockResolvedValue({ ok: true, data: { cancelled: true } });
+
+    const response = await DELETE(new Request(`http://localhost/api/research/${session.id}`), {
+      params: Promise.resolve({ id: session.id }),
+    });
+    expect(response.status).toBe(200);
+    expect(cancelResearch).toHaveBeenCalledWith(session.id);
+  });
+
+  it("已结束的会话返回 409", async () => {
+    startResearch.mockResolvedValue(upstreamOf(HAPPY_PATH));
+    const posted = await ask({ question: "Q" });
+    const sessionId = posted.headers.get("X-Session-Id")!;
+    await drain(posted);
+
+    const response = await DELETE(new Request(`http://localhost/api/research/${sessionId}`), {
+      params: Promise.resolve({ id: sessionId }),
+    });
+    expect(response.status).toBe(409);
   });
 });

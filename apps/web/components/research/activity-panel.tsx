@@ -5,7 +5,7 @@ import { cn, formatDuration } from "@/lib/utils";
 
 import { StatusIcon, statusLabel } from "./status-icon";
 
-const AGENT_LABELS: Record<string, string> = {
+export const AGENT_LABELS: Record<string, string> = {
   research_manager: "Research Manager",
   crypto_research: "Crypto Research",
   stock_research: "Stock Research",
@@ -98,12 +98,22 @@ function TaskRow({ task, now }: { task: TaskNode; now: number }) {
   );
 }
 
-export function ActivityPanel({ state, now }: { state: ResearchViewState; now: number }) {
+export function ActivityPanel({
+  state,
+  now,
+  hideHeading = false,
+}: {
+  state: ResearchViewState;
+  now: number;
+  hideHeading?: boolean;
+}) {
   const tasks = state.taskIds.map((id) => state.tasks[id]).filter((task) => task !== undefined);
 
   return (
     <div className="space-y-4">
-      <h2 className="text-xs font-medium tracking-wide text-zinc-500 uppercase">Activity</h2>
+      {hideHeading ? null : (
+        <h2 className="text-xs font-medium tracking-wide text-zinc-500 uppercase">研究过程</h2>
+      )}
 
       {/* 屏幕阅读器靠这里播报进展；视觉上它由下面的任务树呈现（§13.2 无障碍） */}
       <p aria-live="polite" className="sr-only">

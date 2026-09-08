@@ -8,7 +8,7 @@
 
 - 设计文档：[`docs/DEVELOPMENT_PLAN.md`](docs/DEVELOPMENT_PLAN.md)
 - 开发进度：[`docs/ROADMAP.md`](docs/ROADMAP.md)
-- **当前状态：MVP（Phase 0–5）已验收**，tag `v0.1.0-mvp`。本机只有 DeepSeek key；History 列表与 Activity 完善是 Phase 6。限制见 [`docs/ROADMAP.md`](docs/ROADMAP.md) 的 P5.5。
+- **当前状态：MVP（Phase 0–5）已验收**，tag `v0.1.0-mvp`。本机只有 DeepSeek key。P6 已改成报告居中 + 历史 / 续订 / 取消。限制见 [`docs/ROADMAP.md`](docs/ROADMAP.md) 的 P5.5。
 
 ---
 

@@ -38,6 +38,15 @@ export const SESSION_STATUSES = [
   "cancelled",
 ] as const;
 
+/** 仍在跑、刷新后需要续订事件的状态（P6-6）。 */
+export const ACTIVE_SESSION_STATUSES = [
+  "pending",
+  "planning",
+  "researching",
+  "checking",
+  "writing",
+] as const;
+
 export const QUESTION_TYPES = ["crypto", "stock", "macro", "compare", "generic"] as const;
 
 export const EPISTEMIC_TYPES = [
@@ -84,6 +93,12 @@ export const AGENT_NAMES = [
 ] as const;
 
 export type SessionStatus = (typeof SESSION_STATUSES)[number];
+export type ActiveSessionStatus = (typeof ACTIVE_SESSION_STATUSES)[number];
+
+export function isActiveSessionStatus(status: string): status is ActiveSessionStatus {
+  return (ACTIVE_SESSION_STATUSES as readonly string[]).includes(status);
+}
+
 export type QuestionType = (typeof QUESTION_TYPES)[number];
 export type EpistemicType = (typeof EPISTEMIC_TYPES)[number];
 export type ConfidenceLevel = (typeof CONFIDENCE_LEVELS)[number];

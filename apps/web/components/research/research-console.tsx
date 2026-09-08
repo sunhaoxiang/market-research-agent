@@ -2,17 +2,16 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import type { ResearchEvent } from "@mra/shared";
-
 import { MetricCharts } from "@/components/report/metric-charts";
 import { ReportViewer } from "@/components/report/report-viewer";
+import { ProcessPanel } from "@/components/research/process-panel";
 import { SourcePanel } from "@/components/sources/source-panel";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/field";
+import { replayAndFollow } from "@/lib/research/replay";
 import { useResearchState, useResearchStore, useTicker } from "@/lib/research/store";
 import { ResearchStreamError, streamResearch } from "@/lib/sse";
 
-import { ActivityPanel } from "./activity-panel";
 import { type ModelOption, ModelSelector } from "./model-selector";
 import { SessionHeader } from "./session-header";
 
@@ -22,37 +21,51 @@ const EXAMPLES = [
   "英伟达最新一季财报的关键信号是什么？",
 ];
 
-export function ResearchConsole({ models }: { models: ModelOption[] }) {
+export function ResearchConsole({
+  models,
+  initialSessionId,
+}: {
+  models: ModelOption[];
+  initialSessionId?: string;
+}) {
   const store = useResearchStore();
   const state = useResearchState(store);
   const [question, setQuestion] = useState("");
   const [modelId, setModelId] = useState("");
   const [activeCitation, setActiveCitation] = useState<number | null>(null);
+  const [cancelling, setCancelling] = useState(false);
+  const [restoring, setRestoring] = useState(Boolean(initialSessionId));
   const abortRef = useRef<AbortController | null>(null);
 
   const running = state.status === "running";
+  const idle = state.status === "idle" && !restoring;
 
   useEffect(() => {
-    const sessionId = new URLSearchParams(window.location.search).get("session");
+    const sessionId =
+      initialSessionId ?? new URLSearchParams(window.location.search).get("session");
     if (!sessionId) return;
-    let cancelled = false;
+    const controller = new AbortController();
+    abortRef.current = controller;
     void (async () => {
-      const response = await fetch(`/api/research/${encodeURIComponent(sessionId)}/events`);
-      if (!response.ok || cancelled) return;
-      const body = (await response.json()) as { events?: ResearchEvent[] };
-      if (cancelled || !Array.isArray(body.events)) return;
-      store.reset();
-      for (const event of body.events) store.apply(event);
+      try {
+        await replayAndFollow(sessionId, store, controller.signal);
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        store.failStream("REPLAY_ERROR", error instanceof Error ? error.message : "无法回放会话");
+      } finally {
+        if (!controller.signal.aborted) setRestoring(false);
+      }
     })();
     return () => {
-      cancelled = true;
+      controller.abort();
     };
-  }, [store]);
+  }, [initialSessionId, store]);
 
   async function submit() {
     const trimmed = question.trim();
     if (!trimmed || running) return;
 
+    abortRef.current?.abort();
     store.reset();
     setActiveCitation(null);
     const controller = new AbortController();
@@ -66,8 +79,6 @@ export function ResearchConsole({ models }: { models: ModelOption[] }) {
         store.apply(event);
       }
     } catch (error) {
-      // 中止是用户主动的，不是故障。研究本身仍在后端跑完并落库（§11.2），
-      // 所以这里也不该显示成失败
       if (controller.signal.aborted) return;
 
       const detail =
@@ -82,75 +93,116 @@ export function ResearchConsole({ models }: { models: ModelOption[] }) {
     }
   }
 
-  // 只在运行中走时钟，避免空闲页面每秒重渲染
+  async function cancel() {
+    const sessionId = state.sessionId;
+    if (!sessionId || !running || cancelling) return;
+    setCancelling(true);
+    try {
+      const response = await fetch(`/api/research/${encodeURIComponent(sessionId)}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as {
+          error?: { message?: string };
+        } | null;
+        store.failStream("CANCEL_FAILED", body?.error?.message ?? "取消失败");
+      }
+    } finally {
+      setCancelling(false);
+    }
+  }
+
+  function startFresh() {
+    abortRef.current?.abort();
+    store.reset();
+    setQuestion("");
+    setActiveCitation(null);
+    setRestoring(false);
+    const url = new URL(window.location.href);
+    url.searchParams.delete("session");
+    window.history.replaceState(null, "", url);
+  }
+
   const now = useTicker(running);
 
   return (
     <div className="space-y-6">
-      <form
-        onSubmit={(submitEvent) => {
-          submitEvent.preventDefault();
-          void submit();
-        }}
-        className="space-y-3"
-      >
-        <Textarea
-          value={question}
-          onChange={(changeEvent) => setQuestion(changeEvent.target.value)}
-          onKeyDown={(keyEvent) => {
-            // Cmd/Ctrl+Enter 提交，单独 Enter 保留换行——问题可能是多行的
-            if (keyEvent.key === "Enter" && (keyEvent.metaKey || keyEvent.ctrlKey)) {
-              keyEvent.preventDefault();
-              void submit();
-            }
+      {idle ? (
+        <form
+          onSubmit={(submitEvent) => {
+            submitEvent.preventDefault();
+            void submit();
           }}
-          placeholder="问一个 Crypto / 美股 / 宏观的研究问题…"
-          rows={3}
-          maxLength={2000}
-          disabled={running}
-          aria-label="研究问题"
-        />
+          className="mx-auto max-w-2xl space-y-3"
+        >
+          <Textarea
+            value={question}
+            onChange={(changeEvent) => setQuestion(changeEvent.target.value)}
+            onKeyDown={(keyEvent) => {
+              if (keyEvent.key === "Enter" && (keyEvent.metaKey || keyEvent.ctrlKey)) {
+                keyEvent.preventDefault();
+                void submit();
+              }
+            }}
+            placeholder="问一个 Crypto / 美股 / 宏观的研究问题…"
+            rows={3}
+            maxLength={2000}
+            disabled={running}
+            aria-label="研究问题"
+          />
 
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <ModelSelector models={models} value={modelId} onChange={setModelId} disabled={running} />
-
-          <div className="flex items-center gap-2">
-            {running && (
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => abortRef.current?.abort()}
-                title="停止接收事件。研究会在后端跑完并落库"
-              >
-                停止查看
-              </Button>
-            )}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <ModelSelector
+              models={models}
+              value={modelId}
+              onChange={setModelId}
+              disabled={running}
+            />
             <Button type="submit" disabled={running || question.trim().length === 0}>
-              {running ? "研究中…" : "开始研究"}
+              开始研究
             </Button>
           </div>
-        </div>
-      </form>
 
-      {state.status === "idle" ? (
-        <div className="space-y-2">
-          <p className="text-xs font-medium tracking-wide text-zinc-500 uppercase">试试这些</p>
-          <ul className="space-y-1">
-            {EXAMPLES.map((example) => (
-              <li key={example}>
-                <button
-                  type="button"
-                  onClick={() => setQuestion(example)}
-                  className="text-left text-sm text-zinc-500 underline-offset-2 hover:text-zinc-900 hover:underline dark:hover:text-zinc-100"
-                >
-                  {example}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
+          <div className="space-y-2">
+            <p className="text-xs font-medium tracking-wide text-zinc-500 uppercase">试试这些</p>
+            <ul className="space-y-1">
+              {EXAMPLES.map((example) => (
+                <li key={example}>
+                  <button
+                    type="button"
+                    onClick={() => setQuestion(example)}
+                    className="text-left text-sm text-zinc-500 underline-offset-2 hover:text-zinc-900 hover:underline dark:hover:text-zinc-100"
+                  >
+                    {example}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </form>
       ) : (
-        <div className="space-y-5 border-t border-zinc-200 pt-5 dark:border-zinc-800">
+        <div className="space-y-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <h2 className="max-w-3xl text-lg leading-snug font-semibold">
+              {state.question ?? (restoring ? "正在恢复会话…" : question)}
+            </h2>
+            <div className="flex shrink-0 items-center gap-2">
+              {running && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => void cancel()}
+                  disabled={cancelling}
+                >
+                  {cancelling ? "取消中…" : "取消研究"}
+                </Button>
+              )}
+              <Button type="button" variant="ghost" onClick={startFresh}>
+                新研究
+              </Button>
+            </div>
+          </div>
+
           <SessionHeader state={state} now={now} />
 
           {state.lastMessage && (
@@ -163,16 +215,9 @@ export function ResearchConsole({ models }: { models: ModelOption[] }) {
             </p>
           )}
 
-          <div className="grid gap-8 lg:grid-cols-[minmax(0,22rem)_1fr]">
-            <div className="space-y-4">
-              <ActivityPanel state={state} now={now} />
-              <SourcePanel
-                sources={state.sources}
-                activeIndex={activeCitation}
-                onSelect={setActiveCitation}
-              />
-            </div>
+          <ProcessPanel state={state} now={now} />
 
+          <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem]">
             {state.report ? (
               <ReportViewer
                 report={state.report}
@@ -185,9 +230,7 @@ export function ResearchConsole({ models }: { models: ModelOption[] }) {
               />
             ) : (
               <div className="space-y-3">
-                <h2 className="text-xs font-medium tracking-wide text-zinc-500 uppercase">
-                  Report
-                </h2>
+                <h2 className="text-xs font-medium tracking-wide text-zinc-500 uppercase">报告</h2>
                 <MetricCharts metrics={state.metrics} />
                 {state.plan ? (
                   <div className="space-y-3">
@@ -216,6 +259,13 @@ export function ResearchConsole({ models }: { models: ModelOption[] }) {
                 )}
               </div>
             )}
+
+            <SourcePanel
+              sources={state.sources}
+              activeIndex={activeCitation}
+              onSelect={setActiveCitation}
+              className="lg:border-l lg:border-zinc-200 lg:pl-6 dark:lg:border-zinc-800"
+            />
           </div>
         </div>
       )}

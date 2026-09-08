@@ -1,5 +1,5 @@
 /**
- * 历史事件回放（刷新页面后重建 Source Panel / 报告）。
+ * 历史事件回放（刷新页面后重建报告）。进行中会话带 `status`，方便前端决定要不要续订（P6-6）。
  *
  * 浏览器只持有内存里的 reducer 状态；关掉标签页就没了。事件已经按序
  * 落在 `research_events`，从这里读出来再 `reduceAll` 就能还原现场。
@@ -30,5 +30,5 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   const after = Number.isFinite(afterSeq) ? afterSeq : -1;
 
   const events: ResearchEvent[] = listEvents(db, id, after).map(toClientEvent);
-  return Response.json({ events });
+  return Response.json({ status: session.status, events });
 }

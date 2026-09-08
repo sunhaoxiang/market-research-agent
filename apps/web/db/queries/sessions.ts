@@ -4,7 +4,7 @@
  * 所有 DB 访问都收敛到 db/queries/ 下，便于将来迁移 PostgreSQL 时集中修改（§25.3）。
  */
 
-import { desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql, type SQL } from "drizzle-orm";
 
 import type { Db } from "@/db/client";
 import {
@@ -12,11 +12,13 @@ import {
   type NewResearchEvent,
   type NewResearchSession,
   type NewToolCall,
+  type QuestionType,
   type ResearchSession,
   type SessionStatus,
   agentRuns,
   researchEvents,
   researchSessions,
+  sources,
   toolCalls,
 } from "@/db/schema";
 
@@ -36,23 +38,72 @@ export function getSession(db: Db, id: string): ResearchSession | undefined {
 
 export function listSessions(
   db: Db,
-  { userId = LOCAL_USER_ID, limit = 50, offset = 0 }: ListSessionsOptions = {},
+  {
+    userId = LOCAL_USER_ID,
+    limit = 50,
+    offset = 0,
+    status,
+    questionType,
+    modelId,
+  }: ListSessionsOptions = {},
 ): ResearchSession[] {
   return db
     .select()
     .from(researchSessions)
-    .where(eq(researchSessions.userId, userId))
+    .where(sessionFilters({ userId, status, questionType, modelId }))
     .orderBy(desc(researchSessions.createdAt))
     .limit(limit)
     .offset(offset)
     .all();
 }
 
+export function countSessions(
+  db: Db,
+  { userId = LOCAL_USER_ID, status, questionType, modelId }: ListSessionsOptions = {},
+): number {
+  const row = db
+    .select({ total: sql<number>`count(*)` })
+    .from(researchSessions)
+    .where(sessionFilters({ userId, status, questionType, modelId }))
+    .get();
+  return Number(row?.total ?? 0);
+}
+
+export function countSourcesBySession(db: Db, sessionIds: string[]): Record<string, number> {
+  if (sessionIds.length === 0) return {};
+  const rows = db
+    .select({
+      sessionId: sources.sessionId,
+      total: sql<number>`count(*)`,
+    })
+    .from(sources)
+    .where(inArray(sources.sessionId, sessionIds))
+    .groupBy(sources.sessionId)
+    .all();
+  return Object.fromEntries(rows.map((row) => [row.sessionId, Number(row.total)]));
+}
+
 export type ListSessionsOptions = {
   userId?: string;
   limit?: number;
   offset?: number;
+  status?: SessionStatus;
+  questionType?: QuestionType;
+  modelId?: string;
 };
+
+function sessionFilters({
+  userId,
+  status,
+  questionType,
+  modelId,
+}: Pick<ListSessionsOptions, "userId" | "status" | "questionType" | "modelId">): SQL {
+  const parts: SQL[] = [eq(researchSessions.userId, userId ?? LOCAL_USER_ID)];
+  if (status) parts.push(eq(researchSessions.status, status));
+  if (questionType) parts.push(eq(researchSessions.questionType, questionType));
+  if (modelId) parts.push(eq(researchSessions.modelId, modelId));
+  return and(...parts)!;
+}
 
 export function updateSessionStatus(
   db: Db,

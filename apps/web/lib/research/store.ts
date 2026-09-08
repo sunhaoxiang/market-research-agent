@@ -13,12 +13,14 @@ import { useCallback, useState, useSyncExternalStore } from "react";
 
 import type { ResearchEvent } from "@mra/shared";
 
-import { type ResearchViewState, initialState, reduce } from "@/lib/research/state";
+import { type ResearchViewState, initialState, reduce, reduceAll } from "@/lib/research/state";
 
 export type ResearchStore = {
   getSnapshot: () => ResearchViewState;
   subscribe: (listener: () => void) => () => void;
   apply: (event: ResearchEvent) => void;
+  /** 回放时一次归约整批，避免每条事件触发一次渲染。 */
+  applyAll: (events: readonly ResearchEvent[]) => void;
   /** 流层面的失败（连不上、HTTP 错误），与 session_failed 事件区分开 */
   failStream: (code: string, message: string) => void;
   reset: () => void;
@@ -43,6 +45,10 @@ export function createResearchStore(from: ResearchViewState = initialState): Res
       return () => listeners.delete(listener);
     },
     apply: (event) => commit(reduce(snapshot, event)),
+    applyAll: (events) => {
+      if (events.length === 0) return;
+      commit(reduceAll(events, snapshot));
+    },
     failStream: (code, message) =>
       commit({
         ...snapshot,

@@ -43,6 +43,33 @@ log = structlog.get_logger(__name__)
 
 router = APIRouter(prefix="/v1/research", tags=["research"])
 
+
+class ResearchRuns:
+    """进行中的 pipeline，按 session_id 索引，给 cancel 用（P6-7）。"""
+
+    def __init__(self) -> None:
+        self._tasks: dict[str, asyncio.Task[object]] = {}
+
+    def register(self, session_id: str, task: asyncio.Task[object]) -> None:
+        existing = self._tasks.get(session_id)
+        if existing is not None and not existing.done():
+            existing.cancel()
+        self._tasks[session_id] = task
+
+        def _forget(done: asyncio.Task[object]) -> None:
+            current = self._tasks.get(session_id)
+            if current is done:
+                self._tasks.pop(session_id, None)
+
+        task.add_done_callback(_forget)
+
+    def cancel(self, session_id: str) -> bool:
+        task = self._tasks.get(session_id)
+        if task is None or task.done():
+            return False
+        return task.cancel()
+
+
 MAX_QUESTION_CHARS = 2_000
 """问题长度上限。不设限的话，一段几十 KB 的粘贴内容会直接进 planner 的 prompt，
 既贵又会把 §9.8 的缓存前缀冲掉。"""
@@ -120,30 +147,40 @@ async def stream_research(request: ResearchRequest, http_request: Request) -> St
         question_chars=len(request.question),
     )
 
-    return StreamingResponse(
-        _pump(
-            bus,
-            asyncio.create_task(
-                run_research(
-                    request.question,
-                    planner=planner,
-                    runner=runner,
-                    writer=writer,
-                    fact_checker=fact_checker,
-                    limits=limits,
-                    bus=bus,
-                    session_id=session_id,
-                    classifier=classifier,
-                    search=search,
-                    fetcher=fetcher,
-                    clock=clock,
-                )
-            ),
+    pipeline = asyncio.create_task(
+        run_research(
+            request.question,
+            planner=planner,
+            runner=runner,
+            writer=writer,
+            fact_checker=fact_checker,
+            limits=limits,
+            bus=bus,
             session_id=session_id,
-        ),
+            classifier=classifier,
+            search=search,
+            fetcher=fetcher,
+            clock=clock,
+        )
+    )
+    runs: ResearchRuns = http_request.app.state.research_runs
+    runs.register(session_id, pipeline)
+
+    return StreamingResponse(
+        _pump(bus, pipeline, session_id=session_id),
         media_type="text/event-stream",
         headers=SSE_HEADERS,
     )
+
+
+@router.post("/{session_id}/cancel", dependencies=[Depends(require_internal_token)])
+async def cancel_research(session_id: str, http_request: Request) -> dict[str, bool]:
+    """取消一次进行中的研究。pipeline 会发 `SESSION_CANCELLED`，原 SSE 消费者负责落库。"""
+    runs: ResearchRuns = http_request.app.state.research_runs
+    if not runs.cancel(session_id):
+        raise _http_error(status.HTTP_404_NOT_FOUND, "NOT_RUNNING", "没有进行中的研究")
+    log.info("research.cancelled", session_id=session_id)
+    return {"cancelled": True}
 
 
 async def _pump(

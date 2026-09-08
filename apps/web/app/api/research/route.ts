@@ -16,8 +16,21 @@ import type { ResearchEvent } from "@mra/shared";
 import { getDb } from "@/db/client";
 import { projectArtifacts } from "@/db/queries/artifacts";
 import { EventBuffer } from "@/db/queries/events";
-import { createSession, patchSession, updateSessionStatus } from "@/db/queries/sessions";
-import type { QuestionType, SessionStatus, TokenUsage } from "@/db/schema";
+import {
+  countSessions,
+  countSourcesBySession,
+  createSession,
+  listSessions,
+  patchSession,
+  updateSessionStatus,
+} from "@/db/queries/sessions";
+import {
+  QUESTION_TYPES,
+  SESSION_STATUSES,
+  type QuestionType,
+  type SessionStatus,
+  type TokenUsage,
+} from "@/db/schema";
 import { startResearch } from "@/lib/agent-client";
 import { newId } from "@/lib/ids";
 import { parseFrames, toResearchEvents } from "@/lib/sse";
@@ -252,4 +265,53 @@ function extractError(detail: unknown): { code: string; message: string } {
 
 function errorResponse(status: number, code: string, message: string): Response {
   return Response.json({ error: { code, message } }, { status });
+}
+
+const LIST_LIMIT_MAX = 50;
+
+export async function GET(request: Request) {
+  const url = new URL(request.url);
+  const limit = parseBoundInt(url.searchParams.get("limit"), 20, 1, LIST_LIMIT_MAX);
+  const offset = parseBoundInt(url.searchParams.get("offset"), 0, 0, 10_000);
+  const status = parseEnum(url.searchParams.get("status"), SESSION_STATUSES);
+  const questionType = parseEnum(url.searchParams.get("questionType"), QUESTION_TYPES);
+  const modelId = url.searchParams.get("modelId")?.trim() || undefined;
+
+  const db = getDb();
+  const filter = { status, questionType, modelId, limit, offset };
+  const rows = listSessions(db, filter);
+  const total = countSessions(db, filter);
+  const sourceCounts = countSourcesBySession(
+    db,
+    rows.map((row) => row.id),
+  );
+
+  return Response.json({
+    total,
+    limit,
+    offset,
+    sessions: rows.map((row) => ({
+      id: row.id,
+      question: row.question,
+      questionType: row.questionType,
+      status: row.status,
+      modelId: row.modelId,
+      durationMs: row.durationMs,
+      costUsd: row.costUsd,
+      createdAt: row.createdAt,
+      sourceCount: sourceCounts[row.id] ?? 0,
+    })),
+  });
+}
+
+function parseBoundInt(raw: string | null, fallback: number, min: number, max: number): number {
+  if (raw === null || raw === "") return fallback;
+  const value = Number(raw);
+  if (!Number.isFinite(value)) return fallback;
+  return Math.min(max, Math.max(min, Math.trunc(value)));
+}
+
+function parseEnum<T extends string>(raw: string | null, allowed: readonly T[]): T | undefined {
+  if (raw === null || raw === "") return undefined;
+  return allowed.includes(raw as T) ? (raw as T) : undefined;
 }

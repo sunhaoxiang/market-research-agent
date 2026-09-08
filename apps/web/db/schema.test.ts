@@ -104,6 +104,12 @@ describe("research_sessions", () => {
 
     expect(listSessions(db).map((s) => s.question)).toEqual(["新", "旧"]);
   });
+
+  it("按状态过滤", () => {
+    createSession(db, newSession({ question: "完成", status: "completed" }));
+    createSession(db, newSession({ question: "失败", status: "failed" }));
+    expect(listSessions(db, { status: "failed" }).map((s) => s.question)).toEqual(["失败"]);
+  });
 });
 
 describe("research_events", () => {

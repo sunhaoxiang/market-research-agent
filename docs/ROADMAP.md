@@ -6,7 +6,7 @@
 > **每完成一个任务就更新此表的状态**；每完成一个阶段，跑 `[DP §26]` 的收尾清单并写阶段小结。
 
 - 最后更新：2026-09-08
-- 当前阶段：**P5.5 MVP 已验收**；下一任务 P6-1。
+- 当前阶段：**P6 进行中**。P6-1/4/5/6/7 已完成（主区居中 + 历史 / 续订 / 取消）。未开：阶段瀑布、Settings、`/debug`、Playwright。
 
 ### 已确认的前置决策（2026-09-07）
 
@@ -43,7 +43,7 @@
 | P4    | 美股数据能力                    | 11     | ✅   | 四问真跑已出带财务与 SEC 引用的报告 |
 | P5    | Multi-Agent 完整编排            | 9      | ✅   | Fact Checker / 并行 / 报告结构   |
 | P5.5  | **MVP 验收**                    | 1      | ✅   | 见 `[DP §21.1]`；限制见 P5.5 记录 |
-| P6    | 高级 UX + 历史 + 可观察性       | 11     | ⬜   | Activity 完善 / History / /debug |
+| P6    | 高级 UX + 历史 + 可观察性       | 11     | 🟡   | 主区居中 + 历史 / 续订 / 取消；/debug 仍后置 |
 | P7    | Evaluation 系统                 | 8      | ⬜   | 数据集 / grader / runner         |
 | P8    | 扩展能力                        | 8      | ⬜   | 按需触发，非线性                 |
 
@@ -356,13 +356,13 @@ Merge / Fact Checker 之后、Writer 之前。**纯代码规则，不打模型�
 
 | ID    | 任务                                                                                                 | 依赖 | 状态 | 验收                            |
 | ----- | ---------------------------------------------------------------------------------------------------- | ---- | ---- | ------------------------------- |
-| P6-1  | Activity Panel 完善：tool 详情展开、耗时、缓存标记、自动折叠、失败保持展开                           | P5.5 | ⬜   | 符合 `[DP §13.2]`               |
+| P6-1  | 按新 `[DP §13.1]` 改研究页：报告居中、过程可折叠、来源右侧。顶栏一行进度（阶段 / n/m / 当前任务）；完成后收起，失败展开 | P5.5 | ✅   | 主栏是报告，不是任务树          |
 | P6-2  | Research Timeline / 阶段瀑布可视化                                                                   | P6-1 | ⬜   | 能看出各阶段耗时                |
 | P6-3  | 无障碍与状态播报（`aria-live`，不只依赖颜色）                                                        | P6-1 | ⬜   | 键盘可完整操作                  |
-| P6-4  | History 列表页 + 过滤（类型/模型/状态）+ 分页。点进一条走已有 `/?session={id}` 回放，**不要**另写一套从 `sources` 表拼 UI 的路径 | P5.5 | ⬜   | 能翻看历史研究                  |
-| P6-5  | Session 详情页与实时页**复用 `ResearchConsole`**（事件源切到 DB 回放）`[DP §14.3]`。回放入口已在：`GET /api/research/{id}/events` + `reduceAll` | P6-4 | ⬜   | 两种视图渲染一致                |
-| P6-6  | 进行中会话的 **live SSE 续订**（偿还 D4）。`GET .../events?after={seq}` 与首页快照回放已有；刷新后若 session 仍在跑，要从 `lastSeq` 接着收新事件，而不是只播已落库的快照 | P6-5 | ⬜   | 刷新页面能续上进行中的研究      |
-| P6-7  | 取消研究（前端按钮 → Next → Python cancel → 状态落库）                                               | P6-6 | ⬜   | 可中断长任务                    |
+| P6-4  | History 列表页 + 过滤（类型/模型/状态）+ 分页。点进一条走已有 `/?session={id}` 回放，**不要**另写一套从 `sources` 表拼 UI 的路径 | P5.5 | ✅   | 能翻看历史研究                  |
+| P6-5  | Session 详情页与实时页**复用 `ResearchConsole`**（事件源切到 DB 回放）`[DP §14.3]`。回放入口已在：`GET /api/research/{id}/events` + `reduceAll` | P6-4 | ✅   | 两种视图渲染一致                |
+| P6-6  | 进行中会话的 **增量续订**（偿还 D4）。`GET .../events?after={seq}` 与首页快照回放已有；刷新后若 session 仍在跑，要从 `lastSeq` 接着收新事件（BFF 仍在落库，轮询 DB 即可，不必再接一条 Python SSE） | P6-5 | ✅   | 刷新页面能续上进行中的研究      |
+| P6-7  | 取消研究（前端按钮 → Next `DELETE /api/research/{id}` → Python `POST /v1/research/{id}/cancel` → 状态落库） | P6-6 | ✅   | 可中断长任务                    |
 | P6-8  | Settings 页：默认模型、按角色指定模型、执行上限、报告偏好                                            | P5.5 | ⬜   | 设置持久化并生效                |
 | P6-9  | `/debug` 可观察性页：阶段瀑布 / Agent 排行 / Tool 失败率 / 模型成本对比 / Provider 配额 `[DP §20.2]` | P5.5 | ⬜   | 能回答 `[DP §20.2]` 的 4 个问题 |
 | P6-10 | 成本与 token 实时显示 + 单 session 成本上限告警                                                      | P6-9 | ⬜   | 超限发 WARNING 事件             |
@@ -374,8 +374,8 @@ Phase 2 真实验收后补的刷新恢复，把历史会话的数据面先做了
 
 | 已有 | 给谁用 | 还缺（仍按原阶段做） |
 | --- | --- | --- |
-| `GET /api/research/{id}/events`（已支持 `?after={seq}`） | P6-5 详情回放、P6-6 增量起点 | 进行中会话的 **live SSE 续订**：刷新后目前只看到已 flush 的快照，不会继续收新事件。这才是 D4 |
-| 首页 `?session=` + `ResearchConsole` 里 `store.reset()` 后逐条 `apply` | P6-4 点进一条历史、P6-5 复用组件 | 独立 History 路由；列表页的过滤/分页；进行中状态不要画成已结束 |
+| `GET /api/research/{id}/events`（已支持 `?after={seq}`，响应带 `status`） | P6-5 详情回放、P6-6 增量起点 | 进行中会话的续订已按 `after` 轮询 DB（D4）。完整阶段瀑布仍是 P6-2 |
+| 首页 `?session=` + `ResearchConsole` 回放 / 续订 | P6-4 点进一条历史、P6-5 复用组件 | `/history` 列表 + 过滤/分页已有。`/debug` 仍是 P6-9 |
 | `projectArtifacts`：`source_found` / `report_completed` → `sources` / `claims` / `claim_sources` / `research_reports` | P6-4 列表「来源数」、P6-9 `/debug` 聚合 | UI **不要**改成只读这几张表来渲染报告。事件回放才是与实时页一致的真源；投影给查询 |
 | `attach_section_claims` 按正文 `[n]` 回填 `section.claim_ids` | P2-10 章节徽标、P5-7 Writer v2（已遵守：模型仍交空数组） | 不要改回让模型抄 id |
 | `web_fetch` 对 DNS `getaddrinfo` 加 5s `wait_for`；Web Agent prompt 禁止对失败 URL 重试 | P3/P4 若复用 `WebFetcher` 自动带上 | 任务级 120s 超时仍在；这不是硬配额，只是失败后别空转 |
@@ -1064,7 +1064,7 @@ P5-8 用 ScriptedModel 覆盖正常 / 工具失败 / 超时 / 冲突 / 引用缺
 
 **偏离计划**：`§21.1` 的「2 分钟」和「3 个 Provider」都没达到——真跑一次财报/深研要 5–11 分钟，本机仍只有 DeepSeek。History 列表按计划属于 Phase 6，MVP 用 `?session=` 回放。P5.5 后补跑 HYPE 投资研究：checking 出现了，但 62 条陈述让 Fact Checker 180s 超时（D23，已截断并拆批偿还，未重跑）。
 
-**新增技术债**：D6 / D8 仍是刻意限制。下一阶段是 P6（Activity 完善 / History / live SSE 续订）。
+**新增技术债**：D6 / D8 仍是刻意限制。P6 已改主区居中并接上历史 / 续订 / 取消；Settings、`/debug`、Playwright 仍后置。
 
 ---
 
@@ -1077,7 +1077,7 @@ P5-8 用 ScriptedModel 覆盖正常 / 工具失败 / 超时 / 冲突 / 引用缺
 | D1  | 无用户系统                                                                                                                                                                                  | 按需                               | ⬜   |
 | D2  | SQLite 无备份                                                                                                                                                                               | P8-3                               | ⬜   |
 | D3  | 进程重启丢失进行中任务                                                                                                                                                                      | P8-7                               | ⬜   |
-| D4  | 断线不可恢复**进行中的** run。已完成会话刷新后可回放（`GET .../events` + `?session=`）；缺的是 live SSE 续订 | P6-6                               | ⬜   |
+| D4  | ~~断线不可恢复进行中的 run~~ → 刷新后回放已落库事件，进行中会话按 `after={seq}` 轮询续订（不必再接 Python SSE） | P6-6                               | ✅   |
 | D5  | 缓存无主动失效                                                                                                                                                                              | 按需                               | ⬜   |
 | D6  | Fact Check 非全量                                                                                                                                                                           | 按需                               | ⬜   |
 | D7  | `data_gaps` 依赖 LLM 自觉                                                                                                                                                                   | P7 持续监控                        | ⬜   |
