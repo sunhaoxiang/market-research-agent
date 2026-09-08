@@ -6,7 +6,7 @@
 > **每完成一个任务就更新此表的状态**；每完成一个阶段，跑 `[DP §26]` 的收尾清单并写阶段小结。
 
 - 最后更新：2026-09-08
-- 当前阶段：**P3-1 CoinGecko provider 已完成**；下一任务 P3-2 DefiLlama。P3-3 消歧用已有 `search_coins`。
+- 当前阶段：**P3-2 DefiLlama provider 已完成**；下一任务 P3-3 `resolve_asset`。P3-6 用已有 DefiLlama 类型，不要再包 HTTP。
 
 ### 已确认的前置决策（2026-09-07）
 
@@ -149,11 +149,11 @@ hash 跨会话稳定，说明 §9.8 的缓存前缀约束真的守住了；95.4%
 | ID    | 任务                                                                                             | 依赖            | 状态 | 验收                                    |
 | ----- | ------------------------------------------------------------------------------------------------ | --------------- | ---- | --------------------------------------- |
 | P3-1  | CoinGecko provider（限流/缓存/错误映射）                                                         | P2-1            | ✅   | 契约测试通过                            |
-| P3-2  | DefiLlama provider                                                                               | P2-1            | ⬜   | 契约测试通过                            |
+| P3-2  | DefiLlama provider                                                                               | P2-1            | ✅   | 契约测试通过                            |
 | P3-3  | `resolve_asset`：符号→coin id 消歧（含同名冲突处理，多候选时返回列表让 Agent 选）。底层用已有 `search_coins`，不要再包一层 HTTP | P3-1            | ⬜   | "HYPE" 正确解析到 Hyperliquid           |
 | P3-4  | `tools/crypto/`：`get_crypto_price` / `get_market_data` / `get_price_history`。包 `CoinGeckoProvider` 的现成类型，不要再解析一遍 JSON | P3-1, P3-3      | ⬜   | 结构化输出 + provenance 完整            |
 | P3-5  | `tools/system/compute_metrics`：涨跌幅 / CAGR / 波动率 / 百分位（纯 Python）`[DP §8.5]`          | P1-1            | ⬜   | 单元测试含边界值                        |
-| P3-6  | `tools/defi/`：`get_tvl` / `get_protocol_fees_revenue` / `get_dex_volume` / `get_chain_overview` | P3-2            | ⬜   | HYPE/Hyperliquid 数据正确               |
+| P3-6  | `tools/defi/`：`get_tvl` / `get_protocol_fees_revenue` / `get_dex_volume` / `get_chain_overview`。包 `DefiLlamaProvider` 的现成类型，不要再解析一遍 JSON | P3-2            | ⬜   | HYPE/Hyperliquid 数据正确               |
 | P3-7  | `tools/crypto/get_tokenomics`：供应量 / 分配 / 解锁（数据源覆盖度调研 + 缺失明确声明）           | P3-1            | ⬜   | 拿不到的字段进 `data_gaps`              |
 | P3-8  | 链上数据源选型调研 + 可行子集实现（`get_chain_activity` 等），受限项写入风险登记 `[DP §23 R4]`   | P3-2            | ⬜   | 输出实际覆盖度结论文档                  |
 | P3-9  | Crypto Research Agent + prompt（整合 crypto/defi/onchain/web tools）                             | P3-4~P3-8, P2-6 | ⬜   | 对 3 个样例 crypto 问题产出完整 finding |
@@ -502,6 +502,19 @@ Agent / Tool 只依赖 `SearchProvider` 协议，Tavily 是第一个实现。换
 - 给人点的 URL 是 `coingecko.com/en/coins/{id}`，不是 API 地址。
 
 `/v1/health` 里 CoinGecko 始终 `configured=true`（无 key 也能用）。注入 `ToolDeps`、挂 `/v1/tools/.../invoke` 是 P3-4，本项只把客户端放进 `app.state.coingecko`。
+
+### P3-2 — DefiLlama provider ✅（2026-09-08）
+
+无需 key，继承 `BaseProvider`。profile 已按礼貌限速 5/s 钉死。400/404 和「只有 message 的 200」都映射成 `NOT_FOUND`，空 chain 历史也是——不要把空列表当成 TVL=0。
+
+四个方法是给 **P3-6** 用的原语：
+
+- `get_protocol_tvl` / `get_chain_tvl` → `get_tvl`。days 在本地按时间裁切，不打进 query，这样 7 天和 30 天共享同一份缓存。
+- `get_fees_revenue` → `get_protocol_fees_revenue`。fees 与 revenue 是两次 `dataType` 不同的请求；没有 revenue adapter 时字段为 None，不让整次失败。
+- `get_dex_volume` / `get_chain_overview` 同名 tool。overview 先拉 `/v2/chains` 再按名匹配（大小写不敏感），列表缓存共享。
+- 给人点的 URL 是 `defillama.com/protocol/{slug}` 或 `/chain/{name}`。
+
+注入 `ToolDeps` 是 P3-6。本项只把客户端放进 `app.state.defillama`。
 
 ---
 

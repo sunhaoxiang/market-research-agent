@@ -21,6 +21,7 @@ from agent_service.config import Settings, get_settings
 from agent_service.models.registry import ModelRegistry, bootstrap_sdk, tracing_status
 from agent_service.observability.logging import configure_logging, get_logger
 from agent_service.providers.crypto import CoinGeckoProvider
+from agent_service.providers.defi import DefiLlamaProvider
 from agent_service.providers.fetch import WebFetcher
 from agent_service.providers.runtime import ProviderRuntime
 from agent_service.providers.search import TavilySearchProvider
@@ -104,6 +105,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         runtime=runtime,
         api_key=None if cg_key is None else cg_key.get_secret_value(),
     )
+    app.state.defillama = DefiLlamaProvider(runtime=runtime)
 
     configured = [p.provider for p in _llm_provider_status(settings) if p.configured]
     log.info(
@@ -130,6 +132,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     coingecko = getattr(app.state, "coingecko", None)
     if coingecko is not None:
         await coingecko.aclose()
+    defillama = getattr(app.state, "defillama", None)
+    if defillama is not None:
+        await defillama.aclose()
     await app.state.provider_runtime.aclose()
     await app.state.registry.aclose()
     log.info("agent_service.shutdown")
@@ -150,6 +155,7 @@ def create_app() -> FastAPI:
     app.state.search_provider = None
     app.state.web_fetcher = None
     app.state.coingecko = None
+    app.state.defillama = None
 
     @app.get("/v1/health", response_model=HealthResponse, tags=["system"])
     async def health() -> HealthResponse:
