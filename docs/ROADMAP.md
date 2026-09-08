@@ -6,7 +6,7 @@
 > **每完成一个任务就更新此表的状态**；每完成一个阶段，跑 `[DP §26]` 的收尾清单并写阶段小结。
 
 - 最后更新：2026-09-08
-- 当前阶段：**Phase 2 进行中**（P2-1 已完成）
+- 当前阶段：**Phase 2 进行中**（P2-1、P2-2 已完成）
 
 ### 已确认的前置决策（2026-09-07）
 
@@ -128,7 +128,7 @@ hash 跨会话稳定，说明 §9.8 的缓存前缀约束真的守住了；95.4%
 | ID    | 任务                                                                                                                      | 依赖        | 状态 | 验收                                        |
 | ----- | ------------------------------------------------------------------------------------------------------------------------- | ----------- | ---- | ------------------------------------------- |
 | P2-1  | `providers/base.py`：httpx 客户端池 + 分级缓存（SQLite KV）+ 令牌桶限流 + 配额计数 + tenacity 重试 + 自动埋点 `[DP §8.3]` | P1-1        | ✅   | 契约测试覆盖 429/5xx/超时/缓存命中；配额跨重启仍在；缓存命中不耗配额 |
-| P2-2  | `SearchProvider` 抽象 + Tavily 实现（可切 Exa/Brave 的接口设计）                                                          | P2-1        | ⬜   | respx 契约测试通过                          |
+| P2-2  | `SearchProvider` 抽象 + Tavily 实现（可切 Exa/Brave 的接口设计）                                                          | P2-1        | ✅   | respx 契约测试通过：Bearer 鉴权、body 不含 key、`search_depth=basic`、缓存命中 |
 | P2-3  | `web_fetch` 抓取器：SSRF 防护（DNS→IP 校验、协议/重定向/大小/超时限制）+ trafilatura 正文提取                             | P2-1        | ⬜   | 内网 IP / 超大响应被正确拦截                |
 | P2-4  | `tools/web/`：`web_search` / `web_fetch` / `news_search`，全部返回 `ToolResult` + provenance                              | P2-2, P2-3  | ⬜   | `/v1/tools/{name}/invoke` 可单独调用        |
 | P2-5  | Prompt injection 隔离：`<untrusted_web_content>` 包裹 + instructions 声明 + 注入迹象 warning 事件 `[DP §17.1-5]`          | P2-4        | ⬜   | 含注入指令的样例页面不改变 Agent 行为       |
@@ -373,6 +373,18 @@ hash 跨会话稳定，说明 §9.8 的缓存前缀约束真的守住了；95.4%
 重试只覆盖 429 / 5xx / 超时 / 网络错误；4xx 立刻失败。对"标的不存在"重试既浪费配额，也会把瞬时问题伪装成慢。配额落 SQLite：进程重启不能把当天已用次数清零，否则 FMP 的 250/day 会被重启成倍放大。令牌桶只活在内存里，重启后从满桶开始是合理的。
 
 P2-2 起的具体源（Tavily / CoinGecko 等）继承 `BaseProvider` 即可，不必再实现横切能力。`/debug/providers` 仍属 Phase 6，但进程内 `ProviderStats` 已经在记。
+
+### P2-2 — SearchProvider + Tavily ✅（2026-09-08）
+
+Agent / Tool 只依赖 `SearchProvider` 协议，Tavily 是第一个实现。换 Exa 或 Brave 时交出同样的 `SearchPage` 即可，不必改 tool 层。URL 归一化与 `Source.ref` 编号留给 P2-7 / 编排层。
+
+几个刻意的边界：
+
+- 认证走 `Authorization: Bearer`，**不把 key 放进 JSON body**。旧版 Tavily SDK 那样做会让 key 进入缓存键。
+- `search_depth` 钉死 `basic`（1 credit）。`advanced` 要 2 credit，而配额按 HTTP 次计，对不上就会在账单之前把额度用超。
+- `include_answer=False`：答案由我们自己的 Agent 写，不买 Tavily 的摘要。
+- `include_raw_content=markdown`：这是选 Tavily 的理由（§3.5），默认开。
+- `max_results` 上限 10，避免一次搜索把月配额打穿。
 
 ---
 

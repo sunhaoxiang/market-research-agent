@@ -141,6 +141,26 @@ class BaseProvider:
             )
         )
 
+    async def post_json(
+        self,
+        endpoint: str,
+        *,
+        ttl: CacheTTL,
+        json_body: Mapping[str, object],
+        headers: Mapping[str, str] | None = None,
+        bypass_cache: bool = False,
+    ) -> ProviderResponse:
+        return await self.request(
+            ProviderRequest(
+                endpoint=endpoint,
+                ttl=ttl,
+                method="POST",
+                json_body=json_body,
+                headers=headers,
+                bypass_cache=bypass_cache,
+            )
+        )
+
     async def request(self, req: ProviderRequest) -> ProviderResponse:
         started = self.runtime.clock.monotonic()
         self.stats.requests += 1

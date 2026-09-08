@@ -1,7 +1,7 @@
 """外部数据源客户端。
 
-P2-1 只落地横切基础设施（缓存 / 限流 / 配额 / 重试）。具体源（Tavily、
-CoinGecko 等）从 P2-2 / P3 / P4 接入时继承 `BaseProvider` 即可。
+横切能力在 `BaseProvider`；具体源按协议接入。搜索走 `SearchProvider`，
+默认实现是 Tavily，接口按可替换 Exa / Brave 设计（§3.5）。
 """
 
 from agent_service.providers.base import (
@@ -13,6 +13,13 @@ from agent_service.providers.base import (
 from agent_service.providers.errors import ProviderError, RetryableProviderError
 from agent_service.providers.profiles import PROFILES, ProviderProfile, RetryPolicy, profile_for
 from agent_service.providers.runtime import Clock, ProviderRuntime
+from agent_service.providers.search import (
+    SearchHit,
+    SearchPage,
+    SearchProvider,
+    SearchQuery,
+    TavilySearchProvider,
+)
 from agent_service.providers.ttl import CacheTTL
 
 __all__ = [
@@ -28,5 +35,10 @@ __all__ = [
     "ProviderStats",
     "RetryPolicy",
     "RetryableProviderError",
+    "SearchHit",
+    "SearchPage",
+    "SearchProvider",
+    "SearchQuery",
+    "TavilySearchProvider",
     "profile_for",
 ]
