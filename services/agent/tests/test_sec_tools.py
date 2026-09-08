@@ -1,4 +1,4 @@
-"""SEC tools（P4-8 验收）。能列出申报、抽出 Item 1A/7 正文、按 tag 取 XBRL、财报摘要。"""
+"""SEC tools（P4-8 / P4-9 验收）。列出申报、按 Item 分节并截取正文、XBRL facts、财报摘要。"""
 
 from __future__ import annotations
 
@@ -25,7 +25,12 @@ from agent_service.tools.sec.bindings import SEC_TOOLS
 from agent_service.tools.sec.earnings import run_get_earnings_summary
 from agent_service.tools.sec.facts import run_get_xbrl_facts
 from agent_service.tools.sec.filings import run_list_sec_filings
-from agent_service.tools.sec.sections import extract_item, html_to_text, run_get_filing_section
+from agent_service.tools.sec.sections import (
+    extract_item,
+    html_to_text,
+    run_get_filing_section,
+    split_items,
+)
 
 _NOW = datetime(2026, 9, 8, tzinfo=UTC)
 _CIK = "0001045810"
@@ -273,6 +278,25 @@ def test_mda_alias_is_item_7() -> None:
     assert item.code == "7"
 
 
+def test_split_items_skips_table_of_contents() -> None:
+    html = """<html><body>
+<div>ITEM 1. BUSINESS 5</div>
+<div>ITEM 1A. RISK FACTORS 12</div>
+<div>ITEM 7. MD&A 40</div>
+<div>ITEM 1. BUSINESS</div>
+<p>We design GPUs for accelerated computing and data centers worldwide.</p>
+<div>ITEM 1A. RISK FACTORS</div>
+<p>Competition may harm our business. Customer concentration is a material risk.</p>
+<div>ITEM 7. MD&A</div>
+<p>Revenue was $130.5 billion in fiscal 2025 compared to $60.9 billion in fiscal 2024.</p>
+</body></html>"""
+    items = split_items(html_to_text(html))
+    by_code = {item.code: item for item in items}
+    assert "Competition may harm our business" in by_code["1A"].text
+    assert "BUSINESS 5" not in by_code["1"].text
+    assert "130.5 billion" in by_code["7"].text
+
+
 async def test_list_sec_filings_filters_10k() -> None:
     sec = FakeSecEdgar()
     result = await run_list_sec_filings(ToolDeps(sec_edgar=sec), ticker="NVDA", form_types=["10-K"])
@@ -303,7 +327,9 @@ async def test_get_filing_section_returns_item_1a() -> None:
     assert result.data.section == "1A"
     assert result.data.form == "10-K"
     assert "Competition" in result.data.text
-    assert result.data.truncated is False
+    assert [item.code for item in result.data.items] == ["1", "1A", "7", "7A", "8"]
+    assert result.data.total_chars == len(result.data.text)
+    assert result.data.next_offset is None
     assert sec.document_calls == [(_CIK, _TEN_K, "nvda-20250126.htm")]
     assert result.provenance is not None
     url = result.provenance.source_url
@@ -313,11 +339,20 @@ async def test_get_filing_section_returns_item_1a() -> None:
 
 async def test_get_filing_section_unknown_section_is_invalid() -> None:
     result = await run_get_filing_section(
-        ToolDeps(sec_edgar=FakeSecEdgar()), accession=_TEN_K, section="99"
+        ToolDeps(sec_edgar=FakeSecEdgar()), accession=_TEN_K, section="nope"
     )
     assert result.ok is False
     assert result.error is not None
     assert result.error.code is ToolErrorCode.INVALID_INPUT
+
+
+async def test_get_filing_section_missing_item_is_not_found() -> None:
+    result = await run_get_filing_section(
+        ToolDeps(sec_edgar=FakeSecEdgar()), accession=_TEN_K, section="9A"
+    )
+    assert result.ok is False
+    assert result.error is not None
+    assert result.error.code is ToolErrorCode.NOT_FOUND
 
 
 async def test_get_filing_section_missing_accession_is_not_found() -> None:
@@ -329,6 +364,72 @@ async def test_get_filing_section_missing_accession_is_not_found() -> None:
     assert result.ok is False
     assert result.error is not None
     assert result.error.code is ToolErrorCode.NOT_FOUND
+
+
+async def test_get_filing_section_outline_is_catalog_only() -> None:
+    result = await run_get_filing_section(
+        ToolDeps(sec_edgar=FakeSecEdgar()), accession=_TEN_K, section="outline"
+    )
+    assert result.ok is True
+    assert result.data is not None
+    assert result.data.section == "outline"
+    assert result.data.truncated is False
+    assert [item.code for item in result.data.items] == ["1", "1A", "7", "7A", "8"]
+    assert "ITEM 1A" in result.data.text
+    assert "Competition may harm" not in result.data.text
+
+
+async def test_get_filing_section_paginates_long_item() -> None:
+    filler = "risk " * 3_000
+    html = (
+        "<html><body>"
+        "<div>ITEM 1A. RISK FACTORS</div>"
+        f"<p>{filler}</p>"
+        "<div>ITEM 8. FINANCIAL STATEMENTS</div>"
+        "<p>See the notes.</p>"
+        "</body></html>"
+    )
+    deps = ToolDeps(sec_edgar=FakeSecEdgar(html=html))
+    first = await run_get_filing_section(deps, accession=_TEN_K, section="1A", max_chars=80)
+    assert first.ok is True
+    assert first.data is not None
+    assert first.data.truncated is True
+    assert len(first.data.text) == 80
+    assert first.data.next_offset == 80
+    assert first.data.total_chars > 80
+    assert first.quality is not None
+    assert any("offset=80" in item for item in first.quality.caveats)
+
+    second = await run_get_filing_section(
+        deps, accession=_TEN_K, section="1A", offset=80, max_chars=80
+    )
+    assert second.ok is True
+    assert second.data is not None
+    full = extract_item(html_to_text(html), "1A")
+    assert full is not None
+    assert second.data.text == full.text[80:160]
+
+
+async def test_get_filing_section_clamps_max_chars() -> None:
+    filler = "risk " * 4_000
+    html = (
+        "<html><body>"
+        "<div>ITEM 1A. RISK FACTORS</div>"
+        f"<p>{filler}</p>"
+        "<div>ITEM 8. NOTES</div><p>end</p>"
+        "</body></html>"
+    )
+    result = await run_get_filing_section(
+        ToolDeps(sec_edgar=FakeSecEdgar(html=html)),
+        accession=_TEN_K,
+        section="1A",
+        max_chars=50_000,
+    )
+    assert result.ok is True
+    assert result.data is not None
+    assert len(result.data.text) == 8_000
+    assert result.data.truncated is True
+    assert result.data.next_offset == 8_000
 
 
 async def test_get_xbrl_facts_pins_nvda_fy2025_revenue() -> None:

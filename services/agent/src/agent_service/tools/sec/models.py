@@ -27,14 +27,24 @@ class SecFilingsData(Schema):
     url: str
 
 
+class FilingItemOutline(Schema):
+    code: str
+    heading: str
+    chars: int
+
+
 class FilingSectionData(Schema):
     accession: str
     form: str | None = None
     section: str
     heading: str | None = None
     text: str
+    offset: int = 0
+    total_chars: int = 0
     truncated: bool = False
+    next_offset: int | None = None
     url: str
+    items: list[FilingItemOutline] = Field(default_factory=list)
 
 
 class XbrlFactPointData(Schema):

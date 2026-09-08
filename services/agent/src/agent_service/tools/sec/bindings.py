@@ -44,16 +44,26 @@ async def get_filing_section(
     ctx: RunContextWrapper[ToolDeps],
     accession: str,
     section: str,
+    offset: int = 0,
+    max_chars: int = 6000,
 ) -> ToolResult[FilingSectionData]:
-    """取出一份已申报文件的指定章节正文（10-K Item 1A / 7，10-Q Item 2）。只要 accession。
+    """取出一份已申报文件的指定章节。先分节再截取，单次最多约 8000 字符；用 offset 续取。
 
     Args:
         accession: 申报编号，例如 "0001045810-25-000031"。
-        section: 章节，例如 "1A"、"risk_factors"、"7"、"mda"、"2"。
+        section: 章节，例如 "1A"、"risk_factors"、"7"、"mda"、"2"；"outline" 只返回目录。
+        offset: 从章节第几个字符开始，默认 0。
+        max_chars: 本次最多返回多少字符，1–8000，默认 6000。
     """
     return stamp_for_agent(
         ctx.context,
-        await run_get_filing_section(ctx.context, accession=accession, section=section),
+        await run_get_filing_section(
+            ctx.context,
+            accession=accession,
+            section=section,
+            offset=offset,
+            max_chars=max_chars,
+        ),
     )
 
 

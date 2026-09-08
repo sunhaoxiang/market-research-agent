@@ -11,7 +11,8 @@
 - `get_company_facts` → **P4-5** 三表 XBRL / **P4-8** `get_xbrl_facts`
 - `get_filing_document` → **P4-8** `get_filing_section`（HTML 按 accession 永久缓存）
 
-`get_submissions` / `get_company_facts` / `get_filing_document` 只收 CIK。大文件分节是 P4-9。
+`get_submissions` / `get_company_facts` / `get_filing_document` 只收 CIK。
+HTML 按 accession 永久缓存；注入侧分节截取在 tool 层。
 """
 
 from __future__ import annotations

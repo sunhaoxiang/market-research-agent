@@ -12,6 +12,7 @@ from agent_service.tools.sec.facts import run_get_xbrl_facts
 from agent_service.tools.sec.filings import run_list_sec_filings
 from agent_service.tools.sec.models import (
     EarningsSummaryData,
+    FilingItemOutline,
     FilingListItem,
     FilingSectionData,
     SecFilingsData,
@@ -19,11 +20,17 @@ from agent_service.tools.sec.models import (
     XbrlFactPointData,
     XbrlFactsData,
 )
-from agent_service.tools.sec.sections import extract_item, html_to_text, run_get_filing_section
+from agent_service.tools.sec.sections import (
+    extract_item,
+    html_to_text,
+    run_get_filing_section,
+    split_items,
+)
 
 __all__ = [
     "SEC_TOOLS",
     "EarningsSummaryData",
+    "FilingItemOutline",
     "FilingListItem",
     "FilingSectionData",
     "SecFilingsData",
@@ -40,4 +47,5 @@ __all__ = [
     "run_get_filing_section",
     "run_get_xbrl_facts",
     "run_list_sec_filings",
+    "split_items",
 ]

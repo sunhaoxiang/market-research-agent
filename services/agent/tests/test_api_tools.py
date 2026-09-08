@@ -847,6 +847,8 @@ def test_invoke_filing_section(client: TestClient) -> None:
     assert body["data"]["section"] == "1A"
     assert "Competition" in body["data"]["text"]
     assert "ITEM 7" not in body["data"]["text"]
+    assert body["data"]["items"][0]["code"] == "1A"
+    assert body["data"]["truncated"] is False
 
 
 def test_invoke_xbrl_facts(client: TestClient) -> None:

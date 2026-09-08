@@ -161,6 +161,8 @@ class ListSecFilingsArgs(BaseModel):
 class FilingSectionArgs(BaseModel):
     accession: str
     section: str
+    offset: int = 0
+    max_chars: int = 6000
 
 
 class XbrlFactsArgs(BaseModel):
@@ -403,7 +405,13 @@ async def _get_filing_section(
         args = FilingSectionArgs.model_validate(arguments)
     except ValidationError as exc:
         return fail_validation("get_filing_section", exc)
-    return await run_get_filing_section(deps, accession=args.accession, section=args.section)
+    return await run_get_filing_section(
+        deps,
+        accession=args.accession,
+        section=args.section,
+        offset=args.offset,
+        max_chars=args.max_chars,
+    )
 
 
 async def _get_xbrl_facts(deps: ToolDeps, arguments: dict[str, Any]) -> ToolResult[XbrlFactsData]:
