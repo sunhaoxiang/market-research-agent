@@ -6,7 +6,7 @@
 > **每完成一个任务就更新此表的状态**；每完成一个阶段，跑 `[DP §26]` 的收尾清单并写阶段小结。
 
 - 最后更新：2026-09-08
-- 当前阶段：**P5-8 已完成**；下一任务 P5-9。
+- 当前阶段：**P5-9 已完成**；下一任务 P5.5 MVP 验收。
 
 ### 已确认的前置决策（2026-09-07）
 
@@ -200,7 +200,7 @@ hash 跨会话稳定，说明 §9.8 的缓存前缀约束真的守住了；95.4%
 | P5-6 | Gap Check + 最多 1 轮补充研究（`PLAN_UPDATED`）                                                            | P5-5              | ✅   | 缺关键数据时能补一轮                        |
 | P5-7 | Report Writer v2：动态 `report_sections`、Executive Summary、Bull/Bear Case、Risks、数据限制章节、免责声明。**`claim_ids` 继续由 `attach_section_claims` 代码回填**，不要改回让模型抄 id | P5-6, P2-8        | ✅   | 不同问题类型报告结构不同                        |
 | P5-8 | 全流程 workflow 测试（ScriptedModel）：正常 / 工具失败 / 超时 / 冲突 / 引用缺失 / schema 解析失败 6 条路径 | P5-7, P1-8        | ✅   | 全部确定性通过                              |
-| P5-9 | 多模型冒烟：6 个 provider 各跑一次完整研究，结果写入 catalog `verified` 字段 + `[DP §9.4]` 降级验证        | P5-8, P1-4        | ⬜   | 已配 key 的 provider 全部跑通或明确标注限制 |
+| P5-9 | 多模型冒烟：6 个 provider 各跑一次完整研究，结果写入 catalog `verified` 字段 + `[DP §9.4]` 降级验证        | P5-8, P1-4        | ✅   | 已配 key 的 provider 全部跑通或明确标注限制 |
 
 ### P5-1 — 意图分类层 ✅（2026-09-08）
 
@@ -278,6 +278,16 @@ Merge / Fact Checker 之后、Writer 之前。**纯代码规则，不打模型�
 | schema 解析失败 | 规划首次坏 JSON 重试成功并累计用量；Writer 三次都坏则 `SESSION_FAILED` / `writing` |
 
 不是真跑 DeepSeek。
+
+### P5-9 — 多模型冒烟（仅 DeepSeek）✅（2026-09-08）
+
+本机只有 `DEEPSEEK_API_KEY`。验收是「已配 key 的跑通，没配的明确标注限制」，不是硬跑 6 家。没有新开一轮 5 分钟完整 live 研究——Phase 2–4 已经真跑过 DeepSeek，json_mode 路径也在 P1-4b / P1-9 核实过。CI 无真实 key，不能把 live 研究塞进默认 pytest。
+
+`ModelEntry.verified` 是冒烟结果，和已有的 `verified_at`（价格/参数对照官方文档的日期）分开。DeepSeek 两条都 `verified=True`：`v4-pro` 是完整研究；`v4-flash` 覆盖同一真跑会话的 FAST 角色，**不适合 planner**（P1-9）。其余五家 `verified=False`，notes 写明缺哪个 `*_API_KEY`。`models/smoke.py` 按 provider 汇总：没 key → `skipped_no_key`；有 key 且至少一条 `verified` → `verified`；有 key 但全是 `verified=False` → `pending`。
+
+`GET /v1/models` 带上 `verified`。前端选择器：可用模型标「已验证 / 未验证」；不可用的仍只显示「未配置 KEY」，不叠「未验证」。
+
+§9.4：DeepSeek / 智谱继续走 `json_mode`（开发期正常路径）。OpenAI / Kimi 的 `native_schema`、Anthropic 的 `prompt_only` 本机未 live，catalog 保持未验证。
 
 ### P5.5 — MVP 验收 ⬜
 

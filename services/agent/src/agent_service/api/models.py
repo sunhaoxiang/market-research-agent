@@ -27,6 +27,11 @@ class ModelInfo(BaseModel):
     verified_at: str | None = Field(
         default=None, description="参数最后一次对照官方文档核实的日期；null 表示未核实"
     )
+    verified: bool = Field(
+        description=(
+            "是否完成过一次完整研究冒烟（含 §9.4 结构化输出路径）。与 verified_at 不是同一件事。"
+        )
+    )
     notes: str | None = None
 
 
@@ -56,6 +61,7 @@ async def list_models(request: Request) -> ModelsResponse:
             unavailable_reason=reasons.get(entry.id),
             capabilities=entry.capabilities,
             verified_at=entry.verified_at.isoformat() if entry.verified_at else None,
+            verified=entry.verified,
             notes=entry.notes,
         )
         for entry in CATALOG

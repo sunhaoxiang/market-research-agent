@@ -14,7 +14,16 @@ export type ModelOption = {
   display_name: string;
   available: boolean;
   unavailable_reason: string | null;
+  /** 完整研究冒烟是否通过。不可用的模型只显示缺 key，不叠「未验证」。 */
+  verified: boolean;
 };
+
+export function optionLabel(model: ModelOption): string {
+  if (!model.available) {
+    return `${model.display_name} — ${model.unavailable_reason ?? "不可用"}`;
+  }
+  return `${model.display_name} — ${model.verified ? "已验证" : "未验证"}`;
+}
 
 /**
  * Provider → Model 两级选择器（§9.3）。
@@ -53,8 +62,7 @@ export function ModelSelector({
           <optgroup key={provider} label={provider}>
             {group.map((model) => (
               <option key={model.id} value={model.id} disabled={!model.available}>
-                {model.display_name}
-                {model.available ? "" : ` — ${model.unavailable_reason ?? "不可用"}`}
+                {optionLabel(model)}
               </option>
             ))}
           </optgroup>

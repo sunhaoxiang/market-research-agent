@@ -55,6 +55,8 @@ export type AgentModelInfo = {
   capabilities: ModelCapabilities;
   /** 参数最后一次对照官方文档核实的日期；null 表示未核实，UI 应提示。 */
   verified_at: string | null;
+  /** 是否完成过一次完整研究冒烟。与 verified_at 不是同一件事。 */
+  verified: boolean;
   notes: string | null;
 };
 

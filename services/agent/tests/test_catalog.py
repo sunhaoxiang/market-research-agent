@@ -205,6 +205,12 @@ def test_only_kimi_and_openai_claim_native_schema() -> None:
     assert "zhipu:glm-5.3-flash" not in native
 
 
+def test_only_deepseek_is_smoke_verified() -> None:
+    """P5-9：本机只有 DeepSeek key，完整研究冒烟只标这两条。"""
+    verified = {entry.id for entry in CATALOG if entry.verified}
+    assert verified == {"deepseek:deepseek-v4-pro", "deepseek:deepseek-v4-flash"}
+
+
 def test_peak_schedule_hour_windows_are_well_formed() -> None:
     schedule = PeakSchedule(timezone="Asia/Shanghai", hour_windows=[(9, 12), (14, 18)])
     for start, end in schedule.hour_windows:

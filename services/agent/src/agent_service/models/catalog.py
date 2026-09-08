@@ -2,7 +2,7 @@
 
 声明式配置，**新增模型只改这一个文件**。
 
-两条关于数字的纪律：
+三条关于数字与冒烟的纪律：
 
 1. **价格统一折算成 USD**，因为成本护栏 `MAX_SESSION_COST_USD` 是美元。
    国内厂商按人民币报价，用下方 `CNY_PER_USD` 这一个参考汇率换算——
@@ -10,6 +10,9 @@
 2. **每个条目带 `verified_at`**。DeepSeek 在 2026-08 的调价里部分项目涨了 11 倍，
    价格表会过期。`None` 表示该条目的参数尚未对着官方页面核实过，
    成本核算会照算但不应据此做预算决策。
+3. **`verified` 是 P5-9 完整研究冒烟结果**，与 `verified_at` 不是同一件事。
+   价格对过官方文档 ≠ 这条模型跑通过一次研究。没配 key 的 provider
+   保持 `verified=False`，并在 notes 里写明限制。
 """
 
 from __future__ import annotations
@@ -54,6 +57,13 @@ class ModelEntry(Schema):
     display_name: str
     capabilities: ModelCapabilities
     verified_at: date | None = Field(default=None, description="参数最后一次对照官方文档核实的日期")
+    verified: bool = Field(
+        default=False,
+        description=(
+            "P5-9：是否完成过一次完整研究冒烟（含 §9.4 结构化输出路径）。"
+            "与 verified_at 不是同一件事——后者只说明价格表对过官方文档。"
+        ),
+    )
     notes: str | None = None
 
 
@@ -71,6 +81,7 @@ CATALOG: tuple[ModelEntry, ...] = (
         adapter=AdapterKind.OPENAI_CHAT,
         display_name="DeepSeek V4 Pro",
         verified_at=_VERIFIED,
+        verified=True,
         notes=(
             "开发期 PLANNER / BALANCED / WRITING 的默认模型。"
             "json_mode 已实测确认：发送 response_format=json_schema 会被 400 拒绝，"
@@ -78,6 +89,8 @@ CATALOG: tuple[ModelEntry, ...] = (
             "planner 场景实测单次 17-60s，输出 1.1k-4k token，延迟与输出量正相关；"
             "三个样例问题 3/3 产出无需修复的合法计划，故保留为 PLANNER 默认。"
             "偶发返回 200 + 空 content（见 EmptyOutputError），已按可重试处理。"
+            "P5-9（2026-09-08）：完整研究冒烟通过（Phase 2–4 真跑，json_mode）；"
+            "本机仅有 DeepSeek key，未对其它 provider 重跑。"
         ),
         capabilities=ModelCapabilities(
             tool_calling=True,
@@ -102,12 +115,14 @@ CATALOG: tuple[ModelEntry, ...] = (
         adapter=AdapterKind.OPENAI_CHAT,
         display_name="DeepSeek V4 Flash",
         verified_at=_VERIFIED,
+        verified=True,
         notes=(
             "开发期 FAST 的默认模型：意图分类与 Web Research。"
             "**不适合做 planner**（P1-9 实测）：它同样是推理模型，规划这类任务上"
             "输出 4.3k-4.7k token（v4-pro 只要 2.1k-2.7k），因此中位延迟 42s"
             "反而略高于 v4-pro 的 38s，价格优势也被输出量吃掉大半；"
             "同一问题连跑 5 次有 1 次返回空 content，延迟方差 14-71s。"
+            "P5-9：同一真跑会话的 FAST 角色已覆盖；不作为 planner。"
         ),
         capabilities=ModelCapabilities(
             tool_calling=True,
@@ -135,7 +150,10 @@ CATALOG: tuple[ModelEntry, ...] = (
         adapter=AdapterKind.OPENAI_CHAT,
         display_name="GLM-5.3-Flash",
         verified_at=_VERIFIED,
-        notes="目录中最便宜的条目（¥0.8/¥2.8）。原生多模态，1M 上下文。",
+        notes=(
+            "目录中最便宜的条目（¥0.8/¥2.8）。原生多模态，1M 上下文。"
+            "P5-9：未配置 ZHIPU_API_KEY，完整研究冒烟未跑。"
+        ),
         capabilities=ModelCapabilities(
             tool_calling=True,
             parallel_tool_calls=True,
@@ -157,7 +175,10 @@ CATALOG: tuple[ModelEntry, ...] = (
         adapter=AdapterKind.OPENAI_CHAT,
         display_name="GLM-5.3",
         verified_at=_VERIFIED,
-        notes="中文写作与长程 Agent 任务表现较强，可作 WRITING 的对比项。",
+        notes=(
+            "中文写作与长程 Agent 任务表现较强，可作 WRITING 的对比项。"
+            "P5-9：未配置 ZHIPU_API_KEY，完整研究冒烟未跑。"
+        ),
         capabilities=ModelCapabilities(
             tool_calling=True,
             parallel_tool_calls=True,
@@ -184,6 +205,7 @@ CATALOG: tuple[ModelEntry, ...] = (
             "目录中唯一确认支持 strict json_schema 的非 OpenAI 模型。"
             "输出 $15/M 是 DeepSeek Pro 闲时的 7 倍，仅在 json_mode 路径被证明"
             "不可靠时启用。始终开启推理，用 reasoning_effort 调节。"
+            "P5-9：未配置 MOONSHOT_API_KEY，native_schema 完整研究冒烟未跑。"
         ),
         capabilities=ModelCapabilities(
             tool_calling=True,
@@ -207,7 +229,10 @@ CATALOG: tuple[ModelEntry, ...] = (
         upstream_model="gpt-5.6-terra",
         adapter=AdapterKind.OPENAI_RESPONSES,
         display_name="GPT-5.6 Terra",
-        notes="上线期 BALANCED。上下文窗口为保守估计，切换前需复核。",
+        notes=(
+            "上线期 BALANCED。上下文窗口为保守估计，切换前需复核。"
+            "P5-9：未配置 OPENAI_API_KEY，native_schema 完整研究冒烟未跑。"
+        ),
         capabilities=ModelCapabilities(
             tool_calling=True,
             parallel_tool_calls=True,
@@ -226,7 +251,7 @@ CATALOG: tuple[ModelEntry, ...] = (
         upstream_model="gpt-5.6-sol",
         adapter=AdapterKind.OPENAI_RESPONSES,
         display_name="GPT-5.6 Sol",
-        notes="上线期 PLANNER / WRITING。",
+        notes=("上线期 PLANNER / WRITING。P5-9：未配置 OPENAI_API_KEY，完整研究冒烟未跑。"),
         capabilities=ModelCapabilities(
             tool_calling=True,
             parallel_tool_calls=True,
@@ -245,7 +270,7 @@ CATALOG: tuple[ModelEntry, ...] = (
         upstream_model="gpt-5.6-luna",
         adapter=AdapterKind.OPENAI_RESPONSES,
         display_name="GPT-5.6 Luna",
-        notes="上线期 FAST。",
+        notes=("上线期 FAST。P5-9：未配置 OPENAI_API_KEY，完整研究冒烟未跑。"),
         capabilities=ModelCapabilities(
             tool_calling=True,
             parallel_tool_calls=True,
@@ -264,7 +289,7 @@ CATALOG: tuple[ModelEntry, ...] = (
         upstream_model="gpt-6-astra",
         adapter=AdapterKind.OPENAI_RESPONSES,
         display_name="GPT-6 Astra",
-        notes="可选升档：复杂研究与长财报。",
+        notes=("可选升档：复杂研究与长财报。P5-9：未配置 OPENAI_API_KEY，完整研究冒烟未跑。"),
         capabilities=ModelCapabilities(
             tool_calling=True,
             parallel_tool_calls=True,
@@ -287,7 +312,9 @@ CATALOG: tuple[ModelEntry, ...] = (
         upstream_model="anthropic/claude-sonnet-4-5",
         adapter=AdapterKind.LITELLM,
         display_name="Claude Sonnet",
-        notes="占位条目，参数未核实。",
+        notes=(
+            "占位条目，参数未核实。P5-9：未配置 ANTHROPIC_API_KEY，prompt_only 完整研究冒烟未跑。"
+        ),
         capabilities=ModelCapabilities(
             tool_calling=True,
             parallel_tool_calls=True,
@@ -305,7 +332,7 @@ CATALOG: tuple[ModelEntry, ...] = (
         upstream_model="gemini/gemini-2.5-pro",
         adapter=AdapterKind.LITELLM,
         display_name="Gemini Pro",
-        notes="占位条目，参数未核实。",
+        notes=("占位条目，参数未核实。P5-9：未配置 GOOGLE_API_KEY，完整研究冒烟未跑。"),
         capabilities=ModelCapabilities(
             tool_calling=True,
             parallel_tool_calls=True,

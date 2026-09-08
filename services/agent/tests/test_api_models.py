@@ -78,6 +78,17 @@ def test_reports_unverified_parameters(only_deepseek: TestClient) -> None:
     assert models["openai:gpt-5.6-terra"]["verified_at"] is None
 
 
+def test_reports_smoke_verified_separately_from_pricing(only_deepseek: TestClient) -> None:
+    """P5-9：冒烟 `verified` 与价格核实日期不是同一件事。"""
+    models = {m["id"]: m for m in only_deepseek.get("/v1/models").json()["models"]}
+
+    assert models["deepseek:deepseek-v4-pro"]["verified"] is True
+    assert models["deepseek:deepseek-v4-flash"]["verified"] is True
+    assert models["zhipu:glm-5.3-flash"]["verified"] is False
+    assert models["zhipu:glm-5.3-flash"]["verified_at"] == "2026-09-07"
+    assert models["openai:gpt-5.6-terra"]["verified"] is False
+
+
 def test_role_defaults_reflect_env_overrides(monkeypatch: pytest.MonkeyPatch) -> None:
     for name in _KEY_ENV_VARS:
         monkeypatch.delenv(name, raising=False)
