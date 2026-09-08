@@ -22,13 +22,14 @@ from agent_service.agents.research_manager import (
 from agent_service.models.capabilities import StructuredOutputMode
 from agent_service.models.registry import ModelRegistry
 from agent_service.observability.event_bus import EventBus
+from agent_service.orchestrator.intent import Intent
 from agent_service.orchestrator.plan_validation import PlanRejectedError
 from agent_service.orchestrator.planner import create_plan
 from agent_service.prompts import render_prompt
-from agent_service.schemas.common import AgentName, QuestionType
+from agent_service.schemas.common import AgentName, AssetType, QuestionType
+from agent_service.schemas.entities import Entity
 from agent_service.schemas.events import (
     EventType,
-    IntentClassifiedPayload,
     PlanCreatedPayload,
     ResearchEvent,
     WarningPayload,
@@ -222,6 +223,28 @@ async def test_current_date_goes_into_the_user_message() -> None:
     assert "2026-09-07" not in (call.system_instructions or "")
 
 
+async def test_intent_hint_goes_into_the_user_message() -> None:
+    """分类结果随问题变，写进 system prompt 会让 §9.8 的缓存失效。"""
+    planner = _scripted_planner(_plan_json())
+    intent = Intent(
+        question_type=QuestionType.CRYPTO,
+        entities=(Entity(type=AssetType.CRYPTO, symbol="HYPE", name="Hyperliquid"),),
+        interpretation="识别为加密资产研究，标的 HYPE",
+        source="rules",
+    )
+    await create_plan(
+        "Hyperliquid 最近怎么样？",
+        planner=planner,
+        limits=_limits(),
+        now=_NOW,
+        intent=intent,
+    )
+
+    call = _scripted(planner).calls[0]
+    assert "已识别意图：crypto，标的 HYPE" in str(call.input)
+    assert "已识别意图" not in (call.system_instructions or "")
+
+
 async def test_json_mode_wiring_reaches_the_model_call() -> None:
     """端到端确认 DeepSeek 路径：发 `json_object`，且**不发** json_schema。
 
@@ -315,8 +338,11 @@ async def _drain(bus: EventBus) -> list[ResearchEvent]:
     return [event async for event in bus.stream()]
 
 
-async def test_intent_event_precedes_the_plan_event() -> None:
-    """前端要在完整任务树到达之前就能显示「理解成了什么」（§12.2）。"""
+async def test_plan_event_carries_the_task_tree() -> None:
+    """`plan_created` 必须带完整任务树：前端靠它一次性画出来（§12.2）。
+
+    意图事件改由分类层在规划之前发（P5-1），本函数不再发 `intent_classified`。
+    """
     bus = EventBus("sess-1", heartbeat_interval_s=60.0)
     await create_plan(
         "Hyperliquid",
@@ -327,16 +353,8 @@ async def test_intent_event_precedes_the_plan_event() -> None:
     )
     events = await _drain(bus)
 
-    assert [event.type for event in events] == [
-        EventType.INTENT_CLASSIFIED,
-        EventType.PLAN_CREATED,
-    ]
-    intent = _payload(events[0], IntentClassifiedPayload)
-    assert intent.question_type is QuestionType.CRYPTO
-    assert [entity.symbol for entity in intent.entities] == ["HYPE"]
-
-    # plan_created 必须带完整任务树：前端靠它一次性画出来（§12.2）
-    plan = _payload(events[1], PlanCreatedPayload).plan
+    assert [event.type for event in events] == [EventType.PLAN_CREATED]
+    plan = _payload(events[0], PlanCreatedPayload).plan
     assert [task.id for task in plan.tasks] == ["t1", "t2"]
 
 

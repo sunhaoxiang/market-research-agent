@@ -24,8 +24,6 @@ from agent_service.orchestrator.plan_validation import (
     validate_plan,
 )
 from agent_service.schemas.events import (
-    IntentClassifiedEvent,
-    IntentClassifiedPayload,
     PlanCreatedEvent,
     PlanCreatedPayload,
     TokenUsage,
@@ -39,6 +37,7 @@ if TYPE_CHECKING:
     from agent_service.agents.research_manager import PlannerAgent
     from agent_service.config import ExecutionLimits
     from agent_service.observability.event_bus import EventBus
+    from agent_service.orchestrator.intent import Intent
     from agent_service.schemas.plan import ResearchPlan
 
 log = structlog.get_logger(__name__)
@@ -67,6 +66,7 @@ async def create_plan(
     limits: ExecutionLimits,
     bus: EventBus | None = None,
     now: datetime | None = None,
+    intent: Intent | None = None,
 ) -> PlanningResult:
     """生成并校验研究计划。
 
@@ -79,7 +79,7 @@ async def create_plan(
     """
     structured = await run_structured(
         planner.agent,
-        _user_message(question, now or datetime.now(UTC)),
+        _user_message(question, now or datetime.now(UTC), intent),
         strategy=planner.strategy,
     )
     try:
@@ -111,33 +111,25 @@ async def create_plan(
     )
 
 
-def _user_message(question: str, now: datetime) -> str:
+def _user_message(question: str, now: datetime, intent: Intent | None) -> str:
     """拼装 user 消息。
 
     给出当前日期是必要的：模型的知识截止日期早于当下，没有这个锚点它会把
     「最新财报」「过去 30 天」解析到训练数据的时间，而这类偏差在计划里看不
-    出来，要等执行完拿到过期数据才发现。
+    出来，要等执行完拿到过期数据才发现。意图分类的结果也放这里，不放进
+    system prompt——分类结果随问题变，写进 instructions 会让 §9.8 的缓存失效。
     """
+    hint = f"\n\n{intent.planner_hint()}" if intent is not None else ""
     return (
         f"当前日期：{now.strftime('%Y-%m-%d')}（UTC）\n\n"
-        f"用户问题：\n{question.strip()}\n\n"
+        f"用户问题：\n{question.strip()}{hint}\n\n"
         "请给出研究计划。"
     )
 
 
 def _emit(bus: EventBus, validated: ValidatedPlan) -> None:
-    """发出规划阶段的事件。
-
-    `intent_classified` 先于 `plan_created`：前端可以在完整任务树到达之前
-    就把「理解成了什么问题、涉及哪些标的」显示出来，让用户尽早发现理解偏差
-    （§12.2）。
-    """
+    """发出 `plan_created`。意图事件由分类层在规划之前发（P5-1）。"""
     plan = validated.plan
-    bus.emit(
-        IntentClassifiedEvent,
-        payload=IntentClassifiedPayload(question_type=plan.question_type, entities=plan.entities),
-        message=plan.interpretation,
-    )
     bus.emit(
         PlanCreatedEvent,
         payload=PlanCreatedPayload(plan=plan),

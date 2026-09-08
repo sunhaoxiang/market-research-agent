@@ -25,6 +25,7 @@ import structlog
 from agent_service.models.structured_output import StructuredOutputError
 from agent_service.orchestrator.conflicts import record_metric_conflicts
 from agent_service.orchestrator.executor import execute_plan
+from agent_service.orchestrator.intent import Intent, IntentClassifier, classify_intent
 from agent_service.orchestrator.plan_validation import PlanRejectedError
 from agent_service.orchestrator.planner import PlanningResult, create_plan
 from agent_service.orchestrator.state import AgentRun, ResearchState
@@ -86,6 +87,7 @@ async def run_research(
     bus: EventBus,
     session_id: str | None = None,
     now: datetime | None = None,
+    classifier: IntentClassifier | None = None,
 ) -> ResearchOutcome:
     """跑完一次研究。
 
@@ -108,7 +110,13 @@ async def run_research(
 
     try:
         await _plan_and_execute(
-            state, planner=planner, runner=runner, writer=writer, limits=limits, now=now
+            state,
+            planner=planner,
+            runner=runner,
+            writer=writer,
+            limits=limits,
+            now=now,
+            classifier=classifier,
         )
     except PlanRejectedError as error:
         # 规划失败没有降级形态：没有计划就没有任务可执行（§7.2）
@@ -148,9 +156,11 @@ async def _plan_and_execute(
     writer: ReportWriterAgent,
     limits: ExecutionLimits,
     now: datetime | None,
+    classifier: IntentClassifier | None,
 ) -> None:
     state.advance_to(Stage.PLANNING)
-    planning = await _plan(state, planner=planner, limits=limits, now=now)
+    intent = await classify_intent(state.question, classifier=classifier, bus=state.bus)
+    planning = await _plan(state, planner=planner, limits=limits, now=now, intent=intent)
     state.attach_plan(planning.validated)
 
     state.advance_to(Stage.RESEARCHING)
@@ -173,6 +183,7 @@ async def _plan(
     planner: PlannerAgent,
     limits: ExecutionLimits,
     now: datetime | None,
+    intent: Intent | None,
 ) -> PlanningResult:
     """跑规划，并且**无论成败**都把这次 run 记进埋点。
 
@@ -202,6 +213,7 @@ async def _plan(
             limits=limits,
             bus=state.bus,
             now=now,
+            intent=intent,
         )
     except PlanRejectedError as error:
         record(error.usage, ErrorInfo(code="plan_rejected", message=error.reason))

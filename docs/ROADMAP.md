@@ -6,7 +6,7 @@
 > **每完成一个任务就更新此表的状态**；每完成一个阶段，跑 `[DP §26]` 的收尾清单并写阶段小结。
 
 - 最后更新：2026-09-08
-- 当前阶段：**Phase 4 阶段验收已通过**；下一阶段 P5。
+- 当前阶段：**P5-1 已完成**；下一任务 P5-2。
 
 ### 已确认的前置决策（2026-09-07）
 
@@ -192,7 +192,7 @@ hash 跨会话稳定，说明 §9.8 的缓存前缀约束真的守住了；95.4%
 
 | ID   | 任务                                                                                                       | 依赖              | 状态 | 验收                                        |
 | ---- | ---------------------------------------------------------------------------------------------------------- | ----------------- | ---- | ------------------------------------------- |
-| P5-1 | 意图分类层（词典/正则短路 + FAST 模型兜底）`[DP §25.1]`                                                    | P1-9              | ⬜   | 常见问题不走 LLM 也能正确分类               |
+| P5-1 | 意图分类层（词典/正则短路 + FAST 模型兜底）`[DP §25.1]`                                                    | P1-9              | ✅   | 常见问题不走 LLM 也能正确分类               |
 | P5-2 | Agents-as-Tools 装配：Manager 通过工具调用子 Agent，结果回编排层 `[DP 决策 B]`                             | P3-9, P4-10, P2-6 | ⬜   | 单次研究可同时用到 crypto + web             |
 | P5-3 | 完整并行 fan-out：依赖分层 + `asyncio.gather` + 单任务超时 + 部分失败降级                                  | P5-2              | ⬜   | 1 个任务失败不影响整体出报告                |
 | P5-4 | Merge & Dedup 阶段：source 归一、claim 合并、冲突汇总                                                      | P5-3, P3-10       | ⬜   | 跨 Agent 的重复来源被合并                   |
@@ -201,6 +201,16 @@ hash 跨会话稳定，说明 §9.8 的缓存前缀约束真的守住了；95.4%
 | P5-7 | Report Writer v2：动态 `report_sections`、Executive Summary、Bull/Bear Case、Risks、数据限制章节、免责声明。**`claim_ids` 继续由 `attach_section_claims` 代码回填**，不要改回让模型抄 id | P5-6, P2-8        | ⬜   | 不同问题类型报告结构不同                        |
 | P5-8 | 全流程 workflow 测试（ScriptedModel）：正常 / 工具失败 / 超时 / 冲突 / 引用缺失 / schema 解析失败 6 条路径 | P5-7, P1-8        | ⬜   | 全部确定性通过                              |
 | P5-9 | 多模型冒烟：6 个 provider 各跑一次完整研究，结果写入 catalog `verified` 字段 + `[DP §9.4]` 降级验证        | P5-8, P1-4        | ⬜   | 已配 key 的 provider 全部跑通或明确标注限制 |
+
+### P5-1 — 意图分类层 ✅（2026-09-08）
+
+分类与规划分离。常见问题 `classify_by_rules` 直接返回，**完全不打模型**；对不上再走 `ModelRole.FAST`（与用户选的会话模型无关），2s 超时。FAST 失败或超时降成 `generic`，不让整次研究失败。规划仍要 LLM。
+
+不是第 7 个专职 Agent：不扩 `AgentName`，不写 `agent_runs`（FAST token 会漏计）。`intent_classified` 在规划 LLM **之前**发；分类结果放 user 消息 hint，不进 system prompt（§9.8 缓存）。
+
+ticker 只匹配原文大写独立词，避免 `sol` / `meta` / `hype` 误伤。跨资产且没有比较词、宏观词叠 ticker、比较词但不足两个标的 → 交给 FAST。FAST 构造失败（没配 key）则 `classifier=None`，规则仍可用。
+
+规则覆盖的常见问：`NVDA 是做什么的` / 财报 / 估值 / `英伟达…` → stock·NVDA；`HYPE 最近有什么重要进展` / TVL / `Hyperliquid 怎么样？` → crypto·HYPE；`比较 NVDA、AMD、AVGO` → compare 三标的；`比较 Solana 和 Sui` → SOL, SUI；`美联储会不会降息` → macro；`你好` → generic。
 
 ### P5.5 — MVP 验收 ⬜
 

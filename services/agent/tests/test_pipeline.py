@@ -25,7 +25,7 @@ from agent_service.observability.event_bus import EventBus
 from agent_service.orchestrator.executor import TaskContext
 from agent_service.orchestrator.pipeline import run_research
 from agent_service.orchestrator.state import ResearchState
-from agent_service.schemas.common import AgentName, SourceType, Stage, TaskStatus
+from agent_service.schemas.common import AgentName, QuestionType, SourceType, Stage, TaskStatus
 from agent_service.schemas.entities import MetricPoint
 from agent_service.schemas.events import (
     TERMINAL_EVENT_TYPES,
@@ -34,6 +34,7 @@ from agent_service.schemas.events import (
     AgentStartedPayload,
     ConflictDetectedPayload,
     EventType,
+    IntentClassifiedPayload,
     ResearchEvent,
     SessionCompletedPayload,
     SessionFailedPayload,
@@ -253,6 +254,14 @@ async def test_event_sequence_covers_the_whole_flow() -> None:
     ]
     assert types.count(EventType.AGENT_STARTED) == 2
     assert types.count(EventType.AGENT_COMPLETED) == 2
+
+    intent_i = types.index(EventType.INTENT_CLASSIFIED)
+    plan_i = types.index(EventType.PLAN_CREATED)
+    assert intent_i < plan_i
+    intent = events[intent_i].payload
+    assert isinstance(intent, IntentClassifiedPayload)
+    assert intent.question_type is QuestionType.CRYPTO
+    assert [entity.symbol for entity in intent.entities] == ["HYPE"]
 
 
 async def test_every_task_is_started_before_it_completes() -> None:

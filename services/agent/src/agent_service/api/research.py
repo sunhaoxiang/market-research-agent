@@ -29,6 +29,7 @@ from agent_service.config import get_settings
 from agent_service.models.catalog import UnknownModelError
 from agent_service.models.registry import ProviderUnavailableError
 from agent_service.observability.event_bus import EventBus
+from agent_service.orchestrator.intent import build_intent_classifier
 from agent_service.orchestrator.pipeline import run_research
 from agent_service.utils.ids import new_id
 
@@ -86,6 +87,11 @@ async def stream_research(request: ResearchRequest, http_request: Request) -> St
             status.HTTP_503_SERVICE_UNAVAILABLE, "MODEL_NOT_AVAILABLE", str(error)
         ) from error
 
+    try:
+        classifier = build_intent_classifier(registry)
+    except (UnknownModelError, ProviderUnavailableError):
+        classifier = None
+
     bus = EventBus(session_id)
     runtime = getattr(http_request.app.state, "provider_runtime", None)
     runner = SubAgentRunner(
@@ -121,6 +127,7 @@ async def stream_research(request: ResearchRequest, http_request: Request) -> St
                     limits=limits,
                     bus=bus,
                     session_id=session_id,
+                    classifier=classifier,
                 )
             ),
             session_id=session_id,
