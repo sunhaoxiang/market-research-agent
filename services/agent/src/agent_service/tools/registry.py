@@ -9,6 +9,8 @@ from pydantic import BaseModel, Field, ValidationError
 
 from agent_service.schemas.tools import ToolResult
 from agent_service.tools._result import fail_validation
+from agent_service.tools.crypto.models import ResolveAssetData
+from agent_service.tools.crypto.resolve import run_resolve_asset
 from agent_service.tools.deps import ToolDeps
 from agent_service.tools.web.fetch import run_web_fetch
 from agent_service.tools.web.models import WebPageData, WebSearchData
@@ -32,6 +34,10 @@ class NewsSearchArgs(BaseModel):
 
 class WebFetchArgs(BaseModel):
     url: str
+
+
+class ResolveAssetArgs(BaseModel):
+    query: str
 
 
 async def _web_search(deps: ToolDeps, arguments: dict[str, Any]) -> ToolResult[WebSearchData]:
@@ -64,8 +70,17 @@ async def _web_fetch(deps: ToolDeps, arguments: dict[str, Any]) -> ToolResult[We
     return await run_web_fetch(deps, url=args.url)
 
 
+async def _resolve_asset(deps: ToolDeps, arguments: dict[str, Any]) -> ToolResult[ResolveAssetData]:
+    try:
+        args = ResolveAssetArgs.model_validate(arguments)
+    except ValidationError as exc:
+        return fail_validation("resolve_asset", exc)
+    return await run_resolve_asset(deps, query=args.query)
+
+
 HANDLERS: dict[str, ToolHandler] = {
     "news_search": _news_search,
+    "resolve_asset": _resolve_asset,
     "web_fetch": _web_fetch,
     "web_search": _web_search,
 }

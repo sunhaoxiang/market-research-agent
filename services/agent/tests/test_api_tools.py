@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 
 from agent_service.config import get_settings
 from agent_service.main import create_app
+from agent_service.providers.crypto import CoinSearchHit, CoinSearchPage
 from agent_service.providers.search import SearchHit, SearchPage
 from agent_service.schemas.tools import DataProvenance, ToolErrorCode
 
@@ -32,6 +33,18 @@ class _FakeSearch:
         self.page = page
 
     async def search(self, query: object) -> SearchPage:
+        del query
+        return self.page
+
+    async def aclose(self) -> None:
+        return None
+
+
+class _FakeCoinGecko:
+    def __init__(self, page: CoinSearchPage) -> None:
+        self.page = page
+
+    async def search_coins(self, query: str) -> CoinSearchPage:
         del query
         return self.page
 
@@ -95,6 +108,35 @@ def test_invoke_unknown_tool_is_404(client: TestClient) -> None:
     response = client.post("/v1/tools/nope/invoke", json={"arguments": {}})
     assert response.status_code == 404
     assert response.json()["detail"]["error"]["code"] == "TOOL_NOT_FOUND"
+
+
+def test_invoke_resolve_asset(client: TestClient) -> None:
+    client.app.state.coingecko = _FakeCoinGecko(
+        CoinSearchPage(
+            query="HYPE",
+            hits=(
+                CoinSearchHit(
+                    id="hyperliquid",
+                    symbol="HYPE",
+                    name="Hyperliquid",
+                    market_cap_rank=15,
+                    url="https://www.coingecko.com/en/coins/hyperliquid",
+                ),
+            ),
+            provenance=DataProvenance(
+                provider="coingecko",
+                endpoint="/search",
+                retrieved_at=datetime(2026, 9, 8, tzinfo=UTC),
+            ),
+        )
+    )
+    response = client.post("/v1/tools/resolve_asset/invoke", json={"arguments": {"query": "HYPE"}})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["data"]["resolved"]["coin_id"] == "hyperliquid"
+    assert body["data"]["resolved"]["name"] == "Hyperliquid"
+    assert body["provenance"]["provider"] == "coingecko"
 
 
 def test_invoke_invalid_args_are_tool_errors(client: TestClient) -> None:

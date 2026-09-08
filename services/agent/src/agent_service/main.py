@@ -99,7 +99,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         )
     app.state.search_provider = search_provider
     app.state.web_fetcher = WebFetcher(runtime)
-    # Demo 档无 key 也能打公共限流；tool 层（P3-4）再注入 ToolDeps
+    # Demo 档无 key 也能打公共限流；tool 层（P3-3）注入 ToolDeps
     cg_key = settings.coingecko_api_key
     app.state.coingecko = CoinGeckoProvider(
         runtime=runtime,

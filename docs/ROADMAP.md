@@ -6,7 +6,7 @@
 > **每完成一个任务就更新此表的状态**；每完成一个阶段，跑 `[DP §26]` 的收尾清单并写阶段小结。
 
 - 最后更新：2026-09-08
-- 当前阶段：**P3-2 DefiLlama provider 已完成**；下一任务 P3-3 `resolve_asset`。P3-6 用已有 DefiLlama 类型，不要再包 HTTP。
+- 当前阶段：**P3-3 `resolve_asset` 已完成**；下一任务 P3-4 crypto 行情 tools。P3-4 复用 `ToolDeps.coingecko` 与现成类型，不要再包 HTTP。
 
 ### 已确认的前置决策（2026-09-07）
 
@@ -150,7 +150,7 @@ hash 跨会话稳定，说明 §9.8 的缓存前缀约束真的守住了；95.4%
 | ----- | ------------------------------------------------------------------------------------------------ | --------------- | ---- | --------------------------------------- |
 | P3-1  | CoinGecko provider（限流/缓存/错误映射）                                                         | P2-1            | ✅   | 契约测试通过                            |
 | P3-2  | DefiLlama provider                                                                               | P2-1            | ✅   | 契约测试通过                            |
-| P3-3  | `resolve_asset`：符号→coin id 消歧（含同名冲突处理，多候选时返回列表让 Agent 选）。底层用已有 `search_coins`，不要再包一层 HTTP | P3-1            | ⬜   | "HYPE" 正确解析到 Hyperliquid           |
+| P3-3  | `resolve_asset`：符号→coin id 消歧（含同名冲突处理，多候选时返回列表让 Agent 选）。底层用已有 `search_coins`，不要再包一层 HTTP | P3-1            | ✅   | "HYPE" 正确解析到 Hyperliquid           |
 | P3-4  | `tools/crypto/`：`get_crypto_price` / `get_market_data` / `get_price_history`。包 `CoinGeckoProvider` 的现成类型，不要再解析一遍 JSON | P3-1, P3-3      | ⬜   | 结构化输出 + provenance 完整            |
 | P3-5  | `tools/system/compute_metrics`：涨跌幅 / CAGR / 波动率 / 百分位（纯 Python）`[DP §8.5]`          | P1-1            | ⬜   | 单元测试含边界值                        |
 | P3-6  | `tools/defi/`：`get_tvl` / `get_protocol_fees_revenue` / `get_dex_volume` / `get_chain_overview`。包 `DefiLlamaProvider` 的现成类型，不要再解析一遍 JSON | P3-2            | ⬜   | HYPE/Hyperliquid 数据正确               |
@@ -501,7 +501,7 @@ Agent / Tool 只依赖 `SearchProvider` 协议，Tavily 是第一个实现。换
 - `get_price` / `get_market` / `get_market_chart` → **P3-4** 的三个 crypto tool。200 空 payload（`{}` / `[]`）映射成 `NOT_FOUND`，404/401/403 也是，不要让 Agent 把空对象当成「价格是 null」。
 - 给人点的 URL 是 `coingecko.com/en/coins/{id}`，不是 API 地址。
 
-`/v1/health` 里 CoinGecko 始终 `configured=true`（无 key 也能用）。注入 `ToolDeps`、挂 `/v1/tools/.../invoke` 是 P3-4，本项只把客户端放进 `app.state.coingecko`。
+`/v1/health` 里 CoinGecko 始终 `configured=true`（无 key 也能用）。本项只把客户端放进 `app.state.coingecko`。注入 `ToolDeps` 从 **P3-3** 开始（`resolve_asset`），P3-4 行情 tools 复用，不要再接一遍。
 
 ### P3-2 — DefiLlama provider ✅（2026-09-08）
 
@@ -515,6 +515,17 @@ Agent / Tool 只依赖 `SearchProvider` 协议，Tavily 是第一个实现。换
 - 给人点的 URL 是 `defillama.com/protocol/{slug}` 或 `/chain/{name}`。
 
 注入 `ToolDeps` 是 P3-6。本项只把客户端放进 `app.state.defillama`。
+
+### P3-3 — `resolve_asset` ✅（2026-09-08）
+
+只调 `CoinGeckoProvider.search_coins`，不包 HTTP。消歧是 tool 层的职责：
+
+- 唯一精确匹配 id / 符号 / 名称，或搜索只返回一条 → `resolved.coin_id`。
+- 同符号多条且市值排名有**唯一最优**（HYPE 的典型情况）→ 选取排名最高的，candidates 仍带上其余项，`quality.caveats` 说明已自动选取。后续行情请传 `coin_id`，不要再传代号。
+- 排名并列或没有精确匹配的多条结果 → `ok=true` 但 `resolved` 为空，Agent 从 `candidates` 里挑 id 再调。
+- 零结果是 `NOT_FOUND`，不要把空列表当成「解析成功」。
+
+`CRYPTO_TOOLS` 已挂 `@function_tool` 和 `/v1/tools/resolve_asset/invoke`。P3-9 再接到 Crypto Research Agent；不要提前塞进 Web Research。
 
 ---
 
