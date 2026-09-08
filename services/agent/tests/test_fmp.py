@@ -404,6 +404,60 @@ async def test_403_is_a_key_error(respx_mock: respx.MockRouter, runtime: Provide
 
 
 @respx.mock(base_url=_BASE)
+async def test_http_402_on_quote_is_quota_exhausted(
+    respx_mock: respx.MockRouter, runtime: ProviderRuntime
+) -> None:
+    """额度紧张时 `/quote` 也会 402；不能当成可重试的 upstream_error（D21）。"""
+    respx_mock.get("/quote").mock(return_value=httpx.Response(402, json={"Error Message": "Limit"}))
+    async with fmp(runtime) as provider:
+        with pytest.raises(ProviderError) as exc:
+            await provider.get_quote("AVGO")
+    assert exc.value.code is ToolErrorCode.QUOTA_EXHAUSTED
+    assert exc.value.status_code == 402
+    assert exc.value.retryable is False
+
+
+@respx.mock(base_url=_BASE)
+async def test_http_402_on_ratios_ttm_is_quota_exhausted(
+    respx_mock: respx.MockRouter, runtime: ProviderRuntime
+) -> None:
+    respx_mock.get("/ratios-ttm").mock(return_value=httpx.Response(402))
+    async with fmp(runtime) as provider:
+        with pytest.raises(ProviderError) as exc:
+            await provider.get_ratios_ttm("AVGO")
+    assert exc.value.code is ToolErrorCode.QUOTA_EXHAUSTED
+
+
+@respx.mock(base_url=_BASE)
+async def test_http_402_on_ratio_history_is_unsupported(
+    respx_mock: respx.MockRouter, runtime: ProviderRuntime
+) -> None:
+    """历史 `/ratios` 是付费档；402 应让 Agent 写缺口，而不是搜网页凑分位。"""
+    respx_mock.get("/ratios").mock(return_value=httpx.Response(402))
+    async with fmp(runtime) as provider:
+        with pytest.raises(ProviderError) as exc:
+            await provider.get_ratios("NVDA", period="quarterly", limit=8)
+    assert exc.value.code is ToolErrorCode.UNSUPPORTED
+    assert exc.value.status_code == 402
+
+
+@respx.mock(base_url=_BASE)
+async def test_error_message_premium_is_unsupported(
+    respx_mock: respx.MockRouter, runtime: ProviderRuntime
+) -> None:
+    respx_mock.get("/ratios").mock(
+        return_value=httpx.Response(
+            200,
+            json={"Error Message": "This endpoint is only available for Premium subscribers."},
+        )
+    )
+    async with fmp(runtime) as provider:
+        with pytest.raises(ProviderError) as exc:
+            await provider.get_ratios("NVDA", period="quarterly", limit=8)
+    assert exc.value.code is ToolErrorCode.UNSUPPORTED
+
+
+@respx.mock(base_url=_BASE)
 async def test_error_message_limit_reach_is_quota_exhausted(
     respx_mock: respx.MockRouter, runtime: ProviderRuntime
 ) -> None:

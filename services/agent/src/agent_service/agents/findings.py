@@ -115,7 +115,8 @@ def salvage_finding(
     """超时取消时，把已登记的来源和工具缺口留给 Writer。
 
     没有 LLM 草稿就没有数字 claims；来源仍做成可引用陈述，否则
-    `assign_citation_indices` 不会给孤儿来源发 [n]。
+    `assign_citation_indices` 不会给孤儿来源发 [n]。对比表读的是
+    `metrics`，这里目前不填——D22，跟 P5-3 一起还。
     """
     gap = TIMEOUT_INCOMPLETE_GAP.format(timeout_s=timeout_s)
     draft = AgentFinding(

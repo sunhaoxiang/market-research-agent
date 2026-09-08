@@ -194,7 +194,7 @@ hash 跨会话稳定，说明 §9.8 的缓存前缀约束真的守住了；95.4%
 | ---- | ---------------------------------------------------------------------------------------------------------- | ----------------- | ---- | ------------------------------------------- |
 | P5-1 | 意图分类层（词典/正则短路 + FAST 模型兜底）`[DP §25.1]`                                                    | P1-9              | ✅   | 常见问题不走 LLM 也能正确分类               |
 | P5-2 | Agents-as-Tools 装配：Manager 通过工具调用子 Agent，结果回编排层 `[DP 决策 B]`                             | P3-9, P4-10, P2-6 | ⬜   | 单次研究可同时用到 crypto + web             |
-| P5-3 | 完整并行 fan-out：依赖分层 + `asyncio.gather` + 单任务超时 + 部分失败降级                                  | P5-2              | ⬜   | 1 个任务失败不影响整体出报告                |
+| P5-3 | 完整并行 fan-out：依赖分层 + `asyncio.gather` + 单任务超时 + 部分失败降级。**开工先带 D22**：超时 salvage 已拉到的 SEC 三表/季报要进对比表 `metrics` | P5-2              | ⬜   | 1 个任务失败不影响整体出报告；salvage 数字能进对比表 |
 | P5-4 | Merge & Dedup 阶段：source 归一、claim 合并、冲突汇总                                                      | P5-3, P3-10       | ⬜   | 跨 Agent 的重复来源被合并                   |
 | P5-5 | Fact Checker Agent（干净上下文，只看 claims + sources，可复检索）+ 校验事件流                              | P5-4              | ⬜   | 能识别注入的错误声明                        |
 | P5-6 | Gap Check + 最多 1 轮补充研究（`PLAN_UPDATED`）                                                            | P5-5              | ⬜   | 缺关键数据时能补一轮                        |
@@ -211,6 +211,8 @@ hash 跨会话稳定，说明 §9.8 的缓存前缀约束真的守住了；95.4%
 ticker 只匹配原文大写独立词，避免 `sol` / `meta` / `hype` 误伤。跨资产且没有比较词、宏观词叠 ticker、比较词但不足两个标的 → 交给 FAST。FAST 构造失败（没配 key）则 `classifier=None`，规则仍可用。
 
 规则覆盖的常见问：`NVDA 是做什么的` / 财报 / 估值 / `英伟达…` → stock·NVDA；`HYPE 最近有什么重要进展` / TVL / `Hyperliquid 怎么样？` → crypto·HYPE；`比较 NVDA、AMD、AVGO` → compare 三标的；`比较 Solana 和 Sui` → SOL, SUI；`美联储会不会降息` → macro；`你好` → generic。
+
+P5-3 开工备忘：**D22** — 超时 salvage 没有把已成功的 SEC 数字写成 `metrics`，对比表 AVGO 列因此缺失。不要只改超时秒数。
 
 ### P5.5 — MVP 验收 ⬜
 
@@ -735,7 +737,7 @@ Writer 的 user 消息带上冲突清单，prompt 要求并列写出；前端从
 
 - `get_quote` / `get_profile` / `get_historical_prices` / `get_peers` → **P4-4** 的股票 tools。历史价按 `days` 在本地算 `from`/`to`，含当日用 `HISTORY_TODAY`。
 - `get_ratios_ttm` → **P4-7** 估值。财报主路径是 SEC；FMP 只补 PE/PB/PS/EV·EBITDA。缺字段保持 None，不要当成 0。
-- 200 空列表、404 映射成 `NOT_FOUND`。FMP 常在 200 里塞 `Error Message`：额度用尽 → `QUOTA_EXHAUSTED`，无效 key → `UPSTREAM_ERROR`，付费档接口 → `UNSUPPORTED`。
+- 200 空列表、404 映射成 `NOT_FOUND`。FMP 常在 200 里塞 `Error Message`：额度用尽 → `QUOTA_EXHAUSTED`，无效 key → `UPSTREAM_ERROR`，付费档接口 → `UNSUPPORTED`。HTTP **402** 另映射：历史 `/ratios` → `UNSUPPORTED`，其余 → `QUOTA_EXHAUSTED`（D21）。
 - 给人点的 URL 是 `financialmodelingprep.com/financial-summary/{symbol}`，不是 API 地址。
 
 日配额在 `QuotaTracker` 里预检：耗尽时 `QUOTA_EXHAUSTED` 快速失败、不打 HTTP；缓存命中不记账。本项只把客户端放进 `app.state.fmp`（无 key 则为 None）。注入 `ToolDeps` 从 **P4-4** 开始。
@@ -950,8 +952,12 @@ Plan 层：`compare` 问题按标的拆取数任务（同层并行），再加�
 | D18 | ~~开发态 `useTicker` hydration 不一致，挡住第一次「开始研究」~~ → idle 与 server snapshot 同为 0                                                                                           | 已偿还（2026-09-08）               | ✅   |
 | D19 | ~~`sources` / `claims` 只在事件流里，刷新丢 Source Panel~~ → BFF 投影 + `GET .../events` 回放。进行中会话续订仍是 D4/P6-6                                                                  | 已偿还（2026-09-08）               | ✅   |
 | D20 | ~~单任务 120s 超时会丢弃已成功的工具结果~~ → 超时 salvage finding；并发 4→2、单任务 180s、总预算 600s | 已偿还（2026-09-08） | ✅   |
-| D21 | FMP HTTP 402（`/ratios` 历史分位；额度紧张时 `/quote` `/ratios-ttm` 也会）被映射成泛化 `upstream_error`，Agent 改搜网页把 180s 烧完 | P5 / 按需 | ⬜   |
-| D22 | 超时 salvage 已拉到的 SEC 三表/季报没有进对比表 `metrics`，AVGO 列因此缺失 | P5 | ⬜   |
+| D21 | ~~FMP HTTP 402 被映射成泛化 `upstream_error`，Agent 改搜网页把 180s 烧完~~ → `/ratios` 历史分位 → `UNSUPPORTED`；`/quote` `/ratios-ttm` 等 → `QUOTA_EXHAUSTED`。Stock prompt 禁止为此搜网页凑数 | 已偿还（2026-09-08） | ✅   |
+| D22 | 超时 salvage 已拉到的 SEC 三表/季报没有进对比表 `metrics`，AVGO 列因此缺失。P5-3 开工时一起还，不要只改超时秒数 | P5-3 | ⬜   |
+
+### D21 — FMP HTTP 402 映射 ✅（2026-09-08）
+
+基类把 4xx 一律标成 `UPSTREAM_ERROR` 且丢掉 body。FMP 的 402 不是瞬时故障：历史 `/ratios`（分位）→ `UNSUPPORTED`；`/quote`、`/ratios-ttm` 等免费档接口 → `QUOTA_EXHAUSTED`。Stock prompt 禁止为此搜网页凑 PE / 报价。未重跑 Phase 4 四问。
 
 ### D14 偿还记录 — GitHub Actions 首次远端运行（2026-09-07）
 

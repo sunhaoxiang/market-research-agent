@@ -429,6 +429,27 @@ def _map_http_error(exc: ProviderError, *, endpoint: str) -> ProviderError:
             provider="fmp",
             endpoint=endpoint,
         )
+    if exc.status_code == httpx.codes.PAYMENT_REQUIRED:
+        # 基类把 4xx 一律标成 UPSTREAM_ERROR，body 也丢了。402 对 FMP 不是
+        # 瞬时故障：历史 `/ratios` 是付费档；`/quote` `/ratios-ttm` 则是额度用尽。
+        # 必须让 Agent 写 data gap，而不是改搜网页把 180s 烧完（D21）。
+        if endpoint == _RATIOS_HISTORY_PATH:
+            return ProviderError(
+                ToolErrorCode.UNSUPPORTED,
+                "FMP 免费档不支持这个接口",
+                retryable=False,
+                status_code=exc.status_code,
+                provider="fmp",
+                endpoint=endpoint,
+            )
+        return ProviderError(
+            ToolErrorCode.QUOTA_EXHAUSTED,
+            "FMP 当日免费额度已用尽",
+            retryable=False,
+            status_code=exc.status_code,
+            provider="fmp",
+            endpoint=endpoint,
+        )
     return exc
 
 
