@@ -110,9 +110,9 @@ describe("引用交互", () => {
 
     fireEvent.click(screen.getAllByRole("link", { name: "来源 1：Fee share" })[0]!);
 
-    expect(
-      screen.getByRole("button", { name: "来源 1：Fee share" }).getAttribute("aria-current"),
-    ).toBe("true");
+    const source = screen.getByRole("button", { name: "来源 1：Fee share" });
+    expect(source.getAttribute("aria-current")).toBe("true");
+    expect(source).toBe(document.activeElement);
     expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalled();
   });
 

@@ -35,7 +35,7 @@ export function StageTimeline({ state, now }: { state: ResearchViewState; now: n
         {spans.map((span, index) => (
           <div
             key={`${span.stage}-${span.startedAtMs}`}
-            className={cn(STAGE_TONE[span.stage], span.active && "animate-pulse")}
+            className={cn(STAGE_TONE[span.stage], span.active && "motion-safe:animate-pulse")}
             style={{ flexGrow: weights[index], flexBasis: 0 }}
           />
         ))}

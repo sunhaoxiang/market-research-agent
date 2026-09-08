@@ -15,6 +15,34 @@ export const STAGE_LABELS: Record<Stage, string> = {
   writing: "撰写报告",
 };
 
+export const AGENT_LABELS: Record<string, string> = {
+  research_manager: "Research Manager",
+  crypto_research: "Crypto Research",
+  stock_research: "Stock Research",
+  web_research: "Web Research",
+  fact_checker: "Fact Checker",
+  report_writer: "Report Writer",
+};
+
+export const SESSION_STATUS_LABELS: Record<ResearchViewState["status"], string> = {
+  idle: "待提问",
+  running: "进行中",
+  completed: "已完成",
+  failed: "失败",
+  cancelled: "已取消",
+};
+
+export function taskProgress(state: ResearchViewState): string | null {
+  const tasks = state.taskIds.map((id) => state.tasks[id]).filter((task) => task !== undefined);
+  if (tasks.length === 0) return null;
+  const settled = tasks.filter(
+    (task) => task.status === "completed" || task.status === "failed" || task.status === "skipped",
+  ).length;
+  const running = tasks.find((task) => task.status === "running");
+  const current = running ? (AGENT_LABELS[running.agent] ?? running.agent) : null;
+  return current ? `${settled}/${tasks.length} · ${current}` : `${settled}/${tasks.length}`;
+}
+
 export type ResolvedStageSpan = StageSpan & {
   durationMs: number;
   active: boolean;

@@ -63,6 +63,7 @@ export function ReportMarkdown({
             return (
               <a href={href} target="_blank" rel="noreferrer">
                 {children}
+                <span className="sr-only">（新标签页）</span>
               </a>
             );
           },
@@ -94,10 +95,13 @@ function CitationLink({
         href={citationHref(index)}
         aria-label={`来源 ${index}：${label}`}
         aria-current={active ? "true" : undefined}
-        onClick={() => onCite(index)}
+        onClick={(clickEvent) => {
+          clickEvent.preventDefault();
+          onCite(index);
+        }}
         className={cn(
           "mx-0.5 inline-flex translate-y-px rounded px-0.5 text-xs font-medium no-underline",
-          "text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950",
+          "text-blue-700 hover:bg-blue-50 focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:outline-none dark:text-blue-400 dark:hover:bg-blue-950",
           active &&
             "bg-amber-200 text-amber-950 ring-1 ring-amber-400 dark:bg-amber-900 dark:text-amber-100",
         )}

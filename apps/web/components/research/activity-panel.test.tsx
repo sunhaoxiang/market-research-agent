@@ -243,32 +243,6 @@ describe("工具调用", () => {
 });
 
 describe("无障碍与告警", () => {
-  it("状态变更通过 aria-live 播报", () => {
-    const { container } = panel(stateFrom(...planningEvents()));
-
-    const live = container.querySelector('[aria-live="polite"]');
-    expect(live?.textContent).toBe("正在执行研究任务");
-  });
-
-  it("没有文案的事件不会把播报清空", () => {
-    // agent_progress / agent_completed 的 message 都是 null。清空的话，
-    // 屏幕阅读器用户会在任务推进时听到一片空白
-    const state = stateFrom(
-      ...planningEvents(),
-      event("agent_started", {
-        agent: "crypto_research",
-        task_id: "t1",
-        objective: "o",
-        model_id: "m",
-      }),
-      event("agent_progress", { agent: "crypto_research", task_id: "t1", message: "占位实现" }),
-    );
-
-    const { container } = panel(state);
-
-    expect(container.querySelector('[aria-live="polite"]')?.textContent).toBe("正在执行研究任务");
-  });
-
   it("警告逐条显示而不覆盖", () => {
     const state = stateFrom(
       ...planningEvents(),

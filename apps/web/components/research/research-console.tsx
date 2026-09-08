@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { MetricCharts } from "@/components/report/metric-charts";
 import { ReportViewer } from "@/components/report/report-viewer";
+import { LiveStatus } from "@/components/research/live-status";
 import { ProcessPanel } from "@/components/research/process-panel";
 import { StageTimeline } from "@/components/research/stage-timeline";
 import { SourcePanel } from "@/components/sources/source-panel";
@@ -128,6 +129,7 @@ export function ResearchConsole({
 
   return (
     <div className="space-y-6">
+      <LiveStatus state={state} />
       {idle ? (
         <form
           onSubmit={(submitEvent) => {
@@ -172,7 +174,7 @@ export function ResearchConsole({
                   <button
                     type="button"
                     onClick={() => setQuestion(example)}
-                    className="text-left text-sm text-zinc-500 underline-offset-2 hover:text-zinc-900 hover:underline dark:hover:text-zinc-100"
+                    className="text-left text-sm text-zinc-500 underline-offset-2 hover:text-zinc-900 hover:underline focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:outline-none dark:hover:text-zinc-100"
                   >
                     {example}
                   </button>
@@ -182,7 +184,7 @@ export function ResearchConsole({
           </div>
         </form>
       ) : (
-        <div className="space-y-5">
+        <div className="space-y-5" aria-busy={running || restoring}>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <h2 className="max-w-3xl text-lg leading-snug font-semibold">
               {state.question ?? (restoring ? "正在恢复会话…" : question)}

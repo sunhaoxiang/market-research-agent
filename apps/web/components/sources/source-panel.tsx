@@ -22,9 +22,10 @@ export function SourcePanel({ sources, activeIndex, onSelect, className }: Sourc
 
   useEffect(() => {
     if (activeIndex === null) return;
-    document.getElementById(sourceElementId(activeIndex))?.scrollIntoView({
-      block: "nearest",
-    });
+    const el = document.getElementById(sourceElementId(activeIndex));
+    if (!(el instanceof HTMLElement)) return;
+    el.scrollIntoView({ block: "nearest" });
+    el.focus({ preventScroll: true });
   }, [activeIndex]);
 
   if (sources.length === 0) return null;
@@ -71,15 +72,16 @@ function SourceRow({
   const label = source.title ?? source.domain ?? source.url;
 
   return (
-    <li id={sourceElementId(index)} className="group relative">
+    <li className="group relative">
       <button
         type="button"
+        id={sourceElementId(index)}
         aria-current={active ? "true" : undefined}
         aria-label={`来源 ${index}：${label}`}
         onClick={() => onSelect(index)}
         className={cn(
           "w-full rounded-md px-2 py-1.5 text-left text-xs transition",
-          "hover:bg-zinc-100 dark:hover:bg-zinc-800",
+          "hover:bg-zinc-100 focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:outline-none dark:hover:bg-zinc-800",
           active && "bg-amber-50 ring-1 ring-amber-400 dark:bg-amber-950/40",
         )}
       >

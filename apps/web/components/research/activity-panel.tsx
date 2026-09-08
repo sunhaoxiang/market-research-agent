@@ -1,18 +1,12 @@
 "use client";
 
 import type { ResearchViewState, TaskNode, ToolCallNode } from "@/lib/research/state";
+import { AGENT_LABELS } from "@/lib/research/stages";
 import { cn, formatDuration } from "@/lib/utils";
 
 import { StatusIcon, statusLabel } from "./status-icon";
 
-export const AGENT_LABELS: Record<string, string> = {
-  research_manager: "Research Manager",
-  crypto_research: "Crypto Research",
-  stock_research: "Stock Research",
-  web_research: "Web Research",
-  fact_checker: "Fact Checker",
-  report_writer: "Report Writer",
-};
+export { AGENT_LABELS };
 
 /** running 节点显示实时耗时，已完成的显示最终耗时（§13.2）。 */
 function elapsed(node: { durationMs: number | null; startedAtMs: number | null }, now: number) {
@@ -114,11 +108,6 @@ export function ActivityPanel({
       {hideHeading ? null : (
         <h2 className="text-xs font-medium tracking-wide text-zinc-500 uppercase">研究过程</h2>
       )}
-
-      {/* 屏幕阅读器靠这里播报进展；视觉上它由下面的任务树呈现（§13.2 无障碍） */}
-      <p aria-live="polite" className="sr-only">
-        {state.lastMessage}
-      </p>
 
       <ol className="space-y-1">
         <li className="flex items-baseline gap-2">

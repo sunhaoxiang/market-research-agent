@@ -84,7 +84,10 @@ describe("过程折叠", () => {
     expect(screen.getByRole("button", { name: /研究过程/ }).getAttribute("aria-expanded")).toBe(
       "false",
     );
-    expect(screen.queryByText("Crypto Research")).toBeNull();
+    expect(screen.getByRole("button", { name: /研究过程/ }).getAttribute("aria-controls")).toBe(
+      "research-process",
+    );
+    expect(document.getElementById("research-process")?.hidden).toBe(true);
   });
 
   it("点击后可以展开已完成的过程", () => {

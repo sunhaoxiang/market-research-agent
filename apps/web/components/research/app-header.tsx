@@ -36,8 +36,8 @@ function NavLink({ href, active, children }: { href: Route; active: boolean; chi
       className={cn(
         "underline-offset-4",
         active
-          ? "font-medium text-zinc-900 dark:text-zinc-100"
-          : "text-zinc-500 hover:text-zinc-800 hover:underline dark:hover:text-zinc-200",
+          ? "font-medium text-zinc-900 focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:outline-none dark:text-zinc-100"
+          : "text-zinc-500 hover:text-zinc-800 hover:underline focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:outline-none dark:hover:text-zinc-200",
       )}
     >
       {children}

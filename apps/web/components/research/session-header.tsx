@@ -1,20 +1,19 @@
 "use client";
 
-import { AGENT_LABELS } from "@/components/research/activity-panel";
-import { STAGE_LABELS } from "@/lib/research/stages";
+import { SESSION_STATUS_LABELS, STAGE_LABELS, taskProgress } from "@/lib/research/stages";
 import type { ResearchViewState } from "@/lib/research/state";
 import { cn, formatCost, formatDuration, formatTokens } from "@/lib/utils";
 
-const STATUS_LOOK: Record<ResearchViewState["status"], { label: string; dot: string }> = {
-  idle: { label: "待提问", dot: "bg-zinc-300 dark:bg-zinc-600" },
-  running: { label: "进行中", dot: "animate-pulse bg-blue-500" },
-  completed: { label: "已完成", dot: "bg-emerald-500" },
-  failed: { label: "失败", dot: "bg-amber-500" },
-  cancelled: { label: "已取消", dot: "bg-zinc-400" },
+const STATUS_DOT: Record<ResearchViewState["status"], string> = {
+  idle: "bg-zinc-300 dark:bg-zinc-600",
+  running: "motion-safe:animate-pulse bg-blue-500",
+  completed: "bg-emerald-500",
+  failed: "bg-amber-500",
+  cancelled: "bg-zinc-400",
 };
 
 export function SessionHeader({ state, now }: { state: ResearchViewState; now: number }) {
-  const look = STATUS_LOOK[state.status];
+  const look = SESSION_STATUS_LABELS[state.status];
   // 结束后用后端给的权威耗时；进行中按本地时钟算，每秒走一格
   const duration =
     state.durationMs ??
@@ -26,9 +25,12 @@ export function SessionHeader({ state, now }: { state: ResearchViewState; now: n
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-500">
       <span className="flex items-center gap-1.5">
-        <span aria-hidden className={cn("inline-block size-2 rounded-full", look.dot)} />
+        <span
+          aria-hidden
+          className={cn("inline-block size-2 rounded-full", STATUS_DOT[state.status])}
+        />
         <span className="font-medium text-zinc-700 dark:text-zinc-300">
-          {stage ? `${look.label} · ${stage}` : look.label}
+          {stage ? `${look} · ${stage}` : look}
         </span>
       </span>
 
@@ -48,15 +50,4 @@ export function SessionHeader({ state, now }: { state: ResearchViewState; now: n
       {progress ? <span>{progress}</span> : null}
     </div>
   );
-}
-
-function taskProgress(state: ResearchViewState): string | null {
-  const tasks = state.taskIds.map((id) => state.tasks[id]).filter((task) => task !== undefined);
-  if (tasks.length === 0) return null;
-  const settled = tasks.filter(
-    (task) => task.status === "completed" || task.status === "failed" || task.status === "skipped",
-  ).length;
-  const running = tasks.find((task) => task.status === "running");
-  const current = running ? (AGENT_LABELS[running.agent] ?? running.agent) : null;
-  return current ? `${settled}/${tasks.length} · ${current}` : `${settled}/${tasks.length}`;
 }

@@ -22,17 +22,20 @@ export function ProcessPanel({ state, now }: { state: ResearchViewState; now: nu
       <button
         type="button"
         aria-expanded={open}
+        aria-controls="research-process"
         onClick={() => setUserOpen(!open)}
-        className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900"
+        className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-zinc-50 focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:outline-none dark:hover:bg-zinc-900"
       >
         <span className="font-medium">研究过程</span>
         <span className="text-xs text-zinc-400">{open ? "收起" : "展开"}</span>
       </button>
-      {open && (
-        <div className="border-t border-zinc-200 px-3 py-3 dark:border-zinc-800">
-          <ActivityPanel state={state} now={now} hideHeading />
-        </div>
-      )}
+      <div
+        id="research-process"
+        hidden={!open}
+        className="border-t border-zinc-200 px-3 py-3 dark:border-zinc-800"
+      >
+        <ActivityPanel state={state} now={now} hideHeading />
+      </div>
     </div>
   );
 }

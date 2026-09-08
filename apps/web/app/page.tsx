@@ -21,7 +21,7 @@ export default async function HomePage({
   const { session: initialSessionId } = await searchParams;
 
   return (
-    <main className="mx-auto max-w-6xl px-6 py-12">
+    <main id="main" className="mx-auto max-w-6xl px-6 py-12">
       <AppHeader current="research" />
 
       {!catalog.ok && (

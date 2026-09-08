@@ -62,7 +62,7 @@ export default async function HistoryPage({ searchParams }: { searchParams: Prom
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
-    <main className="mx-auto max-w-6xl px-6 py-12">
+    <main id="main" className="mx-auto max-w-6xl px-6 py-12">
       <AppHeader current="history" />
 
       <form method="get" className="mb-6 flex flex-wrap items-end gap-3 text-sm">
@@ -94,12 +94,12 @@ export default async function HistoryPage({ searchParams }: { searchParams: Prom
             name="modelId"
             defaultValue={modelId ?? ""}
             placeholder="全部"
-            className="w-56 rounded-md border border-zinc-200 bg-transparent px-3 py-1.5 text-sm dark:border-zinc-800"
+            className="w-56 rounded-md border border-zinc-200 bg-transparent px-3 py-1.5 text-sm focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:outline-none dark:border-zinc-800"
           />
         </label>
         <button
           type="submit"
-          className="rounded-md border border-zinc-200 px-3 py-1.5 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900"
+          className="rounded-md border border-zinc-200 px-3 py-1.5 hover:bg-zinc-50 focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:outline-none dark:border-zinc-800 dark:hover:bg-zinc-900"
         >
           筛选
         </button>
@@ -113,7 +113,7 @@ export default async function HistoryPage({ searchParams }: { searchParams: Prom
             <li key={row.id}>
               <Link
                 href={`/?session=${encodeURIComponent(row.id)}` as Route}
-                className="block py-3 hover:bg-zinc-50 dark:hover:bg-zinc-900/40"
+                className="block py-3 hover:bg-zinc-50 focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:outline-none dark:hover:bg-zinc-900/40"
               >
                 <p className="font-medium">{row.question}</p>
                 <p className="mt-1 text-xs text-zinc-500">
@@ -135,7 +135,7 @@ export default async function HistoryPage({ searchParams }: { searchParams: Prom
           {page > 1 && (
             <Link
               href={historyHref({ ...params, page: String(page - 1) })}
-              className="text-zinc-500 hover:underline"
+              className="text-zinc-500 hover:underline focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:outline-none"
             >
               上一页
             </Link>
@@ -146,7 +146,7 @@ export default async function HistoryPage({ searchParams }: { searchParams: Prom
           {page < pages && (
             <Link
               href={historyHref({ ...params, page: String(page + 1) })}
-              className="text-zinc-500 hover:underline"
+              className="text-zinc-500 hover:underline focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:outline-none"
             >
               下一页
             </Link>
