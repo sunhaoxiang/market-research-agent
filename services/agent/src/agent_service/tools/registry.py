@@ -22,6 +22,8 @@ from agent_service.tools.crypto.models import (
 )
 from agent_service.tools.crypto.resolve import run_resolve_asset
 from agent_service.tools.deps import ToolDeps
+from agent_service.tools.system.compute import run_compute_metrics
+from agent_service.tools.system.models import ComputeMetricsData, SeriesPoint
 from agent_service.tools.web.fetch import run_web_fetch
 from agent_service.tools.web.models import WebPageData, WebSearchData
 from agent_service.tools.web.search import run_news_search, run_web_search
@@ -64,6 +66,13 @@ class CryptoHistoryArgs(BaseModel):
     asset: str
     days: int = 30
     vs_currency: str = "usd"
+
+
+class ComputeMetricsArgs(BaseModel):
+    series: list[SeriesPoint]
+    ops: list[str]
+    years: float | None = None
+    periods_per_year: float | None = None
 
 
 async def _web_search(deps: ToolDeps, arguments: dict[str, Any]) -> ToolResult[WebSearchData]:
@@ -136,7 +145,24 @@ async def _get_price_history(
     )
 
 
+async def _compute_metrics(
+    deps: ToolDeps, arguments: dict[str, Any]
+) -> ToolResult[ComputeMetricsData]:
+    try:
+        args = ComputeMetricsArgs.model_validate(arguments)
+    except ValidationError as exc:
+        return fail_validation("compute_metrics", exc)
+    return run_compute_metrics(
+        deps,
+        series=args.series,
+        ops=args.ops,
+        years=args.years,
+        periods_per_year=args.periods_per_year,
+    )
+
+
 HANDLERS: dict[str, ToolHandler] = {
+    "compute_metrics": _compute_metrics,
     "get_crypto_price": _get_crypto_price,
     "get_market_data": _get_market_data,
     "get_price_history": _get_price_history,

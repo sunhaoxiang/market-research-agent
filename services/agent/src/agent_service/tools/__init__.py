@@ -9,13 +9,16 @@ from agent_service.tools.crypto.bindings import (
 )
 from agent_service.tools.deps import ToolDeps
 from agent_service.tools.registry import HANDLERS, invoke_tool
+from agent_service.tools.system.bindings import SYSTEM_TOOLS, compute_metrics
 from agent_service.tools.web.bindings import WEB_TOOLS, news_search, web_fetch, web_search
 
 __all__ = [
     "CRYPTO_TOOLS",
     "HANDLERS",
+    "SYSTEM_TOOLS",
     "WEB_TOOLS",
     "ToolDeps",
+    "compute_metrics",
     "get_crypto_price",
     "get_market_data",
     "get_price_history",
