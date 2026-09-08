@@ -12,7 +12,7 @@ import socket
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Protocol, runtime_checkable
 from urllib.parse import urljoin, urlparse
 
 import httpx
@@ -59,6 +59,13 @@ class FetchedPage:
     status_code: int
     content_type: str | None
     provenance: DataProvenance
+
+
+@runtime_checkable
+class PageFetcher(Protocol):
+    """Tool 层只需要 `fetch`。测试替身不必继承 WebFetcher。"""
+
+    async def fetch(self, url: str) -> FetchedPage: ...
 
 
 class WebFetcher:

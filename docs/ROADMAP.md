@@ -6,7 +6,7 @@
 > **每完成一个任务就更新此表的状态**；每完成一个阶段，跑 `[DP §26]` 的收尾清单并写阶段小结。
 
 - 最后更新：2026-09-08
-- 当前阶段：**Phase 2 进行中**（P2-1 ~ P2-3 已完成）
+- 当前阶段：**Phase 2 进行中**（P2-1 ~ P2-4 已完成）
 
 ### 已确认的前置决策（2026-09-07）
 
@@ -130,7 +130,7 @@ hash 跨会话稳定，说明 §9.8 的缓存前缀约束真的守住了；95.4%
 | P2-1  | `providers/base.py`：httpx 客户端池 + 分级缓存（SQLite KV）+ 令牌桶限流 + 配额计数 + tenacity 重试 + 自动埋点 `[DP §8.3]` | P1-1        | ✅   | 契约测试覆盖 429/5xx/超时/缓存命中；配额跨重启仍在；缓存命中不耗配额 |
 | P2-2  | `SearchProvider` 抽象 + Tavily 实现（可切 Exa/Brave 的接口设计）                                                          | P2-1        | ✅   | respx 契约测试通过：Bearer 鉴权、body 不含 key、`search_depth=basic`、缓存命中 |
 | P2-3  | `web_fetch` 抓取器：SSRF 防护（DNS→IP 校验、协议/重定向/大小/超时限制）+ trafilatura 正文提取                             | P2-1        | ✅   | 内网 IP / metadata / 超大响应在出网前拦截；重定向到 loopback 不会打到目标 |
-| P2-4  | `tools/web/`：`web_search` / `web_fetch` / `news_search`，全部返回 `ToolResult` + provenance                              | P2-2, P2-3  | ⬜   | `/v1/tools/{name}/invoke` 可单独调用        |
+| P2-4  | `tools/web/`：`web_search` / `web_fetch` / `news_search`，全部返回 `ToolResult` + provenance                              | P2-2, P2-3  | ✅   | `/v1/tools/{name}/invoke` 可单独调用；错误是 200+ok=false，未知工具才 404 |
 | P2-5  | Prompt injection 隔离：`<untrusted_web_content>` 包裹 + instructions 声明 + 注入迹象 warning 事件 `[DP §17.1-5]`          | P2-4        | ⬜   | 含注入指令的样例页面不改变 Agent 行为       |
 | P2-6  | Web Research Agent + prompt（产出 `ResearchFinding`，含 claims / sources / data_gaps）                                    | P2-4, P1-10 | ⬜   | 对"HYPE 最近有什么新闻"产出带来源的 finding |
 | P2-7  | Source 归一化与去重：URL canonical、`reliability` 分级、`SOURCE_FOUND` 事件、引用重新编号 `[DP §15.1-15.2]`               | P2-6        | ⬜   | 同一 URL 不同参数被正确合并                 |
@@ -392,7 +392,15 @@ Agent / Tool 只依赖 `SearchProvider` 协议，Tavily 是第一个实现。换
 
 每跳独立过关：协议（只允许 http/https）→ 拒绝 URL 中的用户名密码 → 主机名黑名单 → DNS 成 IP → 拒绝私网/loopback/link-local/CGNAT/云 metadata。重定向不会自动跟随，跳到内网的那一跳在发出请求之前就被拦住。HTTPS 降级到 HTTP 直接拒绝。响应先看 `Content-Length`，再按流式字节数封顶 2MB。
 
-正文用 trafilatura 提取；PDF/图片等记 `UNSUPPORTED`。提取失败返回 `text=None`，由 tool 层（P2-4）写进 `data_gaps`，不让模型编。
+正文用 trafilatura 提取；PDF/图片等记 `UNSUPPORTED`。提取失败返回 `text=None`，由 tool 层（P2-4）用 `DataQuality.missing_fields=["text"]` 声明，不让模型编。Agent 把缺口抄进 `data_gaps` 是 P2-6 的事。
+
+### P2-4 — web tools + invoke ✅（2026-09-08）
+
+三个 tool 都是纯 async 函数，catch `ProviderError` 转成 `ToolResult.failure`——栈信息到不了 LLM。成功路径带着 Provider 已经填好的 provenance。`news_search` 走 `SearchTopic.NEWS`，`since` 接受 `day/week/month/year` 或 ISO 日期（映射到能覆盖该时点的最小 Tavily 窗口）。
+
+`POST /v1/tools/{name}/invoke` 与 Agent 共用 `invoke_tool` + `ToolDeps`。未知工具名是 HTTP 404；缺参数 / 上游失败是 200 + `ok=false`，eval 脚本只需要解析同一种形状。未配 `TAVILY_API_KEY` 时搜索工具明确失败，不会空跑。
+
+`@function_tool` 包装已经就绪（`WEB_TOOLS`），P2-6 挂到 Web Research Agent；P2-5 再给正文加 `<untrusted_web_content>` 隔离。
 
 ---
 
