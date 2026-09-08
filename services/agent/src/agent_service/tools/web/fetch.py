@@ -7,6 +7,7 @@ from agent_service.schemas.tools import DataQuality, ToolResult
 from agent_service.tools._result import fail_invalid, fail_provider, fail_unavailable
 from agent_service.tools.deps import ToolDeps
 from agent_service.tools.web.models import WebPageData
+from agent_service.tools.web.untrusted import annotate_untrusted
 
 
 async def run_web_fetch(deps: ToolDeps, *, url: str) -> ToolResult[WebPageData]:
@@ -31,7 +32,7 @@ async def run_web_fetch(deps: ToolDeps, *, url: str) -> ToolResult[WebPageData]:
             missing_fields=["text"],
             caveats=["无法从页面提取正文"],
         )
-    return ToolResult.success(
+    result = ToolResult.success(
         WebPageData(
             url=page.url,
             final_url=page.final_url,
@@ -43,3 +44,4 @@ async def run_web_fetch(deps: ToolDeps, *, url: str) -> ToolResult[WebPageData]:
         provenance=page.provenance,
         quality=quality,
     )
+    return annotate_untrusted(deps, result, source=page.final_url)

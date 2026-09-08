@@ -12,6 +12,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from agent_service.observability.event_bus import EventBus
     from agent_service.providers.fetch import PageFetcher
     from agent_service.providers.runtime import Clock
     from agent_service.providers.search import SearchProvider
@@ -22,6 +23,7 @@ class ToolDeps:
     search: SearchProvider | None = None
     fetcher: PageFetcher | None = None
     clock: Clock | None = None
+    bus: EventBus | None = None
 
     def now(self) -> datetime:
         if self.clock is not None:

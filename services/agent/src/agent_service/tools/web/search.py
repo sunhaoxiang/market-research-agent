@@ -15,6 +15,7 @@ from agent_service.schemas.tools import DataQuality, ToolResult
 from agent_service.tools._result import fail_invalid, fail_provider, fail_unavailable
 from agent_service.tools.deps import ToolDeps
 from agent_service.tools.web.models import WebSearchData, WebSearchHit
+from agent_service.tools.web.untrusted import annotate_untrusted
 
 _MAX_RESULTS = 10
 _TIME_RANGES = {item.value: item for item in SearchTimeRange}
@@ -155,11 +156,12 @@ async def run_web_search(
         return fail_provider("web_search", exc)
 
     hits = _hits(page)
-    return ToolResult.success(
+    result = ToolResult.success(
         WebSearchData(query=page.query, hits=hits, topic=SearchTopic.GENERAL.value),
         provenance=page.provenance,
         quality=_quality(hits),
     )
+    return annotate_untrusted(deps, result, source=page.query)
 
 
 async def run_news_search(
@@ -196,7 +198,7 @@ async def run_news_search(
         return fail_provider("news_search", exc)
 
     hits = _hits(page)
-    return ToolResult.success(
+    result = ToolResult.success(
         WebSearchData(
             query=page.query,
             hits=hits,
@@ -206,3 +208,4 @@ async def run_news_search(
         provenance=page.provenance,
         quality=_quality(hits),
     )
+    return annotate_untrusted(deps, result, source=page.query)
