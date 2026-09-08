@@ -449,6 +449,47 @@ describe("工具调用", () => {
   });
 });
 
+describe("来源", () => {
+  const sample = {
+    id: "src-1",
+    ref: "s1",
+    url: "https://www.theblock.co/post/1?utm_source=x",
+    url_canonical: "https://theblock.co/post/1",
+    title: "Fee share",
+    domain: "theblock.co",
+    source_type: "news" as const,
+    provider: "tavily",
+    reliability: "secondary" as const,
+    published_at: null,
+    retrieved_at: "2026-09-08T12:00:00.000Z",
+    excerpt: "holders",
+    citation_index: null,
+    http_status: null,
+  };
+
+  it("source_found 把来源追加到列表", () => {
+    const e = script();
+    const state = reduce(
+      initialState,
+      e("source_found", { source: sample }, "发现来源：Fee share"),
+    );
+
+    expect(state.sources).toEqual([sample]);
+    expect(state.lastMessage).toBe("发现来源：Fee share");
+  });
+
+  it("同一 canonical URL 不重复追加", () => {
+    const e = script();
+    const state = reduceAll([
+      e("source_found", { source: sample }),
+      e("source_found", { source: { ...sample, id: "src-2", url: "https://theblock.co/post/1" } }),
+    ]);
+
+    expect(state.sources).toHaveLength(1);
+    expect(state.sources[0]!.id).toBe("src-1");
+  });
+});
+
 describe("信封字段", () => {
   it("message 直接可显示，未覆盖的事件类型也能靠它降级", () => {
     // §12.3 的冗余设计：前端不必为每种类型都写文案

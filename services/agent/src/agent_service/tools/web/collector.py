@@ -1,28 +1,30 @@
 """把 tool 结果登记成 Source，并给 LLM 打上 s1/s2 短引用。
 
-URL 归一化与 reliability 分级是 P2-7 的事。这里只保证：同一次任务里
-同一个 URL 共用一个 ref，LLM 不必（也不该）自己复述 URL（§15.1）。
+身份在会话级 `SourceRegistry`：同一 canonical URL（含不同跟踪参数）共用
+一个 ref。本对象只记住「这个任务见到过哪些」，以免把别的任务的来源塞进
+本任务的 finding。
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from urllib.parse import urlparse
+from typing import TYPE_CHECKING
 
-from agent_service.schemas.common import SourceReliability, SourceType
-from agent_service.schemas.sources import Source
+from agent_service.schemas.common import SourceType
 from agent_service.schemas.tools import ToolError, ToolResult
+from agent_service.sources.registry import SourceRegistry
 from agent_service.tools.web.models import WebPageData, WebSearchData
 from agent_service.tools.web.untrusted import strip_isolation_tags
 
-_EXCERPT_CHARS = 400
+if TYPE_CHECKING:
+    from agent_service.schemas.sources import Source
 
 
 @dataclass
 class SourceCollector:
-    _by_url: dict[str, Source] = field(default_factory=dict)
-    _order: list[str] = field(default_factory=list)
+    registry: SourceRegistry = field(default_factory=SourceRegistry)
+    _seen: list[str] = field(default_factory=list)
     errors: list[ToolError] = field(default_factory=list)
 
     def add(
@@ -38,31 +40,24 @@ class SourceCollector:
         domain: str | None = None,
         http_status: int | None = None,
     ) -> str:
-        key = url.strip()
-        existing = self._by_url.get(key)
-        if existing is not None:
-            return existing.ref
-        ref = f"s{len(self._order) + 1}"
-        source = Source(
-            ref=ref,
-            url=key,
-            url_canonical=key,
+        source = self.registry.intern(
+            url=url,
             title=title,
-            domain=domain or _domain(key),
-            source_type=source_type,
+            excerpt=strip_isolation_tags(excerpt) if excerpt else excerpt,
             provider=provider,
-            reliability=SourceReliability.UNKNOWN,
-            published_at=published_at,
             retrieved_at=retrieved_at,
-            excerpt=_excerpt(excerpt),
+            published_at=published_at,
+            source_type=source_type,
+            domain=domain,
             http_status=http_status,
         )
-        self._by_url[key] = source
-        self._order.append(key)
-        return ref
+        if source.url_canonical not in self._seen:
+            self._seen.append(source.url_canonical)
+        return source.ref
 
     def sources(self) -> list[Source]:
-        return [self._by_url[url] for url in self._order]
+        by_canonical = {item.url_canonical: item for item in self.registry.sources()}
+        return [by_canonical[key] for key in self._seen if key in by_canonical]
 
 
 def stamp_refs[T](collector: SourceCollector, result: ToolResult[T]) -> ToolResult[T]:
@@ -110,23 +105,3 @@ def stamp_refs[T](collector: SourceCollector, result: ToolResult[T]) -> ToolResu
         )
         return result.model_copy(update={"data": data.model_copy(update={"ref": ref})})
     return result
-
-
-def _excerpt(text: str | None) -> str | None:
-    if text is None:
-        return None
-    cleaned = strip_isolation_tags(text).strip()
-    if not cleaned:
-        return None
-    if len(cleaned) <= _EXCERPT_CHARS:
-        return cleaned
-    return cleaned[: _EXCERPT_CHARS - 1] + "…"
-
-
-def _domain(url: str) -> str | None:
-    host = urlparse(url).hostname
-    if host is None:
-        return None
-    if host.startswith("www."):
-        host = host[4:]
-    return host or None

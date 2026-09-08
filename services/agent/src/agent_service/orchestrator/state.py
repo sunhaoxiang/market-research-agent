@@ -29,6 +29,7 @@ from agent_service.schemas.events import (
     StageChangedPayload,
     TokenUsage,
 )
+from agent_service.sources.registry import SourceRegistry
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -97,6 +98,7 @@ class ResearchState:
         self.session_id = session_id
         self.question = question
         self.bus = bus
+        self.source_registry = SourceRegistry(bus=bus)
         self._clock = clock
         self._started_at = clock()
         self.stage: Stage | None = None

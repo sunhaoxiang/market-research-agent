@@ -6,7 +6,7 @@
 > **每完成一个任务就更新此表的状态**；每完成一个阶段，跑 `[DP §26]` 的收尾清单并写阶段小结。
 
 - 最后更新：2026-09-08
-- 当前阶段：**Phase 2 进行中**（P2-1 ~ P2-6 已完成）
+- 当前阶段：**Phase 2 进行中**（P2-1 ~ P2-7 已完成）
 
 ### 已确认的前置决策（2026-09-07）
 
@@ -133,7 +133,7 @@ hash 跨会话稳定，说明 §9.8 的缓存前缀约束真的守住了；95.4%
 | P2-4  | `tools/web/`：`web_search` / `web_fetch` / `news_search`，全部返回 `ToolResult` + provenance                              | P2-2, P2-3  | ✅   | `/v1/tools/{name}/invoke` 可单独调用；错误是 200+ok=false，未知工具才 404 |
 | P2-5  | Prompt injection 隔离：`<untrusted_web_content>` 包裹 + instructions 声明 + 注入迹象 warning 事件 `[DP §23 R5]`           | P2-4        | ✅   | 注入句只出现在隔离标签内；命中发 `web.prompt_injection` warning；Scripted Agent 答复不被页面里的 PWNED 改写 |
 | P2-6  | Web Research Agent + prompt（产出 `ResearchFinding`，含 claims / sources / data_gaps）                                    | P2-4, P1-10 | ✅   | 对"HYPE 最近有什么新闻"产出带来源的 finding |
-| P2-7  | Source 归一化与去重：URL canonical、`reliability` 分级、`SOURCE_FOUND` 事件、引用重新编号 `[DP §15.1-15.2]`               | P2-6        | ⬜   | 同一 URL 不同参数被正确合并                 |
+| P2-7  | Source 归一化与去重：URL canonical、`reliability` 分级、`SOURCE_FOUND` 事件、引用重新编号 `[DP §15.1-15.2]`               | P2-6        | ✅   | 同一 URL 不同参数被正确合并                 |
 | P2-8  | Report Writer Agent v1 + `ResearchReport` schema + `[n]` 引用生成                                                         | P2-7, P1-4  | ⬜   | 产出带引用的 Markdown                       |
 | P2-9  | 引用完整性确定性校验 + output guardrail + 一次修正重试 `[DP §15.4]`                                                       | P2-8        | ⬜   | 故意注入坏引用能被检出并修正                |
 | P2-10 | 前端：Report 渲染（sanitize + `[n]` 可点击）+ Source Panel（悬浮预览 excerpt/domain/时间）+ 认知类型徽标                  | P2-8, P1-12 | ⬜   | 点 `[1]` 高亮对应来源                       |
@@ -425,6 +425,16 @@ Agent / Tool 只依赖 `SearchProvider` 协议，Tavily 是第一个实现。换
 - `SOURCE_BACKED_FACT` 若解析不到来源，降级为 `FACT` 并写 `data_gaps`。
 
 验收用 ScriptedModel：`news_search` → 假搜索页 → AgentFinding JSON，finding 带来源，且发出 `TOOL_STARTED` / `TOOL_COMPLETED`。
+
+### P2-7 — Source 归一化与去重 ✅（2026-09-08）
+
+身份在会话级 `SourceRegistry`：按 `url_canonical` 去重，编连续的 `s1`/`s2`，新来源才发 `SOURCE_FOUND`。跟踪参数、`www`、默认端口、fragment、末尾斜杠都不算新页面——验收就是「同一 URL 不同参数被正确合并」。
+
+可靠性按域名和 `source_type` 判定，不让模型自己标：`sec.gov` / `.gov` 是 `primary`，主流财经媒体 `secondary`，CoinGecko / DefiLlama 等 `aggregator`，社媒和博客 `unknown`。名单是已知样本，没列到的保持 `unknown`。
+
+每个任务仍只把自己见过的来源写进 finding；跨任务共用同一份账本，所以第二个任务的新 URL 会接着编号而不是从 s1 重来。前端 reducer 按 id / canonical 去重，避免重放事件时 Source Panel 长出重复行。
+
+`citation_index`（报告里的 `[n]`）留给 P2-8 / P2-9：孤儿来源不进最终编号。
 
 ---
 

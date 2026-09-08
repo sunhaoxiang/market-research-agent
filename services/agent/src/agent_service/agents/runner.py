@@ -64,7 +64,7 @@ class SubAgentRunner:
 
     async def _run_web(self, context: TaskContext, state: ResearchState) -> ResearchFinding:
         started = time.monotonic()
-        collector = SourceCollector()
+        collector = SourceCollector(registry=state.source_registry)
         deps = ToolDeps(
             search=self._search,
             fetcher=self._fetcher,

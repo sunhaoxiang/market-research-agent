@@ -268,8 +268,13 @@ function applyEvent(state: ResearchViewState, event: ResearchEvent): ResearchVie
         errorMessage: event.payload.message,
       }));
 
-    case "source_found":
-      return { ...state, sources: [...state.sources, event.payload.source] };
+    case "source_found": {
+      const incoming = event.payload.source;
+      const exists = state.sources.some(
+        (item) => item.id === incoming.id || item.url_canonical === incoming.url_canonical,
+      );
+      return exists ? state : { ...state, sources: [...state.sources, incoming] };
+    }
 
     case "metric_found":
       return { ...state, metrics: [...state.metrics, event.payload.metric] };

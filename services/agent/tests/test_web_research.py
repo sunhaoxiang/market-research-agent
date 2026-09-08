@@ -23,11 +23,17 @@ from agent_service.orchestrator.executor import TaskContext
 from agent_service.orchestrator.state import ResearchState
 from agent_service.providers.search import SearchHit, SearchPage, SearchQuery
 from agent_service.schemas.claims import ClaimDraft
-from agent_service.schemas.common import AgentName, ConfidenceLevel, EpistemicType
+from agent_service.schemas.common import (
+    AgentName,
+    ConfidenceLevel,
+    EpistemicType,
+    SourceReliability,
+)
 from agent_service.schemas.events import EventType
 from agent_service.schemas.findings import AgentFinding
 from agent_service.schemas.plan import ResearchTask
 from agent_service.schemas.tools import DataProvenance, ToolResult
+from agent_service.sources.registry import SourceRegistry
 from agent_service.testing import (
     IsolatedExecutionLimits,
     IsolatedProviderCredentials,
@@ -132,6 +138,8 @@ def test_assemble_finding_maps_short_refs() -> None:
     assert finding.sources[0].url == _URL
     assert finding.claims[0].source_ids == [finding.sources[0].id]
     assert finding.claims[0].epistemic_type is EpistemicType.SOURCE_BACKED_FACT
+    assert finding.sources[0].reliability is SourceReliability.SECONDARY
+    assert finding.sources[0].url_canonical == "https://theblock.co/hyperliquid-fee-share"
 
 
 def test_missing_source_ref_downgrades_to_fact() -> None:
@@ -207,7 +215,7 @@ async def test_scripted_web_agent_produces_finding_with_sources() -> None:
         )
     )
     bus = EventBus("sess-web", heartbeat_interval_s=60.0)
-    collector = SourceCollector()
+    collector = SourceCollector(registry=SourceRegistry(bus=bus))
     deps = ToolDeps(search=search, bus=bus, sources=collector)
     translator = AgentRunTranslator(bus, agent=AgentName.WEB_RESEARCH, task_id="t1")
     structured = await run_tool_agent(
@@ -231,6 +239,8 @@ async def test_scripted_web_agent_produces_finding_with_sources() -> None:
     types = [event.type for event in events]
     assert EventType.TOOL_STARTED in types
     assert EventType.TOOL_COMPLETED in types
+    assert EventType.SOURCE_FOUND in types
+    assert types.count(EventType.SOURCE_FOUND) == 1
 
 
 async def test_sub_agent_runner_still_placeholders_crypto() -> None:
