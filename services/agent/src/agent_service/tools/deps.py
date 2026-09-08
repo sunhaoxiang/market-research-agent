@@ -25,6 +25,7 @@ if TYPE_CHECKING:
     from agent_service.providers.onchain import PerpMarketSnapshot
     from agent_service.providers.runtime import Clock
     from agent_service.providers.search import SearchProvider
+    from agent_service.providers.sec import TickerDirectory
     from agent_service.tools.web.collector import SourceCollector
 
 
@@ -62,6 +63,12 @@ class HyperliquidClient(Protocol):
     async def get_perp_snapshot(self) -> PerpMarketSnapshot: ...
 
 
+class SecEdgarClient(Protocol):
+    """SEC 在 ToolDeps 上的面。P4-3 用 ticker 目录；P4-5 / P4-8 再加 submissions / facts。"""
+
+    async def get_ticker_directory(self) -> TickerDirectory: ...
+
+
 @dataclass(frozen=True, slots=True)
 class ToolDeps:
     search: SearchProvider | None = None
@@ -69,6 +76,7 @@ class ToolDeps:
     coingecko: CoinGeckoClient | None = None
     defillama: DefiLlamaClient | None = None
     hyperliquid: HyperliquidClient | None = None
+    sec_edgar: SecEdgarClient | None = None
     clock: Clock | None = None
     bus: EventBus | None = None
     sources: SourceCollector | None = None

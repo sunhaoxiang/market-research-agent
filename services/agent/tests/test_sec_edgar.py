@@ -368,3 +368,57 @@ def test_sec_user_agent_accepts_dp_alias(monkeypatch: pytest.MonkeyPatch) -> Non
     monkeypatch.setenv("SEC_EDGAR_USER_AGENT", "App me@example.com")
     settings = IsolatedSettings()
     assert settings.sec_user_agent == "App me@example.com"
+
+
+def _tickers_payload() -> dict[str, object]:
+    return {
+        "0": {"cik_str": 1045810, "ticker": "NVDA", "title": "NVIDIA CORP"},
+        "1": {"cik_str": 320193, "ticker": "AAPL", "title": "Apple Inc."},
+    }
+
+
+@respx.mock
+async def test_ticker_directory_maps_nvda(
+    respx_mock: respx.MockRouter, runtime: ProviderRuntime
+) -> None:
+    route = respx_mock.get("https://www.sec.gov/files/company_tickers.json").mock(
+        return_value=httpx.Response(200, json=_tickers_payload())
+    )
+    async with edgar(runtime) as provider:
+        directory = await provider.get_ticker_directory()
+
+    assert route.calls[0].request.headers["user-agent"] == _UA
+    by_ticker = {row.ticker: row for row in directory.entries}
+    assert by_ticker["NVDA"].cik == _CIK
+    assert by_ticker["NVDA"].title == "NVIDIA CORP"
+    assert by_ticker["NVDA"].url == company_page_url("1045810")
+    assert directory.provenance.provider == "sec_edgar"
+    assert directory.provenance.endpoint == "/files/company_tickers.json"
+
+
+@respx.mock
+async def test_ticker_directory_hits_the_cache(
+    respx_mock: respx.MockRouter, runtime: ProviderRuntime
+) -> None:
+    route = respx_mock.get("https://www.sec.gov/files/company_tickers.json").mock(
+        return_value=httpx.Response(200, json=_tickers_payload())
+    )
+    async with edgar(runtime) as provider:
+        first = await provider.get_ticker_directory()
+        second = await provider.get_ticker_directory()
+    assert route.call_count == 1
+    assert first.provenance.is_cached is False
+    assert second.provenance.is_cached is True
+
+
+@respx.mock
+async def test_empty_ticker_directory_is_not_found(
+    respx_mock: respx.MockRouter, runtime: ProviderRuntime
+) -> None:
+    respx_mock.get("https://www.sec.gov/files/company_tickers.json").mock(
+        return_value=httpx.Response(200, json={})
+    )
+    async with edgar(runtime) as provider:
+        with pytest.raises(ProviderError) as exc:
+            await provider.get_ticker_directory()
+    assert exc.value.code is ToolErrorCode.NOT_FOUND

@@ -4,12 +4,13 @@
 否则 403 封 IP（§17.2）。限流/缓存/429 走 `BaseProvider`；profile 已按 10 req/s
 钉死。本文件只负责路径、JSON 形状，以及「没有这个 CIK」的错误映射。
 
-两个方法是给后面任务用的原语，不要在 tool 层再包一遍 HTTP：
+三个方法是给后面任务用的原语，不要在 tool 层再包一遍 HTTP：
 
+- `get_ticker_directory` → **P4-3** `resolve_ticker`（本地缓存 `company_tickers.json`）
 - `get_submissions` → **P4-8** `list_sec_filings`（以及归档 URL）
 - `get_company_facts` → **P4-5** 三表 XBRL / **P4-8** `get_xbrl_facts`
 
-ticker→CIK 是 **P4-3**；本项只收 CIK。10-K 章节正文是 P4-8 / P4-9。
+`get_submissions` / `get_company_facts` 只收 CIK。10-K 章节正文是 P4-8 / P4-9。
 """
 
 from __future__ import annotations
@@ -22,7 +23,7 @@ from typing import Any
 
 import httpx
 
-from agent_service.providers.base import BaseProvider, ProviderResponse
+from agent_service.providers.base import BaseProvider, ProviderRequest, ProviderResponse
 from agent_service.providers.errors import ProviderError
 from agent_service.providers.runtime import ProviderRuntime
 from agent_service.providers.ttl import CacheTTL
@@ -31,6 +32,9 @@ from agent_service.schemas.tools import DataProvenance, ToolErrorCode
 _SEC_BASE = "https://data.sec.gov"
 _PROVIDER = "sec_edgar"
 _CIK_WIDTH = 10
+_TICKERS_ENDPOINT = "/files/company_tickers.json"
+_TICKERS_URL = "https://www.sec.gov/files/company_tickers.json"
+_SEARCH_PAGE = "https://www.sec.gov/search-filings"
 
 
 def padded_cik(cik: str, *, endpoint: str = "/submissions") -> str:
@@ -148,6 +152,21 @@ class CompanyFacts:
         return self.concepts.get((taxonomy, tag))
 
 
+@dataclass(frozen=True, slots=True)
+class TickerEntry:
+    cik: str
+    ticker: str
+    title: str
+    url: str
+
+
+@dataclass(frozen=True, slots=True)
+class TickerDirectory:
+    entries: tuple[TickerEntry, ...]
+    url: str
+    provenance: DataProvenance
+
+
 class SecEdgarProvider(BaseProvider):
     def __init__(
         self,
@@ -184,9 +203,17 @@ class SecEdgarProvider(BaseProvider):
         response = await self._get(path, CacheTTL.PROFILE)
         return _parse_facts(response, cik10=cik10)
 
-    async def _get(self, endpoint: str, ttl: CacheTTL) -> ProviderResponse:
+    async def get_ticker_directory(self) -> TickerDirectory:
+        response = await self._get(_TICKERS_ENDPOINT, CacheTTL.PROFILE, path=_TICKERS_URL)
+        return _parse_tickers(response)
+
+    async def _get(
+        self, endpoint: str, ttl: CacheTTL, *, path: str | None = None
+    ) -> ProviderResponse:
         try:
-            return await self.get_json(endpoint, ttl=ttl)
+            if path is None:
+                return await self.get_json(endpoint, ttl=ttl)
+            return await self.request(ProviderRequest(endpoint=endpoint, path=path, ttl=ttl))
         except ProviderError as exc:
             raise _map_http_error(exc, endpoint=endpoint) from exc
 
@@ -337,6 +364,53 @@ def _parse_facts(response: ProviderResponse, *, cik10: str) -> CompanyFacts:
         name=_optional_str(data.get("entityName")),
         concepts=MappingProxyType(concepts),
         url=company_page_url(cik),
+        provenance=response.provenance(),
+    )
+
+
+def _parse_tickers(response: ProviderResponse) -> TickerDirectory:
+    data = response.data
+    if not isinstance(data, dict):
+        raise ProviderError(
+            ToolErrorCode.PARSE_ERROR,
+            "SEC company_tickers 返回了非对象",
+            retryable=False,
+            provider=response.provider,
+            endpoint=response.endpoint,
+        )
+    entries: list[TickerEntry] = []
+    seen: set[str] = set()
+    for item in data.values():
+        if not isinstance(item, dict):
+            continue
+        cik = _cik_str(item.get("cik_str") if item.get("cik_str") is not None else item.get("cik"))
+        ticker = _optional_str(item.get("ticker"))
+        title = _optional_str(item.get("title") or item.get("name"))
+        if cik is None or ticker is None:
+            continue
+        key = ticker.upper()
+        if key in seen:
+            continue
+        seen.add(key)
+        entries.append(
+            TickerEntry(
+                cik=cik,
+                ticker=ticker.upper(),
+                title=title or ticker.upper(),
+                url=company_page_url(cik),
+            )
+        )
+    if not entries:
+        raise ProviderError(
+            ToolErrorCode.NOT_FOUND,
+            "SEC 没有公司代码表",
+            retryable=False,
+            provider=response.provider,
+            endpoint=response.endpoint,
+        )
+    return TickerDirectory(
+        entries=tuple(entries),
+        url=_SEARCH_PAGE,
         provenance=response.provenance(),
     )
 

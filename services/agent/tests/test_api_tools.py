@@ -14,6 +14,7 @@ from agent_service.providers.crypto import CoinMarket, CoinPrice, CoinSearchHit,
 from agent_service.providers.defi import ProtocolTvl, TvlPoint
 from agent_service.providers.onchain import PerpMarketSnapshot
 from agent_service.providers.search import SearchHit, SearchPage
+from agent_service.providers.sec import TickerDirectory, TickerEntry, company_page_url
 from agent_service.schemas.tools import DataProvenance, ToolErrorCode
 
 _KEY_ENV_VARS = (
@@ -162,6 +163,29 @@ class _FakeHyperliquid:
         return None
 
 
+class _FakeSecEdgar:
+    async def get_ticker_directory(self) -> TickerDirectory:
+        return TickerDirectory(
+            entries=(
+                TickerEntry(
+                    cik="0001045810",
+                    ticker="NVDA",
+                    title="NVIDIA CORP",
+                    url=company_page_url("1045810"),
+                ),
+            ),
+            url="https://www.sec.gov/search-filings",
+            provenance=DataProvenance(
+                provider="sec_edgar",
+                endpoint="/files/company_tickers.json",
+                retrieved_at=datetime(2026, 9, 8, tzinfo=UTC),
+            ),
+        )
+
+    async def aclose(self) -> None:
+        return None
+
+
 @pytest.fixture
 def isolated_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     for name in _KEY_ENV_VARS:
@@ -180,6 +204,7 @@ def client(isolated_env: None) -> Iterator[TestClient]:
         app.state.coingecko = _FakeCoinGecko(_coins())
         app.state.defillama = _FakeDefiLlama()
         app.state.hyperliquid = _FakeHyperliquid()
+        app.state.sec_edgar = _FakeSecEdgar()
         yield test_client
 
 
@@ -251,6 +276,16 @@ def test_invoke_resolve_asset(client: TestClient) -> None:
     assert body["data"]["resolved"]["coin_id"] == "hyperliquid"
     assert body["data"]["resolved"]["name"] == "Hyperliquid"
     assert body["provenance"]["provider"] == "coingecko"
+
+
+def test_invoke_resolve_ticker(client: TestClient) -> None:
+    response = client.post("/v1/tools/resolve_ticker/invoke", json={"arguments": {"query": "NVDA"}})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["data"]["resolved"]["cik"] == "0001045810"
+    assert body["data"]["resolved"]["ticker"] == "NVDA"
+    assert body["provenance"]["provider"] == "sec_edgar"
 
 
 def test_invoke_get_tvl(client: TestClient) -> None:

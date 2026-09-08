@@ -24,6 +24,7 @@ from agent_service.tools.onchain.bindings import (
     get_whale_activity,
 )
 from agent_service.tools.registry import HANDLERS, invoke_tool
+from agent_service.tools.stocks.bindings import STOCK_TOOLS, resolve_ticker
 from agent_service.tools.system.bindings import SYSTEM_TOOLS, compute_metrics
 from agent_service.tools.web.bindings import WEB_TOOLS, news_search, web_fetch, web_search
 
@@ -32,6 +33,7 @@ __all__ = [
     "DEFI_TOOLS",
     "HANDLERS",
     "ONCHAIN_TOOLS",
+    "STOCK_TOOLS",
     "SYSTEM_TOOLS",
     "WEB_TOOLS",
     "ToolDeps",
@@ -51,6 +53,7 @@ __all__ = [
     "invoke_tool",
     "news_search",
     "resolve_asset",
+    "resolve_ticker",
     "web_fetch",
     "web_search",
 ]

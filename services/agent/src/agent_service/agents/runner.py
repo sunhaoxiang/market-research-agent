@@ -43,7 +43,12 @@ if TYPE_CHECKING:
     from agent_service.providers.runtime import Clock
     from agent_service.providers.search import SearchProvider
     from agent_service.schemas.findings import ResearchFinding
-    from agent_service.tools.deps import CoinGeckoClient, DefiLlamaClient, HyperliquidClient
+    from agent_service.tools.deps import (
+        CoinGeckoClient,
+        DefiLlamaClient,
+        HyperliquidClient,
+        SecEdgarClient,
+    )
 
 type _UserMessage = Callable[..., str]
 
@@ -61,6 +66,7 @@ class SubAgentRunner:
         coingecko: CoinGeckoClient | None = None,
         defillama: DefiLlamaClient | None = None,
         hyperliquid: HyperliquidClient | None = None,
+        sec_edgar: SecEdgarClient | None = None,
         clock: Clock | None = None,
         fallback_model_id: str,
     ) -> None:
@@ -73,6 +79,7 @@ class SubAgentRunner:
         self._coingecko = coingecko
         self._defillama = defillama
         self._hyperliquid = hyperliquid
+        self._sec_edgar = sec_edgar
         self._clock = clock
 
     def model_id_for(self, agent: AgentName) -> str:
@@ -117,6 +124,7 @@ class SubAgentRunner:
             coingecko=self._coingecko,
             defillama=self._defillama,
             hyperliquid=self._hyperliquid,
+            sec_edgar=self._sec_edgar,
             clock=self._clock,
             bus=state.bus,
             sources=collector,

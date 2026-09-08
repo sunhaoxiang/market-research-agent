@@ -43,6 +43,8 @@ from agent_service.tools.onchain.gaps import (
     run_get_whale_activity,
 )
 from agent_service.tools.onchain.models import ChainActivityData
+from agent_service.tools.stocks.models import ResolveTickerData
+from agent_service.tools.stocks.resolve import run_resolve_ticker
 from agent_service.tools.system.compute import run_compute_metrics
 from agent_service.tools.system.models import ComputeMetricsData, SeriesPoint
 from agent_service.tools.web.fetch import run_web_fetch
@@ -70,6 +72,10 @@ class WebFetchArgs(BaseModel):
 
 
 class ResolveAssetArgs(BaseModel):
+    query: str
+
+
+class ResolveTickerArgs(BaseModel):
     query: str
 
 
@@ -165,6 +171,16 @@ async def _resolve_asset(deps: ToolDeps, arguments: dict[str, Any]) -> ToolResul
     except ValidationError as exc:
         return fail_validation("resolve_asset", exc)
     return await run_resolve_asset(deps, query=args.query)
+
+
+async def _resolve_ticker(
+    deps: ToolDeps, arguments: dict[str, Any]
+) -> ToolResult[ResolveTickerData]:
+    try:
+        args = ResolveTickerArgs.model_validate(arguments)
+    except ValidationError as exc:
+        return fail_validation("resolve_ticker", exc)
+    return await run_resolve_ticker(deps, query=args.query)
 
 
 async def _get_crypto_price(
@@ -309,6 +325,7 @@ HANDLERS: dict[str, ToolHandler] = {
     "get_whale_activity": _get_whale_activity,
     "news_search": _news_search,
     "resolve_asset": _resolve_asset,
+    "resolve_ticker": _resolve_ticker,
     "web_fetch": _web_fetch,
     "web_search": _web_search,
 }

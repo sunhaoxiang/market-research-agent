@@ -6,7 +6,7 @@
 > **每完成一个任务就更新此表的状态**；每完成一个阶段，跑 `[DP §26]` 的收尾清单并写阶段小结。
 
 - 最后更新：2026-09-08
-- 当前阶段：**P4-2 完成**。下一任务 P4-3 `resolve_ticker` + ticker↔CIK。
+- 当前阶段：**P4-3 完成**。下一任务 P4-4 `tools/stocks/` 行情 tools。
 
 ### 已确认的前置决策（2026-09-07）
 
@@ -172,7 +172,7 @@ hash 跨会话稳定，说明 §9.8 的缓存前缀约束真的守住了；95.4%
 | ----- | -------------------------------------------------------------------------------------------------------------------------- | ------------ | ---- | ----------------------------------- |
 | P4-1  | FMP provider（含日配额计数 + `QUOTA_EXHAUSTED` 快速失败）                                                                  | P2-1         | ✅   | 配额耗尽时优雅降级                  |
 | P4-2  | SEC EDGAR provider（`User-Agent` 合规、10 req/s 限流、`submissions` + `companyfacts`）                                     | P2-1         | ✅   | 契约测试通过                        |
-| P4-3  | `resolve_ticker` + ticker↔CIK 映射（本地缓存 SEC company_tickers.json）                                                    | P4-2         | ⬜   | NVDA→CIK 正确                       |
+| P4-3  | `resolve_ticker` + ticker↔CIK 映射（本地缓存 SEC company_tickers.json）                                                    | P4-2         | ✅   | NVDA→CIK 正确                       |
 | P4-4  | `tools/stocks/`：`get_stock_quote` / `get_company_profile` / `get_price_history` / `get_peers` / `compare_to_index`        | P4-1, P4-3   | ⬜   | 结构化输出完整                      |
 | P4-5  | `tools/financials/` 三表：income / balance / cash flow（优先 XBRL，FMP 兜底）                                              | P4-2, P4-1   | ⬜   | 与官方财报数字一致                  |
 | P4-6  | `tools/financials/get_growth_metrics`：YoY / QoQ / CAGR / margin trend（**Python 计算**）                                  | P4-5, P3-5   | ⬜   | 与手算一致                          |
@@ -742,6 +742,17 @@ Writer 的 user 消息带上冲突清单，prompt 要求并列写出；前端从
 - 404 → `NOT_FOUND`；403 → 提示检查 User-Agent。给人点的 URL 是 `sec.gov/edgar/browse/?CIK=`，不是 `data.sec.gov` 的 JSON。
 
 `SEC_USER_AGENT` 与 DP 里的 `SEC_EDGAR_USER_AGENT` 都能读。本项只把客户端放进 `app.state.sec_edgar`。注入 `ToolDeps` 从 P4-5 / P4-8 开始。
+
+### P4-3 — `resolve_ticker` ✅（2026-09-08）
+
+只调 `SecEdgarProvider.get_ticker_directory`，不包 HTTP。目录来自 `www.sec.gov/files/company_tickers.json`，TTL 7 天，缓存命中不打 SEC。消歧是 tool 层的职责：
+
+- 精确 ticker（`NVDA`）或 CIK（`1045810` / `CIK0001045810`）→ `resolved.cik`。`BRK.B` 与 SEC 的 `BRK-B` 视为同一代码。
+- 公司名前缀唯一（`NVIDIA` → NVIDIA CORP）→ 自动选取，`quality.caveats` 说明按名称匹配。后续请传 ticker / CIK。
+- 同名前缀多条（`Apple` → Apple Inc. 与 Apple Hospitality）→ `ok=true` 但 `resolved` 为空，Agent 从 `candidates` 里挑。
+- 零结果是 `NOT_FOUND`，不要把空列表当成「解析成功」。
+
+`STOCK_TOOLS` 已挂 `@function_tool` 和 `/v1/tools/resolve_ticker/invoke`。注入 `ToolDeps.sec_edgar`。P4-10 再接到 Stock Research Agent；不要提前塞进 Crypto / Web Research。
 
 ---
 
