@@ -31,7 +31,7 @@ from agent_service.models.registry import ModelRegistry
 from agent_service.observability.event_bus import EventBus
 from agent_service.orchestrator.executor import TaskContext
 from agent_service.orchestrator.state import ResearchState
-from agent_service.schemas.common import AgentName
+from agent_service.schemas.common import AgentName, ModelRole
 from agent_service.schemas.events import EventType, WarningEvent, WarningPayload
 from agent_service.schemas.plan import ResearchTask
 from agent_service.testing import (
@@ -213,12 +213,12 @@ def client(only_deepseek: None, monkeypatch: pytest.MonkeyPatch) -> TestClient:
     monkeypatch.setattr(
         research_api,
         "build_research_manager",
-        lambda registry, limits, model_id=None: _scripted_planner(_plan_json()),
+        lambda registry, limits, model_id=None, **_: _scripted_planner(_plan_json()),
     )
     monkeypatch.setattr(
         research_api,
         "build_report_writer",
-        lambda registry, model_id=None: _scripted_writer(),
+        lambda registry, model_id=None, **_: _scripted_writer(),
     )
     monkeypatch.setattr(
         research_api,
@@ -450,7 +450,7 @@ def test_placeholder_still_drives_the_agent_lifecycle(
     monkeypatch.setattr(
         research_api,
         "build_research_manager",
-        lambda registry, limits, model_id=None: _scripted_planner(
+        lambda registry, limits, model_id=None, **_: _scripted_planner(
             _plan_json(
                 tasks=[
                     {
@@ -572,3 +572,60 @@ def test_cancel_endpoint_invokes_registry(client: TestClient) -> None:
     assert response.status_code == 200
     assert response.json() == {"cancelled": True}
     assert called["id"] == "sess-9"
+
+
+def test_model_id_overrides_every_role(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: dict[str, str] = {}
+
+    def capture(
+        registry: ModelRegistry, limits: object, model_id: str | None = None
+    ) -> PlannerAgent:
+        seen["planner"] = registry.model_id_for_role(ModelRole.PLANNER)
+        seen["fast"] = registry.model_id_for_role(ModelRole.FAST)
+        return _scripted_planner(_plan_json())
+
+    monkeypatch.setattr(research_api, "build_research_manager", capture)
+    parse_frames(
+        client.post(
+            "/v1/research/stream",
+            json={"question": "Q", "model_id": "deepseek:deepseek-v4-flash"},
+        ).text
+    )
+    assert seen == {
+        "planner": "deepseek:deepseek-v4-flash",
+        "fast": "deepseek:deepseek-v4-flash",
+    }
+
+
+def test_role_and_limit_overrides_from_options(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    seen: dict[str, object] = {}
+
+    def capture(
+        registry: ModelRegistry,
+        limits: IsolatedExecutionLimits,
+        model_id: str | None = None,
+    ) -> PlannerAgent:
+        seen["fast"] = registry.model_id_for_role(ModelRole.FAST)
+        seen["planner"] = registry.model_id_for_role(ModelRole.PLANNER)
+        seen["max_tasks"] = limits.max_tasks_per_plan
+        return _scripted_planner(_plan_json())
+
+    monkeypatch.setattr(research_api, "build_research_manager", capture)
+    parse_frames(
+        client.post(
+            "/v1/research/stream",
+            json={
+                "question": "Q",
+                "options": {
+                    "role_models": {"fast": "deepseek:deepseek-v4-flash"},
+                    "limits": {"max_tasks_per_plan": 3},
+                    "report_language": "en",
+                },
+            },
+        ).text
+    )
+    assert seen["fast"] == "deepseek:deepseek-v4-flash"
+    assert seen["planner"] == "deepseek:deepseek-v4-pro"
+    assert seen["max_tasks"] == 3

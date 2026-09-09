@@ -17,6 +17,7 @@ from agent_service.config import (
     ExecutionLimits,
     ProviderCredentials,
     Settings,
+    apply_limit_overrides,
 )
 from agent_service.testing import (
     IsolatedExecutionLimits,
@@ -96,3 +97,12 @@ def test_secrets_are_masked_in_repr(tmp_path: Path) -> None:
 
     assert "sk-super-secret" not in repr(creds)
     assert "sk-super-secret" not in str(creds)
+
+
+def test_apply_limit_overrides_only_patches_provided_fields() -> None:
+    base = IsolatedExecutionLimits()
+    patched = apply_limit_overrides(base, {"max_tasks_per_plan": 3})
+
+    assert patched.max_tasks_per_plan == 3
+    assert patched.max_parallel_tasks == base.max_parallel_tasks
+    assert apply_limit_overrides(base, None) is base

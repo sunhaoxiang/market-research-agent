@@ -5,8 +5,8 @@
 >
 > **每完成一个任务就更新此表的状态**；每完成一个阶段，跑 `[DP §26]` 的收尾清单并写阶段小结。
 
-- 最后更新：2026-09-08
-- 当前阶段：**P6 进行中**。P6-1/2/3/4/5/6/7 已完成。未开：Settings、`/debug`、Playwright。
+- 最后更新：2026-09-09
+- 当前阶段：**P6 进行中**。P6-1/2/3/4/5/6/7/8 已完成。未开：`/debug`、成本告警、Playwright。
 
 ### 已确认的前置决策（2026-09-07）
 
@@ -43,7 +43,7 @@
 | P4    | 美股数据能力                    | 11     | ✅   | 四问真跑已出带财务与 SEC 引用的报告 |
 | P5    | Multi-Agent 完整编排            | 9      | ✅   | Fact Checker / 并行 / 报告结构   |
 | P5.5  | **MVP 验收**                    | 1      | ✅   | 见 `[DP §21.1]`；限制见 P5.5 记录 |
-| P6    | 高级 UX + 历史 + 可观察性       | 11     | 🟡   | 主区居中 + 阶段瀑布 + 无障碍 + 历史 / 续订 / 取消；Settings /debug 仍后置 |
+| P6    | 高级 UX + 历史 + 可观察性       | 11     | 🟡   | 主区居中 + 阶段瀑布 + 无障碍 + 历史 / 设置 / 续订 / 取消；/debug 仍后置 |
 | P7    | Evaluation 系统                 | 8      | ⬜   | 数据集 / grader / runner         |
 | P8    | 扩展能力                        | 8      | ⬜   | 按需触发，非线性                 |
 
@@ -363,7 +363,7 @@ Merge / Fact Checker 之后、Writer 之前。**纯代码规则，不打模型�
 | P6-5  | Session 详情页与实时页**复用 `ResearchConsole`**（事件源切到 DB 回放）`[DP §14.3]`。回放入口已在：`GET /api/research/{id}/events` + `reduceAll` | P6-4 | ✅   | 两种视图渲染一致                |
 | P6-6  | 进行中会话的 **增量续订**（偿还 D4）。`GET .../events?after={seq}` 与首页快照回放已有；刷新后若 session 仍在跑，要从 `lastSeq` 接着收新事件（BFF 仍在落库，轮询 DB 即可，不必再接一条 Python SSE） | P6-5 | ✅   | 刷新页面能续上进行中的研究      |
 | P6-7  | 取消研究（前端按钮 → Next `DELETE /api/research/{id}` → Python `POST /v1/research/{id}/cancel` → 状态落库） | P6-6 | ✅   | 可中断长任务                    |
-| P6-8  | Settings 页：默认模型、按角色指定模型、执行上限、报告偏好                                            | P5.5 | ⬜   | 设置持久化并生效                |
+| P6-8  | Settings 页：默认模型、按角色指定模型、执行上限、报告偏好                                            | P5.5 | ✅   | 设置持久化并生效                |
 | P6-9  | `/debug` 可观察性页：阶段瀑布 / Agent 排行 / Tool 失败率 / 模型成本对比 / Provider 配额 `[DP §20.2]` | P5.5 | ⬜   | 能回答 `[DP §20.2]` 的 4 个问题 |
 | P6-10 | 成本与 token 实时显示 + 单 session 成本上限告警                                                      | P6-9 | ⬜   | 超限发 WARNING 事件             |
 | P6-11 | Playwright E2E（打桩 Python 服务，跑完整 UI 流程）                                                   | P6-5 | ⬜   | CI 中稳定通过                   |
@@ -1064,7 +1064,7 @@ P5-8 用 ScriptedModel 覆盖正常 / 工具失败 / 超时 / 冲突 / 引用缺
 
 **偏离计划**：`§21.1` 的「2 分钟」和「3 个 Provider」都没达到——真跑一次财报/深研要 5–11 分钟，本机仍只有 DeepSeek。History 列表按计划属于 Phase 6，MVP 用 `?session=` 回放。P5.5 后补跑 HYPE 投资研究：checking 出现了，但 62 条陈述让 Fact Checker 180s 超时（D23，已截断并拆批偿还，未重跑）。
 
-**新增技术债**：D6 / D8 仍是刻意限制。P6 已改主区居中、阶段瀑布、无障碍，并接上历史 / 续订 / 取消；Settings、`/debug`、Playwright 仍后置。
+**新增技术债**：D6 / D8 仍是刻意限制。P6 已改主区居中、阶段瀑布、无障碍、Settings，并接上历史 / 续订 / 取消；`/debug`、Playwright 仍后置。
 
 ---
 

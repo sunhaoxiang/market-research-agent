@@ -43,11 +43,21 @@ class ReportWriterAgent:
         return self.entry.id
 
 
+_LANGUAGE_LINE = {
+    "zh": "全文使用简体中文撰写。引用保持 [n] 格式。",
+    "en": "Write the entire report in English. Keep source citations as [n].",
+}
+
+
 def build_report_writer(
-    registry: ModelRegistry, *, model_id: str | None = None
+    registry: ModelRegistry,
+    *,
+    model_id: str | None = None,
+    language: str = "zh",
 ) -> ReportWriterAgent:
     resolved = registry.resolve(model_id) if model_id else registry.for_role(ModelRole.WRITING)
-    instructions = load_prompt(PROMPT_NAME)
+    clause = _LANGUAGE_LINE.get(language, _LANGUAGE_LINE["zh"])
+    instructions = load_prompt(PROMPT_NAME) + "\n\n" + clause
     return ReportWriterAgent(
         agent=Agent(
             name=AgentName.REPORT_WRITER.value,

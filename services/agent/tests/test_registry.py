@@ -186,6 +186,22 @@ def test_every_role_resolves_with_a_single_key(clean_env: pytest.MonkeyPatch) ->
         assert registry.for_role(role).model is not None
 
 
+def test_request_overrides_win_over_env(clean_env: pytest.MonkeyPatch) -> None:
+    registry = _registry(
+        clean_env,
+        DEEPSEEK_API_KEY="sk-test",
+        MODEL_ROLE_FAST="deepseek:deepseek-v4-pro",
+    )
+    forked = registry.with_role_overrides({"fast": "deepseek:deepseek-v4-flash"})
+
+    assert forked.model_id_for_role(ModelRole.FAST) == "deepseek:deepseek-v4-flash"
+    assert registry.model_id_for_role(ModelRole.FAST) == "deepseek:deepseek-v4-pro"
+    assert (
+        forked.resolve("deepseek:deepseek-v4-pro").model
+        is registry.resolve("deepseek:deepseek-v4-pro").model
+    )
+
+
 # ─── settings ────────────────────────────────────────────────────────────────
 
 

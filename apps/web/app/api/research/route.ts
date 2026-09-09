@@ -31,7 +31,9 @@ import {
   type SessionStatus,
   type TokenUsage,
 } from "@/db/schema";
+import { getPreferences } from "@/db/queries/settings";
 import { startResearch } from "@/lib/agent-client";
+import { toAgentOptions } from "@/lib/settings";
 import { newId } from "@/lib/ids";
 import { parseFrames, toResearchEvents } from "@/lib/sse";
 
@@ -47,13 +49,15 @@ type RequestBody = {
 export async function POST(request: Request) {
   const body = (await request.json().catch(() => ({}))) as RequestBody;
   const question = typeof body.question === "string" ? body.question.trim() : "";
-  const modelId = typeof body.modelId === "string" ? body.modelId : undefined;
-
   if (!question || question.length > MAX_QUESTION_CHARS) {
     return errorResponse(400, "INVALID_QUESTION", `问题需在 1-${MAX_QUESTION_CHARS} 字之间`);
   }
 
+  const requested = typeof body.modelId === "string" ? body.modelId.trim() : "";
   const db = getDb();
+  const prefs = getPreferences(db);
+  const modelId = requested || prefs.defaultModelId || undefined;
+
   const sessionId = newId();
 
   // session 行先落地再调上游：反过来的话，上游已经开始烧 token 而本地没有任何
@@ -67,9 +71,12 @@ export async function POST(request: Request) {
     startedAt: Date.now(),
   });
 
-  const upstream = await startResearch({ sessionId, question, modelId }).catch(
-    (error: unknown) => error as Error,
-  );
+  const upstream = await startResearch({
+    sessionId,
+    question,
+    modelId,
+    options: toAgentOptions(prefs),
+  }).catch((error: unknown) => error as Error);
 
   if (upstream instanceof Error) {
     const message = `无法连接 Agent 服务。是否已启动？（${upstream.message}）`;

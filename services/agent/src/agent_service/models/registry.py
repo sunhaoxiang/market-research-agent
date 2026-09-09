@@ -89,10 +89,16 @@ class ModelRegistry:
     一个 `AsyncOpenAI`，也就共享底层 httpx 连接池。
     """
 
-    def __init__(self, settings: Settings | None = None) -> None:
+    def __init__(
+        self,
+        settings: Settings | None = None,
+        *,
+        role_overrides: dict[ModelRole, str] | None = None,
+    ) -> None:
         self._settings = settings or get_settings()
         self._clients: dict[ProviderId, AsyncOpenAI] = {}
         self._models: dict[str, Model] = {}
+        self._role_overrides = dict(role_overrides or {})
 
     @property
     def settings(self) -> Settings:
@@ -148,17 +154,33 @@ class ModelRegistry:
         return ResolvedModel(entry=entry, model=model, settings=self._default_settings(entry))
 
     def for_role(self, role: ModelRole) -> ResolvedModel:
-        """按角色解析。优先级：`MODEL_ROLE_*` 环境变量 > 目录兜底映射（§9.5）。"""
+        """按角色解析。优先级：请求覆盖 > `MODEL_ROLE_*` > 目录兜底（§9.5）。"""
         return self.resolve(self.model_id_for_role(role))
 
     def model_id_for_role(self, role: ModelRole) -> str:
-        overrides: dict[ModelRole, str | None] = {
+        if role in self._role_overrides:
+            return self._role_overrides[role]
+        env: dict[ModelRole, str | None] = {
             ModelRole.PLANNER: self._settings.model_role_planner,
             ModelRole.BALANCED: self._settings.model_role_balanced,
             ModelRole.FAST: self._settings.model_role_fast,
             ModelRole.WRITING: self._settings.model_role_writing,
         }
-        return overrides[role] or ROLE_DEFAULTS[role]
+        return env[role] or ROLE_DEFAULTS[role]
+
+    def with_role_overrides(self, overrides: dict[str, str]) -> ModelRegistry:
+        """派生一份角色映射，共享 HTTP 客户端。给单次研究会话用，不改进程默认。"""
+        parsed = dict(self._role_overrides)
+        for raw, model_id in overrides.items():
+            if not model_id:
+                continue
+            parsed[ModelRole(raw)] = model_id
+        if parsed == self._role_overrides:
+            return self
+        child = ModelRegistry(self._settings, role_overrides=parsed)
+        child._clients = self._clients
+        child._models = self._models
+        return child
 
     # ── 构造 ────────────────────────────────────────────────────────────────
 

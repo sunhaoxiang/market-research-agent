@@ -157,6 +157,14 @@ def test_report_writer_prompt_hash_is_stable() -> None:
     assert "Disclaimer" in instructions
 
 
+def test_report_language_changes_instructions() -> None:
+    chinese = build_report_writer(_registry(), language="zh")
+    english = build_report_writer(_registry(), language="en")
+    assert "简体中文" in str(chinese.agent.instructions)
+    assert "Write the entire report in English" in str(english.agent.instructions)
+    assert chinese.prompt.hash != english.prompt.hash
+
+
 def test_merge_report_gaps_keeps_task_gaps() -> None:
     draft = ResearchReport(title="T", executive_summary="s", data_gaps=["模型提到的缺口"])
     merged = merge_report_gaps(draft, [_finding(_source())])

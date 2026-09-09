@@ -35,12 +35,25 @@ class ModelInfo(BaseModel):
     notes: str | None = None
 
 
+class LimitsInfo(BaseModel):
+    """当前进程的执行上限（环境变量，尚未叠用户设置）。"""
+
+    max_tasks_per_plan: int
+    max_parallel_tasks: int
+    max_tool_calls_per_agent: int
+    max_supplement_rounds: int
+    task_timeout_s: float
+    total_timeout_s: float
+    max_session_cost_usd: float
+
+
 class ModelsResponse(BaseModel):
     models: list[ModelInfo]
     role_defaults: dict[str, str] = Field(
         description="角色 → 当前生效的 model_id，已应用 MODEL_ROLE_* 环境变量覆盖"
     )
     default_model_id: str
+    limits: LimitsInfo
 
 
 def _registry(request: Request) -> ModelRegistry:
@@ -71,4 +84,5 @@ async def list_models(request: Request) -> ModelsResponse:
         models=models,
         role_defaults={role.value: registry.model_id_for_role(role) for role in ModelRole},
         default_model_id=registry.settings.default_model_id,
+        limits=LimitsInfo.model_validate(registry.settings.limits.model_dump()),
     )

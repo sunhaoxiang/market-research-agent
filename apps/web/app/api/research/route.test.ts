@@ -170,6 +170,62 @@ describe("正常路径", () => {
     expect(startResearch).toHaveBeenCalledOnce();
   });
 
+  it("把已保存的默认模型和上限传给上游", async () => {
+    const { putPreferences } = await import("@/db/queries/settings");
+    putPreferences(db, {
+      defaultModelId: "deepseek:deepseek-v4-flash",
+      roleModels: {
+        planner: null,
+        balanced: null,
+        fast: null,
+        writing: "deepseek:deepseek-v4-pro",
+      },
+      limits: {
+        maxTasksPerPlan: 3,
+        maxParallelTasks: 2,
+        maxToolCallsPerAgent: 12,
+        maxSupplementRounds: 1,
+        taskTimeoutS: 180,
+        totalTimeoutS: 600,
+        maxSessionCostUsd: 1,
+      },
+      report: { language: "en" },
+    });
+    startResearch.mockResolvedValue(upstreamOf(HAPPY_PATH));
+
+    await drain(await ask({ question: "Q" }));
+
+    const [input] = startResearch.mock.calls[0] as [
+      {
+        modelId?: string;
+        options?: {
+          report_language?: string;
+          role_models?: { writing?: string };
+          limits?: { max_tasks_per_plan: number };
+        };
+      },
+    ];
+    expect(input.modelId).toBe("deepseek:deepseek-v4-flash");
+    expect(input.options?.report_language).toBe("en");
+    expect(input.options?.role_models?.writing).toBe("deepseek:deepseek-v4-pro");
+    expect(input.options?.limits?.max_tasks_per_plan).toBe(3);
+  });
+
+  it("这次提问选的模型覆盖已保存的默认模型", async () => {
+    const { putPreferences } = await import("@/db/queries/settings");
+    const { emptyPreferences } = await import("@/lib/settings");
+    putPreferences(db, {
+      ...emptyPreferences(),
+      defaultModelId: "deepseek:deepseek-v4-flash",
+    });
+    startResearch.mockResolvedValue(upstreamOf(HAPPY_PATH));
+
+    await drain(await ask({ question: "Q", modelId: "deepseek:deepseek-v4-pro" }));
+
+    const [input] = startResearch.mock.calls[0] as [{ modelId?: string }];
+    expect(input.modelId).toBe("deepseek:deepseek-v4-pro");
+  });
+
   it("把 session id 放在响应头里", async () => {
     // 浏览器发请求时还不知道 id，而它需要它来跳转详情页；响应体是流，只能走头
     startResearch.mockResolvedValue(upstreamOf(HAPPY_PATH));

@@ -85,6 +85,18 @@ class ExecutionLimits(BaseSettings):
     max_session_cost_usd: float = Field(default=1.0, gt=0)
 
 
+def apply_limit_overrides(
+    base: ExecutionLimits, patch: dict[str, object] | None
+) -> ExecutionLimits:
+    """把用户设置叠到环境上限上。只覆盖有值的字段，硬上限仍由 Field 约束。"""
+    if not patch:
+        return base
+    updates = {key: value for key, value in patch.items() if value is not None}
+    if not updates:
+        return base
+    return base.model_copy(update=updates)
+
+
 class Settings(BaseSettings):
     """服务全局配置。"""
 

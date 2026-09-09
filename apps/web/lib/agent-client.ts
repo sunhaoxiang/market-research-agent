@@ -7,6 +7,7 @@
 import "server-only";
 
 import { serverEnv } from "@/lib/env";
+import type { AgentResearchOptions } from "@/lib/settings";
 
 export type AgentProviderStatus = {
   provider: string;
@@ -64,6 +65,15 @@ export type AgentModels = {
   models: AgentModelInfo[];
   role_defaults: Record<string, string>;
   default_model_id: string;
+  limits?: {
+    max_tasks_per_plan: number;
+    max_parallel_tasks: number;
+    max_tool_calls_per_agent: number;
+    max_supplement_rounds: number;
+    task_timeout_s: number;
+    total_timeout_s: number;
+    max_session_cost_usd: number;
+  };
 };
 
 async function callAgent<T>(path: string, timeoutMs: number): Promise<AgentServiceResult<T>> {
@@ -111,6 +121,7 @@ export type StartResearchInput = {
   sessionId: string;
   question: string;
   modelId?: string;
+  options?: AgentResearchOptions;
 };
 
 /**
@@ -135,6 +146,7 @@ export async function startResearch(input: StartResearchInput): Promise<Response
       session_id: input.sessionId,
       question: input.question,
       model_id: input.modelId ?? null,
+      options: input.options && Object.keys(input.options).length > 0 ? input.options : undefined,
     }),
     cache: "no-store",
   });

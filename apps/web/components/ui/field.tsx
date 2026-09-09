@@ -8,6 +8,10 @@ const CONTROL = [
   "disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-800",
 ];
 
+export function Input({ className, ...props }: ComponentProps<"input">) {
+  return <input className={cn(CONTROL, className)} {...props} />;
+}
+
 export function Textarea({ className, ...props }: ComponentProps<"textarea">) {
   return <textarea className={cn(CONTROL, "resize-none", className)} {...props} />;
 }

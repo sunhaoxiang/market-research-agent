@@ -1,0 +1,47 @@
+import { AppHeader } from "@/components/research/app-header";
+import type { ModelOption } from "@/components/research/model-selector";
+import { SettingsForm } from "@/components/settings/settings-form";
+import { getDb } from "@/db/client";
+import { getPreferences } from "@/db/queries/settings";
+import { fetchAgentModels } from "@/lib/agent-client";
+import { FALLBACK_LIMITS } from "@/lib/settings";
+
+export const dynamic = "force-dynamic";
+
+export default async function SettingsPage() {
+  const catalog = await fetchAgentModels();
+  const models: ModelOption[] = catalog.ok ? catalog.data.models : [];
+  const preferences = getPreferences(getDb());
+  const limits =
+    catalog.ok && catalog.data.limits
+      ? {
+          maxTasksPerPlan: catalog.data.limits.max_tasks_per_plan,
+          maxParallelTasks: catalog.data.limits.max_parallel_tasks,
+          maxToolCallsPerAgent: catalog.data.limits.max_tool_calls_per_agent,
+          maxSupplementRounds: catalog.data.limits.max_supplement_rounds,
+          taskTimeoutS: catalog.data.limits.task_timeout_s,
+          totalTimeoutS: catalog.data.limits.total_timeout_s,
+          maxSessionCostUsd: catalog.data.limits.max_session_cost_usd,
+        }
+      : FALLBACK_LIMITS;
+
+  return (
+    <main id="main" className="mx-auto max-w-6xl px-6 py-12">
+      <AppHeader current="settings" />
+      {!catalog.ok && (
+        <p className="mb-6 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
+          {catalog.error.message}
+        </p>
+      )}
+      <SettingsForm
+        models={models}
+        initial={preferences}
+        defaults={{
+          defaultModelId: catalog.ok ? catalog.data.default_model_id : "deepseek:deepseek-v4-pro",
+          roleModels: catalog.ok ? catalog.data.role_defaults : {},
+          limits,
+        }}
+      />
+    </main>
+  );
+}

@@ -1,6 +1,8 @@
 import { AppHeader } from "@/components/research/app-header";
 import { ResearchConsole } from "@/components/research/research-console";
 import type { ModelOption } from "@/components/research/model-selector";
+import { getDb } from "@/db/client";
+import { getPreferences } from "@/db/queries/settings";
 import { fetchAgentModels } from "@/lib/agent-client";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +21,7 @@ export default async function HomePage({
   const catalog = await fetchAgentModels();
   const models: ModelOption[] = catalog.ok ? catalog.data.models : [];
   const { session: initialSessionId } = await searchParams;
+  const defaultModelId = getPreferences(getDb()).defaultModelId ?? undefined;
 
   return (
     <main id="main" className="mx-auto max-w-6xl px-6 py-12">
@@ -30,7 +33,11 @@ export default async function HomePage({
         </p>
       )}
 
-      <ResearchConsole models={models} initialSessionId={initialSessionId} />
+      <ResearchConsole
+        models={models}
+        initialSessionId={initialSessionId}
+        defaultModelId={defaultModelId}
+      />
     </main>
   );
 }

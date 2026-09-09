@@ -13,7 +13,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -26,12 +26,13 @@ from agent_service.agents.research_manager import build_research_manager
 from agent_service.agents.runner import SubAgentRunner
 from agent_service.api.auth import require_internal_token
 from agent_service.api.sse import SSE_HEADERS, encode_comment, encode_event
-from agent_service.config import get_settings
+from agent_service.config import apply_limit_overrides, get_settings
 from agent_service.models.catalog import UnknownModelError
 from agent_service.models.registry import ProviderUnavailableError
 from agent_service.observability.event_bus import EventBus
 from agent_service.orchestrator.intent import build_intent_classifier
 from agent_service.orchestrator.pipeline import run_research
+from agent_service.schemas.common import ModelRole
 from agent_service.utils.ids import new_id
 
 if TYPE_CHECKING:
@@ -75,6 +76,31 @@ MAX_QUESTION_CHARS = 2_000
 既贵又会把 §9.8 的缓存前缀冲掉。"""
 
 
+class RoleModelOverrides(BaseModel):
+    planner: str | None = None
+    balanced: str | None = None
+    fast: str | None = None
+    writing: str | None = None
+
+
+class LimitsOverride(BaseModel):
+    max_tasks_per_plan: int | None = Field(default=None, ge=1, le=10)
+    max_parallel_tasks: int | None = Field(default=None, ge=1, le=6)
+    max_tool_calls_per_agent: int | None = Field(default=None, ge=1, le=20)
+    max_supplement_rounds: int | None = Field(default=None, ge=0, le=2)
+    task_timeout_s: float | None = Field(default=None, gt=0)
+    total_timeout_s: float | None = Field(default=None, gt=0)
+    max_session_cost_usd: float | None = Field(default=None, gt=0)
+
+
+class ResearchOptions(BaseModel):
+    """单次研究的用户设置（P6-8）。不写进进程级 Settings。"""
+
+    role_models: RoleModelOverrides | None = None
+    limits: LimitsOverride | None = None
+    report_language: Literal["zh", "en"] | None = None
+
+
 class ResearchRequest(BaseModel):
     question: str = Field(min_length=1, max_length=MAX_QUESTION_CHARS)
     session_id: str | None = Field(
@@ -84,9 +110,8 @@ class ResearchRequest(BaseModel):
             "缺省时 Python 自行生成，仅便于 curl 直接调试"
         ),
     )
-    model_id: str | None = Field(
-        default=None, description="覆盖本次会话的 LLM。缺省走 MODEL_ROLE_* 与目录兜底"
-    )
+    model_id: str | None = Field(default=None, description="覆盖本次会话全部角色。缺省走角色映射")
+    options: ResearchOptions | None = None
 
 
 @router.post(
@@ -102,12 +127,18 @@ async def stream_research(request: ResearchRequest, http_request: Request) -> St
     「已经开始研究」的 UI 状态下收到一个失败事件，白白多一次渲染。
     """
     registry: ModelRegistry = http_request.app.state.registry
-    limits = get_settings().limits
+    options = request.options or ResearchOptions()
+    registry = _registry_for_request(registry, request.model_id, options.role_models)
+    limits = apply_limit_overrides(
+        get_settings().limits,
+        None if options.limits is None else options.limits.model_dump(exclude_none=True),
+    )
+    language = options.report_language or "zh"
     session_id = request.session_id or new_id()
 
     try:
         planner = build_research_manager(registry, limits, model_id=request.model_id)
-        writer = build_report_writer(registry)
+        writer = build_report_writer(registry, language=language)
         fact_checker = build_fact_checker(registry)
     except UnknownModelError as error:
         raise _http_error(status.HTTP_400_BAD_REQUEST, "UNKNOWN_MODEL", str(error)) from error
@@ -240,6 +271,24 @@ def _finalize(bus: EventBus, session_id: str) -> Callable[[asyncio.Task[object]]
             log.error("research.pipeline_crashed", session_id=session_id, exc_info=error)
 
     return callback
+
+
+def _registry_for_request(
+    registry: ModelRegistry,
+    model_id: str | None,
+    role_models: RoleModelOverrides | None,
+) -> ModelRegistry:
+    """§9.5：请求里选的模型覆盖全部角色；否则只叠按角色指定的那些。"""
+    overrides: dict[str, str] = {}
+    if model_id:
+        overrides = {role.value: model_id for role in ModelRole}
+    elif role_models is not None:
+        overrides = {
+            role: value
+            for role, value in role_models.model_dump(exclude_none=True).items()
+            if isinstance(value, str) and value
+        }
+    return registry.with_role_overrides(overrides) if overrides else registry
 
 
 def _http_error(status_code: int, code: str, message: str) -> HTTPException:

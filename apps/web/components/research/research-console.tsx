@@ -26,14 +26,16 @@ const EXAMPLES = [
 export function ResearchConsole({
   models,
   initialSessionId,
+  defaultModelId,
 }: {
   models: ModelOption[];
   initialSessionId?: string;
+  defaultModelId?: string;
 }) {
   const store = useResearchStore();
   const state = useResearchState(store);
   const [question, setQuestion] = useState("");
-  const [modelId, setModelId] = useState("");
+  const [modelId, setModelId] = useState(defaultModelId ?? "");
   const [activeCitation, setActiveCitation] = useState<number | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const [restoring, setRestoring] = useState(Boolean(initialSessionId));
