@@ -4,7 +4,14 @@ import nextTypeScript from "eslint-config-next/typescript";
 
 const config = [
   {
-    ignores: [".next/**", "node_modules/**", "db/migrations/**", "next-env.d.ts"],
+    ignores: [
+      ".next/**",
+      "node_modules/**",
+      "db/migrations/**",
+      "next-env.d.ts",
+      "playwright-report/**",
+      "test-results/**",
+    ],
   },
   ...nextCoreWebVitals,
   ...nextTypeScript,

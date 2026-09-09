@@ -6,7 +6,7 @@
 > **每完成一个任务就更新此表的状态**；每完成一个阶段，跑 `[DP §26]` 的收尾清单并写阶段小结。
 
 - 最后更新：2026-09-09
-- 当前阶段：**P6 进行中**。P6-1/2/3/4/5/6/7/8/9/10 已完成。未开：Playwright。
+- 当前阶段：**P7 未开始**。P6 全部完成（含 Playwright E2E）。
 
 ### 已确认的前置决策（2026-09-07）
 
@@ -43,7 +43,7 @@
 | P4    | 美股数据能力                    | 11     | ✅   | 四问真跑已出带财务与 SEC 引用的报告 |
 | P5    | Multi-Agent 完整编排            | 9      | ✅   | Fact Checker / 并行 / 报告结构   |
 | P5.5  | **MVP 验收**                    | 1      | ✅   | 见 `[DP §21.1]`；限制见 P5.5 记录 |
-| P6    | 高级 UX + 历史 + 可观察性       | 11     | 🟡   | 主区居中 + 阶段瀑布 + 无障碍 + 历史 / 设置 / 调试 / 续订 / 取消 / 成本告警；Playwright 仍后置 |
+| P6    | 高级 UX + 历史 + 可观察性       | 11     | ✅   | 主区居中 + 阶段瀑布 + 无障碍 + 历史 / 设置 / 调试 / 续订 / 取消 / 成本告警 + Playwright |
 | P7    | Evaluation 系统                 | 8      | ⬜   | 数据集 / grader / runner         |
 | P8    | 扩展能力                        | 8      | ⬜   | 按需触发，非线性                 |
 
@@ -366,7 +366,9 @@ Merge / Fact Checker 之后、Writer 之前。**纯代码规则，不打模型�
 | P6-8  | Settings 页：默认模型、按角色指定模型、执行上限、报告偏好                                            | P5.5 | ✅   | 设置持久化并生效                |
 | P6-9  | `/debug` 可观察性页：阶段瀑布 / Agent 排行 / Tool 失败率 / 模型成本对比 / Provider 配额 `[DP §20.2]` | P5.5 | ✅   | 能回答 `[DP §20.2]` 的 4 个问题 |
 | P6-10 | 成本与 token 实时显示 + 单 session 成本上限告警                                                      | P6-9 | ✅   | 超限发 WARNING 事件             |
-| P6-11 | Playwright E2E（打桩 Python 服务，跑完整 UI 流程）                                                   | P6-5 | ⬜   | CI 中稳定通过                   |
+| P6-11 | Playwright E2E（打桩 Python 服务，跑完整 UI 流程）                                                   | P6-5 | ✅   | CI 中稳定通过                   |
+
+**阶段验收 ✅**（2026-09-09）：主区是报告、过程可折叠；历史回放复用同一套 `ResearchConsole`；设置写入下次研究；`/debug` 能回答 §20.2 的四个问题；成本在每次 Agent run 后更新，超限发 WARNING。Playwright 打桩 Python、独立 :3100 / :18000，覆盖提问→报告→历史回放→设置→调试→取消，不调 LLM。
 
 ### 已提前落地、P6 / P5 不要重做（2026-09-08）
 
@@ -1064,7 +1066,15 @@ P5-8 用 ScriptedModel 覆盖正常 / 工具失败 / 超时 / 冲突 / 引用缺
 
 **偏离计划**：`§21.1` 的「2 分钟」和「3 个 Provider」都没达到——真跑一次财报/深研要 5–11 分钟，本机仍只有 DeepSeek。History 列表按计划属于 Phase 6，MVP 用 `?session=` 回放。P5.5 后补跑 HYPE 投资研究：checking 出现了，但 62 条陈述让 Fact Checker 180s 超时（D23，已截断并拆批偿还，未重跑）。
 
-**新增技术债**：D6 / D8 仍是刻意限制。P6 已改主区居中、阶段瀑布、无障碍、Settings、`/debug`、成本实时显示与超限 WARNING，并接上历史 / 续订 / 取消；Playwright 仍后置。
+**新增技术债**：D6 / D8 仍是刻意限制。P6 已改主区居中、阶段瀑布、无障碍、Settings、`/debug`、成本实时显示与超限 WARNING，并接上历史 / 续订 / 取消与 Playwright E2E。
+
+### Phase 6 — 高级 UX + 历史 + 可观察性 ✅（2026-09-09）
+
+任务表 11/11。研究页主栏是报告，过程可折叠；阶段瀑布画在进度行下；`aria-live` 不跟过程一起收起。`/history` 点进 `/?session=` 回放，和实时页共用 `ResearchConsole`。进行中刷新按 `after={seq}` 续订（D4）。取消走 BFF → Python，必须收到 `session_cancelled` 才落库。Settings 写入下次研究的 `options`。`/debug` 聚合已有 `agent_runs` / `tool_calls` / 事件，进程内 Provider 配额另打 `/v1/debug/providers`。成本在每次 `record_run` 后发 `usage_updated`，超限 `budget_exhausted` 只一次。
+
+P6-11 Playwright 打桩 Python（`e2e/stub-agent.mjs`），Next 起在 :3100、桩在 :18000，`reuseExistingServer: false`，避免打到本机 `pnpm dev`。不并进 `pnpm test` / web job——CI 另开 e2e job 装 Chromium。
+
+**偏离计划**：没有为阶段单独打 tag（只在 MVP 打了 `v0.1.0-mvp`）。`[DP §26]` 第 7 条「真实问题」在 P2–P5.5 已真跑；本阶段 E2E 按计划不调 LLM。第 11 条 eval 仍是 P7。
 
 ---
 

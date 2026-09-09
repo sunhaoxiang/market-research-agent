@@ -1424,12 +1424,15 @@ model = ScriptedModel([
 
 ### 18.3 CI（GitHub Actions）
 
-单 workflow，两个 job 并行：
+单 workflow，job 并行：
 
 ```text
 python:  uv sync → ruff check → ruff format --check → basedpyright → pytest -m "not live"
 web:     pnpm install → gen-types + git diff --exit-code → eslint → tsc --noEmit
          → drizzle-kit check → vitest run → next build
+e2e:     pnpm install → playwright install chromium → next build → Playwright
+         （打桩 Python 服务，独立端口，不调 LLM；不并进 web job，避免没浏览器的机器跑挂）
+secrets: gitleaks 全量历史扫描
 ```
 
 `gen-types + git diff --exit-code` 确保 Pydantic 与 TS 类型不漂移（§5.1）。

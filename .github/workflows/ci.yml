@@ -92,6 +92,44 @@ jobs:
           DATABASE_URL: file:./data/ci.db
           AGENT_SERVICE_URL: http://127.0.0.1:8000
 
+  e2e:
+    name: E2E (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+
+      - name: Install Playwright Chromium
+        run: pnpm --filter @mra/web exec playwright install --with-deps chromium
+
+      - name: Build
+        run: pnpm --filter @mra/web build
+        env:
+          DATABASE_URL: file:./data/e2e.db
+          AGENT_SERVICE_URL: http://127.0.0.1:18000
+
+      - name: Playwright
+        run: pnpm --filter @mra/web test:e2e
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: apps/web/playwright-report
+          retention-days: 7
+
   secrets:
     name: Secret scan
     runs-on: ubuntu-latest
