@@ -3,7 +3,9 @@ import { ResearchConsole } from "@/components/research/research-console";
 import type { ModelOption } from "@/components/research/model-selector";
 import { getDb } from "@/db/client";
 import { getPreferences } from "@/db/queries/settings";
+import { listSessions } from "@/db/queries/sessions";
 import { fetchAgentModels } from "@/lib/agent-client";
+import type { RecentSessionPreview } from "@/lib/research/empty-home";
 import { FALLBACK_LIMITS } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
@@ -22,9 +24,17 @@ export default async function HomePage({
   const catalog = await fetchAgentModels();
   const models: ModelOption[] = catalog.ok ? catalog.data.models : [];
   const { session: initialSessionId } = await searchParams;
-  const prefs = getPreferences(getDb());
+  const db = getDb();
+  const prefs = getPreferences(db);
   const defaultModelId = prefs.defaultModelId ?? undefined;
   const costLimitUsd = prefs.limits?.maxSessionCostUsd ?? FALLBACK_LIMITS.maxSessionCostUsd;
+  const recent: RecentSessionPreview[] = listSessions(db, { limit: 3 }).map((row) => ({
+    id: row.id,
+    question: row.question,
+    status: row.status,
+    questionType: row.questionType,
+    createdAt: row.createdAt,
+  }));
 
   return (
     <main id="main" className="mx-auto max-w-6xl px-6 py-8">
@@ -41,6 +51,7 @@ export default async function HomePage({
         initialSessionId={initialSessionId}
         defaultModelId={defaultModelId}
         costLimitUsd={costLimitUsd}
+        recent={recent}
       />
     </main>
   );

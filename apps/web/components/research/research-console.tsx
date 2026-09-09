@@ -10,29 +10,27 @@ import { StageTimeline } from "@/components/research/stage-timeline";
 import { SourcePanel } from "@/components/sources/source-panel";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/field";
+import type { RecentSessionPreview } from "@/lib/research/empty-home";
 import { replayAndFollow } from "@/lib/research/replay";
 import { useResearchState, useResearchStore, useTicker } from "@/lib/research/store";
 import { ResearchStreamError, streamResearch } from "@/lib/sse";
 
+import { EmptyHome } from "./empty-home";
 import { type ModelOption, ModelSelector } from "./model-selector";
 import { SessionHeader } from "./session-header";
-
-const EXAMPLES = [
-  "Hyperliquid 的协议收入最近怎么样？HYPE 值得关注吗？",
-  "比较 Solana 和 Sui 的生态活跃度",
-  "英伟达最新一季财报的关键信号是什么？",
-];
 
 export function ResearchConsole({
   models,
   initialSessionId,
   defaultModelId,
   costLimitUsd,
+  recent,
 }: {
   models: ModelOption[];
   initialSessionId?: string;
   defaultModelId?: string;
   costLimitUsd: number;
+  recent: RecentSessionPreview[];
 }) {
   const store = useResearchStore();
   const state = useResearchState(store);
@@ -135,60 +133,48 @@ export function ResearchConsole({
     <div className="space-y-6">
       <LiveStatus state={state} />
       {idle ? (
-        <form
-          onSubmit={(submitEvent) => {
-            submitEvent.preventDefault();
-            void submit();
-          }}
-          className="mx-auto max-w-2xl space-y-3"
-        >
-          <Textarea
-            value={question}
-            onChange={(changeEvent) => setQuestion(changeEvent.target.value)}
-            onKeyDown={(keyEvent) => {
-              if (keyEvent.key === "Enter" && (keyEvent.metaKey || keyEvent.ctrlKey)) {
-                keyEvent.preventDefault();
-                void submit();
-              }
+        <EmptyHome recent={recent} onPickExample={setQuestion}>
+          <form
+            onSubmit={(submitEvent) => {
+              submitEvent.preventDefault();
+              void submit();
             }}
-            placeholder="问一个 Crypto / 美股 / 宏观的研究问题…"
-            rows={3}
-            maxLength={2000}
-            disabled={running}
-            aria-label="研究问题"
-          />
-
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <ModelSelector
-              models={models}
-              value={modelId}
-              onChange={setModelId}
+            className="space-y-3"
+          >
+            <Textarea
+              value={question}
+              onChange={(changeEvent) => setQuestion(changeEvent.target.value)}
+              onKeyDown={(keyEvent) => {
+                if (keyEvent.key === "Enter" && (keyEvent.metaKey || keyEvent.ctrlKey)) {
+                  keyEvent.preventDefault();
+                  void submit();
+                }
+              }}
+              placeholder="问一个 Crypto / 美股 / 宏观的研究问题…"
+              rows={5}
+              maxLength={2000}
               disabled={running}
+              aria-label="研究问题"
+              className="min-h-[8rem] px-4 py-3 text-base leading-relaxed"
             />
-            <Button type="submit" disabled={running || question.trim().length === 0}>
-              开始研究
-            </Button>
-          </div>
 
-          <div className="space-y-2">
-            <p className="text-[11px] font-medium tracking-[0.16em] text-zinc-500 uppercase">
-              试试这些
-            </p>
-            <ul className="space-y-1">
-              {EXAMPLES.map((example) => (
-                <li key={example}>
-                  <button
-                    type="button"
-                    onClick={() => setQuestion(example)}
-                    className="focus-visible:ring-accent rounded-sm text-left text-sm text-zinc-500 underline-offset-2 hover:text-zinc-900 hover:underline focus-visible:ring-2 focus-visible:outline-none dark:hover:text-zinc-100"
-                  >
-                    {example}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </form>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <ModelSelector
+                models={models}
+                value={modelId}
+                onChange={setModelId}
+                disabled={running}
+              />
+              <Button
+                type="submit"
+                disabled={running || question.trim().length === 0}
+                className="px-5 py-2.5"
+              >
+                开始研究
+              </Button>
+            </div>
+          </form>
+        </EmptyHome>
       ) : (
         <div className="space-y-5" aria-busy={running || restoring}>
           <div className="flex flex-wrap items-start justify-between gap-3">
