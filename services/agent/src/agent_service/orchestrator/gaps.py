@@ -98,6 +98,10 @@ def propose_supplement_tasks(
     if state.remaining_s(limits.total_timeout_s) < _MIN_REMAINING_S:
         return []
     if state.over_budget(limits.max_session_cost_usd):
+        state.warn_budget(
+            limits.max_session_cost_usd,
+            message=f"会话成本已达上限 ${limits.max_session_cost_usd:.2f}，不再补充研究",
+        )
         return []
 
     existing = list(state.plan.plan.tasks) if state.plan is not None else []

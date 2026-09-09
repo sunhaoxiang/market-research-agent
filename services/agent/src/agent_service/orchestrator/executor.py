@@ -25,6 +25,7 @@ from typing import TYPE_CHECKING, Protocol
 import structlog
 
 from agent_service.observability.sdk_events import MAX_SUMMARY_CHARS
+from agent_service.orchestrator.state import BUDGET_WARNING_CODE
 from agent_service.schemas.common import TaskStatus
 from agent_service.schemas.events import (
     AgentCompletedEvent,
@@ -105,7 +106,7 @@ async def execute_plan(
     for index, layer in enumerate(state.plan.layers, start=1):
         reason = _stop_reason(state, limits, deadline_s)
         if reason is not None:
-            _skip_remaining(state, layer_index=index, reason=reason)
+            _skip_remaining(state, layer_index=index, reason=reason, limits=limits)
             break
 
         log.info("executor.layer_started", layer=index, tasks=[task.id for task in layer])
@@ -280,7 +281,7 @@ def _stop_reason(
     """返回 (code, message)，None 表示可以继续。"""
     if state.over_budget(limits.max_session_cost_usd):
         return (
-            "budget_exhausted",
+            BUDGET_WARNING_CODE,
             f"会话成本已达上限 ${limits.max_session_cost_usd:.2f}，剩余任务跳过",
         )
     remaining = deadline_s - state.elapsed_ms / 1000
@@ -289,7 +290,13 @@ def _stop_reason(
     return None
 
 
-def _skip_remaining(state: ResearchState, *, layer_index: int, reason: tuple[str, str]) -> None:
+def _skip_remaining(
+    state: ResearchState,
+    *,
+    layer_index: int,
+    reason: tuple[str, str],
+    limits: ExecutionLimits,
+) -> None:
     """把尚未完成的任务全部标记为 skipped 并发一条 warning。
 
     只发一条聚合 warning 而不是每个任务一条：跳过的原因是同一个，
@@ -303,8 +310,13 @@ def _skip_remaining(state: ResearchState, *, layer_index: int, reason: tuple[str
         state.mark(task_id, TaskStatus.SKIPPED)
 
     log.warning("executor.skipped", layer=layer_index, code=code, tasks=skipped)
+    detail = f"{message}（{', '.join(skipped)}）" if skipped else message
+    if code == BUDGET_WARNING_CODE:
+        # record_run 可能已经告过一次；任务照样跳过，事件不重复。
+        state.warn_budget(limits.max_session_cost_usd, message=detail)
+        return
     state.bus.emit(
         WarningEvent,
-        payload=WarningPayload(code=code, message=f"{message}（{', '.join(skipped)}）"),
+        payload=WarningPayload(code=code, message=detail),
         message=message,
     )

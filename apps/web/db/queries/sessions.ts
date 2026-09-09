@@ -129,7 +129,9 @@ export function updateSessionStatus(
 export function patchSession(
   db: Db,
   id: string,
-  patch: Partial<Pick<ResearchSession, "questionType" | "plan" | "modelId" | "tokenUsage">>,
+  patch: Partial<
+    Pick<ResearchSession, "questionType" | "plan" | "modelId" | "tokenUsage" | "costUsd">
+  >,
 ): void {
   db.update(researchSessions).set(patch).where(eq(researchSessions.id, id)).run();
 }

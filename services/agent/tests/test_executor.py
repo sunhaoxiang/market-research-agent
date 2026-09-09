@@ -366,6 +366,22 @@ async def test_exhausted_budget_skips_remaining_layers() -> None:
     assert _payload(warnings[0], WarningPayload).code == "budget_exhausted"
 
 
+async def test_budget_warning_is_not_repeated_when_skipping() -> None:
+    """记账时已经告过，层跳过不再刷第二条。"""
+    state = _state(_task("t1"), _task("t2", depends_on=["t1"]))
+    state.cost_usd = 5.0
+    state.warn_budget(1.0, message="会话成本已达上限 $1.00")
+
+    await execute_plan(
+        state, runner=RecordingRunner(), limits=_limits(max_session_cost_usd=1.0), deadline_s=60.0
+    )
+
+    events = await _drain(state.bus)
+    warnings = [event for event in events if event.type is EventType.WARNING]
+    assert len(warnings) == 1
+    assert set(state.task_status.values()) == {TaskStatus.SKIPPED}
+
+
 async def test_skip_warning_is_aggregated_not_per_task() -> None:
     """跳过的原因是同一个，逐条发只会把事件流刷满而不增加信息。"""
     state = _state(_task("t1"), _task("t2", depends_on=["t1"]), _task("t3", depends_on=["t1"]))

@@ -92,4 +92,15 @@ describe("liveAnnouncement", () => {
   it("空闲时不播报", () => {
     expect(liveAnnouncement(reduceAll([]))).toBe("");
   });
+
+  it("超限 WARNING 不跟过程面板一起消失", () => {
+    seq = 0;
+    const state = reduceAll([
+      event("session_started", { question: "Q", model_id: "m" }),
+      event("stage_changed", { stage: "researching", previous: "planning" }, "正在执行研究任务"),
+      event("warning", { code: "budget_exhausted", message: "会话成本已达上限 $1.00" }),
+    ]);
+
+    expect(liveAnnouncement(state)).toContain("会话成本已达上限 $1.00");
+  });
 });

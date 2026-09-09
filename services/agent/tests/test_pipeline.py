@@ -269,10 +269,12 @@ async def test_event_sequence_covers_the_whole_flow() -> None:
         EventType.INTENT_CLASSIFIED,
         EventType.PLAN_CREATED,
         EventType.AGENT_RUN_METRICS,  # planner
+        EventType.USAGE_UPDATED,
         EventType.STAGE_CHANGED,  # researching
         EventType.STAGE_CHANGED,  # writing
         EventType.REPORT_STARTED,
         EventType.AGENT_RUN_METRICS,  # report writer
+        EventType.USAGE_UPDATED,
         EventType.REPORT_COMPLETED,
         EventType.SESSION_COMPLETED,
     ]

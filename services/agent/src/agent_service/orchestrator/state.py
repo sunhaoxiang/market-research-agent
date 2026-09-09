@@ -31,6 +31,10 @@ from agent_service.schemas.events import (
     StageChangedEvent,
     StageChangedPayload,
     TokenUsage,
+    UsageUpdatedEvent,
+    UsageUpdatedPayload,
+    WarningEvent,
+    WarningPayload,
 )
 from agent_service.sources.registry import SourceRegistry
 
@@ -79,6 +83,10 @@ class AgentRun:
         )
 
 
+BUDGET_WARNING_CODE = "budget_exhausted"
+"""与执行器跳过剩余任务共用。超限只发一次，避免每个 Agent 刷一条。"""
+
+
 _STAGE_MESSAGES = {
     Stage.PLANNING: "正在理解问题并制定研究计划",
     Stage.RESEARCHING: "正在执行研究任务",
@@ -98,6 +106,7 @@ class ResearchState:
         *,
         bus: EventBus,
         clock: Callable[[], float] = time.monotonic,
+        cost_limit_usd: float | None = None,
     ) -> None:
         self.session_id = session_id
         self.question = question
@@ -117,6 +126,9 @@ class ResearchState:
         self.usage = TokenUsage()
         self.cost_usd: float | None = None
         """None 表示尚未产生任何**已知定价**的调用。见 `record_run`。"""
+        self.cost_limit_usd = cost_limit_usd
+        """本会话的成本上限。None 表示不做超限 WARNING（测试或未知定价）。"""
+        self._budget_warned = False
 
     # ── 时间 ────────────────────────────────────────────────────────────────
 
@@ -189,15 +201,13 @@ class ResearchState:
     # ── 用量与成本 ──────────────────────────────────────────────────────────
 
     def record_run(self, run: AgentRun, *, at: datetime | None = None) -> None:
-        """登记一次 Agent run：累加会话账本，并发出 `AGENT_RUN_METRICS`。
+        """登记一次 Agent run：累加会话账本，并发出埋点与累计用量。
 
         逐次累加而非最后汇总，是因为成本护栏要在**下一层任务启动前**生效——
         等会话结束再算就只能事后报告超支。
 
-        记账与发事件绑在一起（同 `advance_to` 的理由）：`agent_runs` 表是
-        `/debug` 与跨模型 eval 的唯一数据源（§20.1），而 Python 不碰业务库，
-        这行数据只能靠事件流过去。留一个"只记账不发事件"的口子，就一定会有
-        某条路径忘记发——那条 run 的成本从此在库里查不到，且没有任何报错。
+        `AGENT_RUN_METRICS` 给 `/debug`（前端 reducer 忽略）。`USAGE_UPDATED`
+        是累计值，给顶栏实时显示（P6-10）；它不是埋点行，不能省。
         """
         moment = at or datetime.now(UTC)
         usage = run.token_usage
@@ -222,6 +232,26 @@ class ResearchState:
                 duration_ms=run.duration_ms,
                 error=run.error,
             ),
+        )
+        self.bus.emit(
+            UsageUpdatedEvent,
+            payload=UsageUpdatedPayload(usage=self.usage, cost_usd=self.cost_usd),
+        )
+        if self.cost_limit_usd is not None:
+            self.warn_budget(
+                self.cost_limit_usd,
+                message=f"会话成本已达上限 ${self.cost_limit_usd:.2f}",
+            )
+
+    def warn_budget(self, limit_usd: float, *, message: str) -> None:
+        """超限只发一次 WARNING。层跳过与记账共用，避免每个 Agent 刷一条。"""
+        if self._budget_warned or not self.over_budget(limit_usd):
+            return
+        self._budget_warned = True
+        self.bus.emit(
+            WarningEvent,
+            payload=WarningPayload(code=BUDGET_WARNING_CODE, message=message),
+            message=message,
         )
 
     def over_budget(self, limit_usd: float) -> bool:

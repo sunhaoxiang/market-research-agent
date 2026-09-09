@@ -22,6 +22,8 @@ export function liveAnnouncement(state: ResearchViewState): string {
   if (progress) parts.push(progress);
   if (state.lastMessage) parts.push(state.lastMessage);
   if (state.error) parts.push(`${state.error.code}：${state.error.message}`);
+  const budget = state.warnings.find((warning) => warning.code === "budget_exhausted");
+  if (budget) parts.push(budget.message);
   if (state.hasGap) parts.push("事件有缺失，刷新可查看完整结果");
   return parts.join("。");
 }

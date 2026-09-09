@@ -20,7 +20,7 @@ from agent_service.models.catalog import ModelEntry, get_entry
 from agent_service.observability.cost import cost_usd, to_token_usage
 from agent_service.observability.event_bus import EventBus
 from agent_service.observability.prompts import PromptFingerprint
-from agent_service.orchestrator.state import AgentRun, ResearchState
+from agent_service.orchestrator.state import BUDGET_WARNING_CODE, AgentRun, ResearchState
 from agent_service.schemas.common import AgentName, Stage, TaskStatus
 from agent_service.schemas.events import (
     AgentRunMetricsEvent,
@@ -29,6 +29,9 @@ from agent_service.schemas.events import (
     ResearchEvent,
     StageChangedPayload,
     TokenUsage,
+    UsageUpdatedEvent,
+    WarningEvent,
+    WarningPayload,
 )
 
 
@@ -211,16 +214,19 @@ async def test_record_run_emits_a_metrics_event() -> None:
         at=_AT,
     )
 
-    (event,) = await _drain(state.bus)
-    assert isinstance(event, AgentRunMetricsEvent)
-    assert event.payload.model_id == entry.id
-    assert event.payload.task_id == "t1"
-    assert event.payload.status is TaskStatus.COMPLETED
-    assert event.payload.usage == TokenUsage(input=100, output=10)
-    assert event.payload.cost_usd == pytest.approx(110 / 1_000_000)
-    assert event.payload.prompt is not None
-    assert event.payload.prompt.hash == "abc123"
-    assert event.payload.prompt.chars == 4096
+    events = await _drain(state.bus)
+    metrics = next(event for event in events if isinstance(event, AgentRunMetricsEvent))
+    usage_event = next(event for event in events if isinstance(event, UsageUpdatedEvent))
+    assert metrics.payload.model_id == entry.id
+    assert metrics.payload.task_id == "t1"
+    assert metrics.payload.status is TaskStatus.COMPLETED
+    assert metrics.payload.usage == TokenUsage(input=100, output=10)
+    assert metrics.payload.cost_usd == pytest.approx(110 / 1_000_000)
+    assert metrics.payload.prompt is not None
+    assert metrics.payload.prompt.hash == "abc123"
+    assert metrics.payload.prompt.chars == 4096
+    assert usage_event.payload.usage == TokenUsage(input=100, output=10)
+    assert usage_event.payload.cost_usd == pytest.approx(110 / 1_000_000)
 
 
 async def test_failed_run_is_recorded_with_its_error() -> None:
@@ -235,13 +241,13 @@ async def test_failed_run_is_recorded_with_its_error() -> None:
         at=_AT,
     )
 
-    (event,) = await _drain(state.bus)
-    assert isinstance(event, AgentRunMetricsEvent)
-    assert event.payload.status is TaskStatus.FAILED
-    assert event.payload.error is not None
-    assert event.payload.error.code == "structured_output"
+    events = await _drain(state.bus)
+    metrics = next(event for event in events if isinstance(event, AgentRunMetricsEvent))
+    assert metrics.payload.status is TaskStatus.FAILED
+    assert metrics.payload.error is not None
+    assert metrics.payload.error.code == "structured_output"
     # 失败照样计费
-    assert event.payload.cost_usd == pytest.approx(100 / 1_000_000)
+    assert metrics.payload.cost_usd == pytest.approx(100 / 1_000_000)
 
 
 async def test_metrics_event_never_carries_the_prompt_text() -> None:
@@ -254,8 +260,8 @@ async def test_metrics_event_never_carries_the_prompt_text() -> None:
         at=_AT,
     )
 
-    (event,) = await _drain(state.bus)
-    assert secret not in event.model_dump_json()
+    dumped = "".join(event.model_dump_json() for event in await _drain(state.bus))
+    assert secret not in dumped
 
 
 def test_cost_stays_none_when_pricing_is_unknown() -> None:
@@ -281,6 +287,25 @@ def test_over_budget_triggers_at_the_limit() -> None:
 
     assert state.over_budget(1.0)
     assert not state.over_budget(1.01)
+
+
+async def test_crossing_cost_limit_emits_warning_once() -> None:
+    """P6-10：超限立刻 WARNING，后续 run 不再刷。"""
+    bus = EventBus("sess-1", heartbeat_interval_s=60.0)
+    state = ResearchState("sess-1", "问题", bus=bus, clock=lambda: 0.0, cost_limit_usd=0.0002)
+    entry = _pricing_entry(Pricing(peak=TokenPrices(input=1.0, output=0.0)))
+
+    state.record_run(_run(entry, _Usage(input_tokens=100)), at=_AT)  # $0.0001
+    state.record_run(_run(entry, _Usage(input_tokens=100)), at=_AT)  # $0.0002 触线
+    state.record_run(_run(entry, _Usage(input_tokens=100)), at=_AT)
+
+    events = await _drain(state.bus)
+    warnings = [event for event in events if isinstance(event, WarningEvent)]
+    assert len(warnings) == 1
+    assert _payload(warnings[0], WarningPayload).code == BUDGET_WARNING_CODE
+    usage_events = [event for event in events if isinstance(event, UsageUpdatedEvent)]
+    assert len(usage_events) == 3
+    assert usage_events[-1].payload.cost_usd == pytest.approx(300 / 1_000_000)
 
 
 def test_failed_and_skipped_tasks_are_both_reported_as_unusable() -> None:

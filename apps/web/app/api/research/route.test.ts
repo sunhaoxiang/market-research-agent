@@ -365,8 +365,7 @@ describe("正常路径", () => {
   });
 
   it("终态事件里的用量与成本都落库", async () => {
-    // 权威用量只在 session_completed 里：pipeline 目前不发 usage_updated，
-    // 只监听后者的话历史列表的 token_usage 会永远是空的
+    // 终态是权威账本；过程中的 usage_updated 也会先写一笔，两者应对齐
     startResearch.mockResolvedValue(upstreamOf(HAPPY_PATH));
 
     await drain(await ask({ question: "Q" }));
@@ -375,6 +374,25 @@ describe("正常路径", () => {
     expect(session.tokenUsage).toEqual({ input: 2419, output: 2395, cached: 2304 });
     expect(session.costUsd).toBeCloseTo(0.02);
     expect(session.durationMs).toBe(1234);
+  });
+
+  it("usage_updated 就把累计成本和 token 写入会话，不等终态", async () => {
+    startResearch.mockResolvedValue(
+      truncatedUpstream(
+        event(1, "session_started", { question: "Q", model_id: "m" }),
+        event(2, "usage_updated", {
+          usage: { input: 400, output: 80, cached: 96 },
+          cost_usd: 0.0031,
+        }),
+      ),
+    );
+
+    await drain(await ask({ question: "Q" }));
+
+    const session = sessions()[0]!;
+    expect(session.tokenUsage).toEqual({ input: 400, output: 80, cached: 96 });
+    expect(session.costUsd).toBeCloseTo(0.0031);
+    expect(session.status).not.toBe("completed");
   });
 
   it("把 payload 里的 agent / task_id 提到列上", async () => {

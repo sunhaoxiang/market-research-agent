@@ -109,7 +109,7 @@ async def run_research(
     `asyncio.timeout` 与 `task.cancel()` 都会失效（见 §7.2 的取消语义）。
     """
     session_id = session_id or new_id()
-    state = ResearchState(session_id, question, bus=bus)
+    state = ResearchState(session_id, question, bus=bus, cost_limit_usd=limits.max_session_cost_usd)
 
     bus.emit(
         SessionStartedEvent,

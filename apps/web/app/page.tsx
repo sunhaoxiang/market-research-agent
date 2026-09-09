@@ -4,6 +4,7 @@ import type { ModelOption } from "@/components/research/model-selector";
 import { getDb } from "@/db/client";
 import { getPreferences } from "@/db/queries/settings";
 import { fetchAgentModels } from "@/lib/agent-client";
+import { FALLBACK_LIMITS } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +22,9 @@ export default async function HomePage({
   const catalog = await fetchAgentModels();
   const models: ModelOption[] = catalog.ok ? catalog.data.models : [];
   const { session: initialSessionId } = await searchParams;
-  const defaultModelId = getPreferences(getDb()).defaultModelId ?? undefined;
+  const prefs = getPreferences(getDb());
+  const defaultModelId = prefs.defaultModelId ?? undefined;
+  const costLimitUsd = prefs.limits?.maxSessionCostUsd ?? FALLBACK_LIMITS.maxSessionCostUsd;
 
   return (
     <main id="main" className="mx-auto max-w-6xl px-6 py-12">
@@ -37,6 +40,7 @@ export default async function HomePage({
         models={models}
         initialSessionId={initialSessionId}
         defaultModelId={defaultModelId}
+        costLimitUsd={costLimitUsd}
       />
     </main>
   );

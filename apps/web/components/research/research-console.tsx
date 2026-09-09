@@ -27,10 +27,12 @@ export function ResearchConsole({
   models,
   initialSessionId,
   defaultModelId,
+  costLimitUsd,
 }: {
   models: ModelOption[];
   initialSessionId?: string;
   defaultModelId?: string;
+  costLimitUsd: number;
 }) {
   const store = useResearchStore();
   const state = useResearchState(store);
@@ -208,7 +210,7 @@ export function ResearchConsole({
             </div>
           </div>
 
-          <SessionHeader state={state} now={now} />
+          <SessionHeader state={state} now={now} costLimitUsd={costLimitUsd} />
           <StageTimeline state={state} now={now} />
 
           {state.lastMessage && (
