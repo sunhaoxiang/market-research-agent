@@ -147,12 +147,50 @@ describe("引用交互", () => {
     expect(source).toBe(document.activeElement);
   });
 
-  it("来源行展示 domain、时间与摘录", () => {
+  it("来源行展示 domain、可靠性徽标与摘录", () => {
     render(<Shell />);
 
     expect(screen.getByRole("heading", { name: "Sources (1)" })).toBeDefined();
-    expect(screen.getByText(/theblock.co · 2026-09-08 12:00 UTC/)).toBeDefined();
+    expect(screen.getAllByText("theblock.co").length).toBeGreaterThan(0);
+    expect(screen.getByText("媒体")).toBeDefined();
     expect(screen.getAllByText(/share trading fees/).length).toBeGreaterThan(0);
+  });
+
+  it("多种类型时可以按类型筛选，点引用会揭开被滤掉的来源", () => {
+    const api: Source = {
+      ...SOURCE,
+      id: "src-api",
+      ref: "s2",
+      url: "https://api.coingecko.com/hype",
+      url_canonical: "https://api.coingecko.com/hype",
+      title: "CoinGecko TVL",
+      domain: "coingecko.com",
+      source_type: "api",
+      reliability: "aggregator",
+      citation_index: 2,
+    };
+    render(
+      <Shell
+        report={{
+          ...REPORT,
+          executive_summary: "TVL 来自聚合接口。[2]",
+          sections: [{ ...REPORT.sections[0]!, markdown: "见上文。", claim_ids: [] }],
+        }}
+        sources={[SOURCE, api]}
+        claims={[]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "新闻 1" }));
+    expect(screen.queryByRole("button", { name: "来源 2：CoinGecko TVL" })).toBeNull();
+    expect(screen.getByRole("button", { name: "来源 1：Fee share" })).toBeDefined();
+
+    fireEvent.click(screen.getByRole("link", { name: "来源 2：CoinGecko TVL" }));
+    expect(screen.getByRole("button", { name: "来源 2：CoinGecko TVL" })).toBeDefined();
+    expect(screen.getByText("聚合")).toBeDefined();
+    expect(screen.getByRole("button", { name: "新闻 1" }).getAttribute("aria-pressed")).toBe(
+      "true",
+    );
   });
 });
 

@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect } from "react";
-import type { Source } from "@mra/shared";
+import { useEffect, useMemo, useState } from "react";
+import type { Source, SourceType } from "@mra/shared";
 
 import { SourceHoverBody } from "@/components/sources/source-preview";
 import { sourceElementId } from "@/lib/report/citations";
-import { cn, formatTimestamp } from "@/lib/utils";
+import { countCitedByType, RELIABILITY_MARK } from "@/lib/report/source-groups";
+import { cn } from "@/lib/utils";
 
 type SourcePanelProps = {
   sources: Source[];
@@ -15,10 +16,21 @@ type SourcePanelProps = {
 };
 
 export function SourcePanel({ sources, activeIndex, onSelect, className }: SourcePanelProps) {
-  const numbered = sources
-    .filter((item) => item.citation_index !== null)
-    .sort((a, b) => (a.citation_index ?? 0) - (b.citation_index ?? 0));
-  const orphans = sources.filter((item) => item.citation_index === null);
+  const numbered = useMemo(
+    () =>
+      sources
+        .filter((item) => item.citation_index !== null)
+        .sort((a, b) => (a.citation_index ?? 0) - (b.citation_index ?? 0)),
+    [sources],
+  );
+  const orphans = useMemo(() => sources.filter((item) => item.citation_index === null), [sources]);
+  const typeCounts = useMemo(() => countCitedByType(numbered), [numbered]);
+  const [typeFilter, setTypeFilter] = useState<SourceType | "all">("all");
+
+  const visible = numbered.filter((item) => {
+    if (typeFilter === "all" || item.citation_index === activeIndex) return true;
+    return item.source_type === typeFilter;
+  });
 
   useEffect(() => {
     if (activeIndex === null) return;
@@ -31,12 +43,40 @@ export function SourcePanel({ sources, activeIndex, onSelect, className }: Sourc
   if (sources.length === 0) return null;
 
   return (
-    <section className={cn("space-y-3", className)}>
-      <h2 className="text-[11px] font-medium tracking-[0.16em] text-zinc-500 uppercase">
-        Sources ({sources.length})
-      </h2>
-      <ol className="space-y-2">
-        {numbered.map((source) => (
+    <section
+      className={cn(
+        "flex min-h-0 flex-col gap-3",
+        "lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)]",
+        className,
+      )}
+    >
+      <div className="shrink-0 space-y-2">
+        <h2 className="text-[11px] font-medium tracking-[0.16em] text-zinc-500 uppercase">
+          Sources ({sources.length})
+        </h2>
+        {typeCounts.length > 1 && (
+          <div className="flex flex-wrap gap-1" role="group" aria-label="按类型筛选来源">
+            <TypeChip
+              label="全部"
+              count={numbered.length}
+              active={typeFilter === "all"}
+              onClick={() => setTypeFilter("all")}
+            />
+            {typeCounts.map((item) => (
+              <TypeChip
+                key={item.type}
+                label={item.label}
+                count={item.count}
+                active={typeFilter === item.type}
+                onClick={() => setTypeFilter(item.type)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      <ol className="min-h-0 space-y-1 overflow-y-auto pr-0.5">
+        {visible.map((source) => (
           <SourceRow
             key={source.id}
             source={source}
@@ -45,8 +85,9 @@ export function SourcePanel({ sources, activeIndex, onSelect, className }: Sourc
           />
         ))}
       </ol>
+
       {orphans.length > 0 && (
-        <ul className="space-y-1 text-xs text-zinc-400">
+        <ul className="shrink-0 space-y-1 text-xs text-zinc-400">
           {orphans.map((source) => (
             <li key={source.id} className="truncate">
               {source.title ?? source.domain ?? source.url}
@@ -55,6 +96,35 @@ export function SourcePanel({ sources, activeIndex, onSelect, className }: Sourc
         </ul>
       )}
     </section>
+  );
+}
+
+function TypeChip({
+  label,
+  count,
+  active,
+  onClick,
+}: {
+  label: string;
+  count: number;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onClick}
+      className={cn(
+        "rounded-full px-2 py-0.5 text-[11px] tabular-nums",
+        "focus-visible:ring-accent focus-visible:ring-2 focus-visible:outline-none",
+        active
+          ? "bg-accent-subtle text-accent-text"
+          : "text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800",
+      )}
+    >
+      {label} {count}
+    </button>
   );
 }
 
@@ -70,6 +140,7 @@ function SourceRow({
   const index = source.citation_index;
   if (index === null) return null;
   const label = source.title ?? source.domain ?? source.url;
+  const reliability = RELIABILITY_MARK[source.reliability];
 
   return (
     <li className="group relative">
@@ -85,27 +156,56 @@ function SourceRow({
           active && "bg-amber-50 ring-1 ring-amber-400 dark:bg-amber-950/40",
         )}
       >
-        <span className="flex items-baseline gap-2">
-          <span className="text-accent-text font-mono font-medium">[{index}]</span>
-          <span className="min-w-0 truncate font-medium text-zinc-800 dark:text-zinc-100">
-            {label}
+        <span className="flex items-start gap-2">
+          <span className="text-accent-text mt-0.5 shrink-0 font-mono font-medium">[{index}]</span>
+          <DomainMark domain={source.domain} />
+          <span className="min-w-0 flex-1">
+            <span className="flex items-start gap-1.5">
+              <span className="line-clamp-2 min-w-0 flex-1 font-medium text-zinc-800 dark:text-zinc-100">
+                {label}
+              </span>
+              {reliability && (
+                <span
+                  className={cn(
+                    "shrink-0 rounded px-1 py-px text-[10px] leading-4 font-medium",
+                    reliability.className,
+                  )}
+                >
+                  {reliability.label}
+                </span>
+              )}
+            </span>
+            {source.domain && (
+              <span className="mt-0.5 block truncate text-zinc-500">{source.domain}</span>
+            )}
+            {active && source.excerpt && (
+              <span className="mt-1.5 block text-[11px] leading-relaxed text-zinc-600 dark:text-zinc-300">
+                {source.excerpt}
+              </span>
+            )}
           </span>
         </span>
-        <span className="mt-0.5 block truncate text-zinc-500">
-          {[source.domain, formatTimestamp(source.retrieved_at)].filter(Boolean).join(" · ")}
-        </span>
       </button>
-      <div
-        role="tooltip"
-        className={cn(
-          "absolute top-full left-0 z-20 mt-1 w-72 rounded-md border border-zinc-200 bg-white p-2 text-zinc-700 shadow-md dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200",
-          active
-            ? "visible"
-            : "pointer-events-none invisible group-hover:visible group-focus-within:visible",
-        )}
-      >
-        <SourceHoverBody source={source} />
-      </div>
+      {!active && (
+        <div
+          role="tooltip"
+          className="pointer-events-none invisible absolute top-full left-0 z-20 mt-1 w-72 rounded-md border border-zinc-200 bg-white p-2 text-zinc-700 shadow-md group-hover:visible group-focus-within:visible dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200"
+        >
+          <SourceHoverBody source={source} />
+        </div>
+      )}
     </li>
+  );
+}
+
+function DomainMark({ domain }: { domain: string | null }) {
+  const letter = (domain?.[0] ?? "?").toUpperCase();
+  return (
+    <span
+      aria-hidden
+      className="bg-accent-subtle text-accent-text mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-sm text-[9px] font-semibold"
+    >
+      {letter}
+    </span>
   );
 }
