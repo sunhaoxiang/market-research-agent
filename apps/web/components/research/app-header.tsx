@@ -3,7 +3,7 @@ import type { Route } from "next";
 
 import { cn } from "@/lib/utils";
 
-export function AppHeader({ current }: { current: "research" | "history" | "settings" }) {
+export function AppHeader({ current }: { current: "research" | "history" | "settings" | "debug" }) {
   return (
     <header className="mb-8 flex flex-wrap items-end justify-between gap-4">
       <div>
@@ -25,6 +25,9 @@ export function AppHeader({ current }: { current: "research" | "history" | "sett
         </NavLink>
         <NavLink href={"/settings" as Route} active={current === "settings"}>
           设置
+        </NavLink>
+        <NavLink href={"/debug" as Route} active={current === "debug"}>
+          调试
         </NavLink>
       </nav>
     </header>

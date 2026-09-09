@@ -6,7 +6,7 @@
 > **每完成一个任务就更新此表的状态**；每完成一个阶段，跑 `[DP §26]` 的收尾清单并写阶段小结。
 
 - 最后更新：2026-09-09
-- 当前阶段：**P6 进行中**。P6-1/2/3/4/5/6/7/8 已完成。未开：`/debug`、成本告警、Playwright。
+- 当前阶段：**P6 进行中**。P6-1/2/3/4/5/6/7/8/9 已完成。未开：成本告警、Playwright。
 
 ### 已确认的前置决策（2026-09-07）
 
@@ -43,7 +43,7 @@
 | P4    | 美股数据能力                    | 11     | ✅   | 四问真跑已出带财务与 SEC 引用的报告 |
 | P5    | Multi-Agent 完整编排            | 9      | ✅   | Fact Checker / 并行 / 报告结构   |
 | P5.5  | **MVP 验收**                    | 1      | ✅   | 见 `[DP §21.1]`；限制见 P5.5 记录 |
-| P6    | 高级 UX + 历史 + 可观察性       | 11     | 🟡   | 主区居中 + 阶段瀑布 + 无障碍 + 历史 / 设置 / 续订 / 取消；/debug 仍后置 |
+| P6    | 高级 UX + 历史 + 可观察性       | 11     | 🟡   | 主区居中 + 阶段瀑布 + 无障碍 + 历史 / 设置 / 调试 / 续订 / 取消；成本告警与 Playwright 仍后置 |
 | P7    | Evaluation 系统                 | 8      | ⬜   | 数据集 / grader / runner         |
 | P8    | 扩展能力                        | 8      | ⬜   | 按需触发，非线性                 |
 
@@ -364,7 +364,7 @@ Merge / Fact Checker 之后、Writer 之前。**纯代码规则，不打模型�
 | P6-6  | 进行中会话的 **增量续订**（偿还 D4）。`GET .../events?after={seq}` 与首页快照回放已有；刷新后若 session 仍在跑，要从 `lastSeq` 接着收新事件（BFF 仍在落库，轮询 DB 即可，不必再接一条 Python SSE） | P6-5 | ✅   | 刷新页面能续上进行中的研究      |
 | P6-7  | 取消研究（前端按钮 → Next `DELETE /api/research/{id}` → Python `POST /v1/research/{id}/cancel` → 状态落库） | P6-6 | ✅   | 可中断长任务                    |
 | P6-8  | Settings 页：默认模型、按角色指定模型、执行上限、报告偏好                                            | P5.5 | ✅   | 设置持久化并生效                |
-| P6-9  | `/debug` 可观察性页：阶段瀑布 / Agent 排行 / Tool 失败率 / 模型成本对比 / Provider 配额 `[DP §20.2]` | P5.5 | ⬜   | 能回答 `[DP §20.2]` 的 4 个问题 |
+| P6-9  | `/debug` 可观察性页：阶段瀑布 / Agent 排行 / Tool 失败率 / 模型成本对比 / Provider 配额 `[DP §20.2]` | P5.5 | ✅   | 能回答 `[DP §20.2]` 的 4 个问题 |
 | P6-10 | 成本与 token 实时显示 + 单 session 成本上限告警                                                      | P6-9 | ⬜   | 超限发 WARNING 事件             |
 | P6-11 | Playwright E2E（打桩 Python 服务，跑完整 UI 流程）                                                   | P6-5 | ⬜   | CI 中稳定通过                   |
 
@@ -374,8 +374,8 @@ Phase 2 真实验收后补的刷新恢复，把历史会话的数据面先做了
 
 | 已有 | 给谁用 | 还缺（仍按原阶段做） |
 | --- | --- | --- |
-| `GET /api/research/{id}/events`（已支持 `?after={seq}`，响应带 `status`） | P6-5 详情回放、P6-6 增量起点 | 进行中会话的续订已按 `after` 轮询 DB（D4）。会话页阶段瀑布是 P6-2（已完成）；跨会话 `/debug` 瀑布仍是 P6-9 |
-| 首页 `?session=` + `ResearchConsole` 回放 / 续订 | P6-4 点进一条历史、P6-5 复用组件 | `/history` 列表 + 过滤/分页已有。`/debug` 仍是 P6-9 |
+| `GET /api/research/{id}/events`（已支持 `?after={seq}`，响应带 `status`） | P6-5 详情回放、P6-6 增量起点 | 会话页阶段瀑布是 P6-2（已完成）；跨会话 `/debug` 瀑布是 P6-9（已完成） |
+| 首页 `?session=` + `ResearchConsole` 回放 / 续订 | P6-4 点进一条历史、P6-5 复用组件 | `/history` 列表 + 过滤/分页已有。`/debug` 是 P6-9（已完成） |
 | `projectArtifacts`：`source_found` / `report_completed` → `sources` / `claims` / `claim_sources` / `research_reports` | P6-4 列表「来源数」、P6-9 `/debug` 聚合 | UI **不要**改成只读这几张表来渲染报告。事件回放才是与实时页一致的真源；投影给查询 |
 | `attach_section_claims` 按正文 `[n]` 回填 `section.claim_ids` | P2-10 章节徽标、P5-7 Writer v2（已遵守：模型仍交空数组） | 不要改回让模型抄 id |
 | `web_fetch` 对 DNS `getaddrinfo` 加 5s `wait_for`；Web Agent prompt 禁止对失败 URL 重试 | P3/P4 若复用 `WebFetcher` 自动带上 | 任务级 120s 超时仍在；这不是硬配额，只是失败后别空转 |
@@ -528,7 +528,7 @@ Phase 2 真实验收后补的刷新恢复，把历史会话的数据面先做了
 
 重试只覆盖 429 / 5xx / 超时 / 网络错误；4xx 立刻失败。对"标的不存在"重试既浪费配额，也会把瞬时问题伪装成慢。配额落 SQLite：进程重启不能把当天已用次数清零，否则 FMP 的 250/day 会被重启成倍放大。令牌桶只活在内存里，重启后从满桶开始是合理的。
 
-P2-2 起的具体源（Tavily / CoinGecko 等）继承 `BaseProvider` 即可，不必再实现横切能力。`/debug/providers` 仍属 Phase 6，但进程内 `ProviderStats` 已经在记。
+P2-2 起的具体源（Tavily / CoinGecko 等）继承 `BaseProvider` 即可，不必再实现横切能力。`GET /v1/debug/providers` 已接上进程内 `ProviderStats` 与配额快照。
 
 ### P2-2 — SearchProvider + Tavily ✅（2026-09-08）
 
@@ -1064,7 +1064,7 @@ P5-8 用 ScriptedModel 覆盖正常 / 工具失败 / 超时 / 冲突 / 引用缺
 
 **偏离计划**：`§21.1` 的「2 分钟」和「3 个 Provider」都没达到——真跑一次财报/深研要 5–11 分钟，本机仍只有 DeepSeek。History 列表按计划属于 Phase 6，MVP 用 `?session=` 回放。P5.5 后补跑 HYPE 投资研究：checking 出现了，但 62 条陈述让 Fact Checker 180s 超时（D23，已截断并拆批偿还，未重跑）。
 
-**新增技术债**：D6 / D8 仍是刻意限制。P6 已改主区居中、阶段瀑布、无障碍、Settings，并接上历史 / 续订 / 取消；`/debug`、Playwright 仍后置。
+**新增技术债**：D6 / D8 仍是刻意限制。P6 已改主区居中、阶段瀑布、无障碍、Settings、`/debug`，并接上历史 / 续订 / 取消；成本告警与 Playwright 仍后置。
 
 ---
 

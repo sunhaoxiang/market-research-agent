@@ -7,6 +7,7 @@
 import "server-only";
 
 import { serverEnv } from "@/lib/env";
+import type { ProviderDebugRow } from "@/lib/debug-stats";
 import type { AgentResearchOptions } from "@/lib/settings";
 
 export type AgentProviderStatus = {
@@ -115,6 +116,12 @@ export function fetchAgentHealth(timeoutMs = 3000): Promise<AgentServiceResult<A
 
 export function fetchAgentModels(timeoutMs = 3000): Promise<AgentServiceResult<AgentModels>> {
   return callAgent<AgentModels>("/v1/models", timeoutMs);
+}
+
+export function fetchProviderDebug(
+  timeoutMs = 3000,
+): Promise<AgentServiceResult<{ providers: ProviderDebugRow[] }>> {
+  return callAgent<{ providers: ProviderDebugRow[] }>("/v1/debug/providers", timeoutMs);
 }
 
 export type StartResearchInput = {

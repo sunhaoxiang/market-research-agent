@@ -1273,6 +1273,7 @@ class EpistemicType(StrEnum):
 | `GET`                 | `/api/models`                           | 可用模型目录（含 `available` 与禁用原因）                       |
 | `GET`/`PATCH`         | `/api/settings`                         | 用户设置（默认模型、角色映射、报告语言）                        |
 | `GET`                 | `/api/health`                           | 自身 + Python 服务健康状态                                      |
+| `GET`                 | `/api/debug`                            | 可观察性快照（阶段 / Agent / Tool / 模型 + Provider 配额）          |
 | `GET`/`POST`/`DELETE` | `/api/watchlist`                        | [P8]                                                            |
 
 ### 16.2 Python Agent Service
