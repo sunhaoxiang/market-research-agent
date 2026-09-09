@@ -49,7 +49,7 @@
 
 ---
 
-## 为什么值得看一眼
+## 项目亮点
 
 面向做 Agent 系统、金融数据产品，或想自己跑一套「能核对」的研究工作流的开发者。
 
@@ -84,7 +84,6 @@ Agents → Tools → 外部 API
          LLM / CoinGecko / DefiLlama / FMP / SEC / Tavily
 ```
 
-三条把项目定型的决策：
 
 1. **编排是确定性 Python，不是 LLM 自主循环。** LLM 只做两件事：写出 `ResearchPlan`，以及在单个任务里调 tool 推理。并发、超时、降级全部由代码控制。
 2. **子 Agent 用 Agents-as-Tools，不用 Handoff。** Handoff 会交出控制权且不返回；这里需要多路并行再汇总给核查与写作。
@@ -112,7 +111,6 @@ flowchart TD
 
 ## Agent 与 Tool
 
-一共 **6 个 Agent**。规划与写作不配 tool，避免「先查再规划」把成本提前烧掉。
 
 | Agent | 职责 | Tools |
 | --- | --- | --- |
@@ -127,7 +125,6 @@ flowchart TD
 
 ### Tool 一览
 
-按域挂到对应研究 Agent，HTTP invoke 与单测走同一套 `registry`，不经过 LLM。
 
 | 域 | Tools |
 | --- | --- |
