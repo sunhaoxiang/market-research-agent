@@ -51,18 +51,12 @@
 
 ## 项目亮点
 
-面向做 Agent 系统、金融数据产品，或想自己跑一套「能核对」的研究工作流的开发者。
-
-- **引用可点回原文。** 正文 `[n]` 与来源面板一一对应；URL 由 tool 层收集，不让模型自己复述链接。
-- **冲突数字并列，不取平均。** CoinGecko、DefiLlama、链上口径对不上时，报告会单独标出「数值冲突」，把各源结果摆在一起。
-- **事实 / 分析 / 推测分开标。** 认知状态写进 claim，前端用徽标区分，避免把观点写成事实。
-- **缺数据就承认。** 没有免费 API、字段缺失时写入 `data_gaps`，而不是补一段假数字。
-- **编排可预期。** 任务 fan-out、并发、超时、重试、汇总都在 Python 里；前端能提前画出计划再逐项点亮。
-- **成本有上限。** 单次研究默认封顶 $1，状态行实时显示耗时、Token、缓存命中与阶段瀑布。
-- **多模型可插拔。** DeepSeek / 智谱 / Kimi / OpenAI 等走同一套 Model Registry；API key 只在服务端。
-- **本地就能跑。** SQLite + 两个进程，不依赖云厂商的 Agent 运行时。
-
-数据源：Tavily、CoinGecko、DefiLlama、FMP、SEC EDGAR。LLM 可换，默认走 DeepSeek。
+- 6 个 Agent：规划、Crypto、美股、网页、事实核查、写作。规划与写作不配 tool。
+- 编排在 Python（fan-out、并发、超时、重试、merge），不是 LLM 自主循环。
+- 子 Agent 用 Agents-as-Tools，结果回到编排层再汇总。
+- 来源 URL 由 tool 层收集；claim 标事实 / 分析 / 推测；缺口写 `data_gaps`。
+- 多源数值冲突并列，不做平均。
+- Fact Checker 只看 claims + sources；补研究最多 1 轮。
 
 ---
 
