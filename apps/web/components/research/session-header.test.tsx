@@ -35,8 +35,11 @@ describe("SessionHeader", () => {
     ]);
 
     render(<SessionHeader state={state} now={0} costLimitUsd={1} />);
-    expect(screen.getByText(/1\.2k in \/ 80 out/)).toBeTruthy();
-    expect(screen.getByText(/\$0\.0031 \/ \$1\.00/)).toBeTruthy();
+    expect(screen.getByText("1.2k in · 80 out")).toBeTruthy();
+    expect(screen.getByRole("group", { name: "成本 $0.0031 / $1.00" })).toBeTruthy();
+    expect(screen.getByText("缓存 8%")).toBeTruthy();
+    expect(screen.getByText("耗时")).toBeTruthy();
+    expect(screen.getByText("Token")).toBeTruthy();
   });
 
   it("超限用文字标出，不只改颜色", () => {
@@ -52,6 +55,7 @@ describe("SessionHeader", () => {
 
     render(<SessionHeader state={state} now={0} costLimitUsd={1} />);
     expect(screen.getByText("会话成本已达上限 $1.00")).toBeTruthy();
-    expect(screen.getByText(/\$1\.20 \/ \$1\.00/)).toBeTruthy();
+    expect(screen.getByRole("group", { name: "成本 $1.20 / $1.00" })).toBeTruthy();
+    expect(screen.getByText("$1.20")).toBeTruthy();
   });
 });

@@ -32,7 +32,11 @@ export const SESSION_STATUS_LABELS: Record<ResearchViewState["status"], string> 
   cancelled: "已取消",
 };
 
-export function taskProgress(state: ResearchViewState): string | null {
+export function taskCounts(state: ResearchViewState): {
+  settled: number;
+  total: number;
+  current: string | null;
+} | null {
   const tasks = state.taskIds.map((id) => state.tasks[id]).filter((task) => task !== undefined);
   if (tasks.length === 0) return null;
   const settled = tasks.filter(
@@ -40,7 +44,15 @@ export function taskProgress(state: ResearchViewState): string | null {
   ).length;
   const running = tasks.find((task) => task.status === "running");
   const current = running ? (AGENT_LABELS[running.agent] ?? running.agent) : null;
-  return current ? `${settled}/${tasks.length} · ${current}` : `${settled}/${tasks.length}`;
+  return { settled, total: tasks.length, current };
+}
+
+export function taskProgress(state: ResearchViewState): string | null {
+  const counts = taskCounts(state);
+  if (!counts) return null;
+  return counts.current
+    ? `${counts.settled}/${counts.total} · ${counts.current}`
+    : `${counts.settled}/${counts.total}`;
 }
 
 export type ResolvedStageSpan = StageSpan & {

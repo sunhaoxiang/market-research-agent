@@ -22,7 +22,7 @@ test("提问后看到计划、报告、来源和成本", async ({ page }) => {
     timeout: 15_000,
   });
   await expect(page.getByText("已完成", { exact: true })).toBeVisible();
-  await expect(page.getByText("$0.02 / $1.00")).toBeVisible();
+  await expect(page.getByRole("group", { name: "成本 $0.02 / $1.00" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Sources (1)" })).toBeVisible();
   await expect(page.getByText("制定计划", { exact: false })).toBeVisible();
   await expect(page.getByText("执行研究", { exact: false })).toBeVisible();
@@ -43,7 +43,7 @@ test("历史列表能点进去回放同一份报告", async ({ page }) => {
 
   await expect(page).toHaveURL(/[?&]session=/);
   await expect(page.getByRole("heading", { name: "HYPE 协议收入简报" })).toBeVisible();
-  await expect(page.getByText("$0.02 / $1.00")).toBeVisible();
+  await expect(page.getByRole("group", { name: "成本 $0.02 / $1.00" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Sources (1)" })).toBeVisible();
 });
 
