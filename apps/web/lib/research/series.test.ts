@@ -1,7 +1,7 @@
 import type { MetricPoint } from "@mra/shared";
 import { describe, expect, it } from "vitest";
 
-import { chartTitle, groupMetricCharts } from "@/lib/research/series";
+import { chartTitle, formatChangePct, groupMetricCharts, seriesDelta } from "@/lib/research/series";
 
 function point(
   overrides: Partial<MetricPoint> & Pick<MetricPoint, "value" | "as_of">,
@@ -34,6 +34,11 @@ describe("groupMetricCharts", () => {
     expect(series[0]!.points).toHaveLength(30);
     expect(series[0]!.spanDays).toBe(29);
     expect(chartTitle(series[0]!)).toBe("TVL · HYPE · 29 天");
+    expect(seriesDelta(series[0]!).latest).toBe(1_429_000_000);
+    expect(seriesDelta(series[0]!).changePct).toBeCloseTo((29_000_000 / 1_400_000_000) * 100);
+    expect(formatChangePct(2.142)).toBe("+2.14%");
+    expect(formatChangePct(-10)).toBe("-10.0%");
+    expect(formatChangePct(0)).toBe("0.00%");
   });
 
   it("恰好跨 30 天时标题带 30 天", () => {

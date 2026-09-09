@@ -287,7 +287,9 @@ describe("sanitize 与徽标", () => {
     expect(screen.getByRole("region", { name: "指标走势" })).toBeDefined();
     expect(screen.getByRole("figure", { name: /TVL · HYPE · 30 天，31 个数据点/ })).toBeDefined();
     expect(screen.getByText("TVL · HYPE · 30 天")).toBeDefined();
-    expect(document.querySelector("svg .recharts-line")).not.toBeNull();
+    expect(screen.getByText("$1.43B")).toBeDefined();
+    expect(screen.getByText("+2.14%")).toBeDefined();
+    expect(document.querySelector("svg .recharts-area")).not.toBeNull();
   });
 
   it("Comparison 章节的 Markdown 表格渲染成 table", () => {

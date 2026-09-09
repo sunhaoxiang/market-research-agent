@@ -85,6 +85,24 @@ export function chartTitle(series: MetricChartSeries): string {
   return `${series.label}${entity} · ${series.spanDays} 天`;
 }
 
+export function seriesDelta(series: MetricChartSeries): {
+  latest: number;
+  changePct: number | null;
+} {
+  const first = series.points[0]?.value;
+  const last = series.points.at(-1)?.value;
+  if (last === undefined) return { latest: 0, changePct: null };
+  if (first === undefined || first === 0) return { latest: last, changePct: null };
+  return { latest: last, changePct: ((last - first) / Math.abs(first)) * 100 };
+}
+
+export function formatChangePct(pct: number): string {
+  if (pct === 0) return "0.00%";
+  const abs = Math.abs(pct);
+  const digits = abs >= 10 ? 1 : 2;
+  return `${pct > 0 ? "+" : "-"}${abs.toFixed(digits)}%`;
+}
+
 export function formatMetricValue(value: number, unit: string | null): string {
   const compact = compactNumber(value);
   if (unit === "USD" || unit === "usd" || unit === "$") return `$${compact}`;
