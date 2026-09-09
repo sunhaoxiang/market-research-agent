@@ -276,6 +276,10 @@ describe("sanitize 与徽标", () => {
 
     expect(screen.getByRole("status")).toBeDefined();
     expect(screen.getByText("数值冲突")).toBeDefined();
+    expect(screen.getByRole("status").className).toContain("rounded-lg");
+    expect(screen.getByRole("heading", { name: "摘要" }).parentElement?.className).toContain(
+      "rounded-lg",
+    );
     expect(screen.getByText("coingecko: 1.2e+09 USD")).toBeDefined();
     expect(screen.getByText("defillama: 1.8e+09 USD")).toBeDefined();
     expect(screen.queryByText(/1\.5e/)).toBeNull();

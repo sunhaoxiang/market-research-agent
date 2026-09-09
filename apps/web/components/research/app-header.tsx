@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import type { Route } from "next";
 
 import { BrandMark } from "@/components/brand-mark";
+import { ThemeToggle } from "@/components/research/theme-toggle";
 import { cn } from "@/lib/utils";
 
 const NAV = [
@@ -33,7 +34,7 @@ export function AppHeader() {
   const current = navFromPath(usePathname() ?? "/");
 
   return (
-    <header className="bg-background/90 sticky top-0 z-40 h-14 border-b border-zinc-200 backdrop-blur-md dark:border-zinc-800">
+    <header className="bg-background/90 border-border sticky top-0 z-40 h-14 border-b backdrop-blur-md">
       <div className="mx-auto flex h-full max-w-6xl items-center justify-between gap-4 px-6">
         <Link
           href={"/" as Route}
@@ -53,6 +54,7 @@ export function AppHeader() {
               </NavLink>
             ))}
           </nav>
+          <ThemeToggle />
           <AgentStatus />
         </div>
       </div>

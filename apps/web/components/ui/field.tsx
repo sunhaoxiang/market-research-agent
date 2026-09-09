@@ -3,9 +3,9 @@ import type { ComponentProps } from "react";
 import { cn } from "@/lib/utils";
 
 const CONTROL = [
-  "w-full rounded-md border border-zinc-200 bg-transparent px-3 py-2 text-sm",
+  "w-full rounded-md border border-border bg-transparent px-3 py-2 text-sm",
   "placeholder:text-zinc-400 focus-visible:ring-accent focus-visible:border-accent focus-visible:ring-2 focus-visible:outline-none",
-  "disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-800",
+  "disabled:cursor-not-allowed disabled:opacity-50",
 ];
 
 export function Input({ className, ...props }: ComponentProps<"input">) {

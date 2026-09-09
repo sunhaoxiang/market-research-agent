@@ -14,6 +14,8 @@ import type { RecentSessionPreview } from "@/lib/research/empty-home";
 import { replayAndFollow } from "@/lib/research/replay";
 import { useResearchState, useResearchStore, useTicker } from "@/lib/research/store";
 import { ResearchStreamError, streamResearch } from "@/lib/sse";
+import { notice, surface } from "@/lib/ui";
+import { cn } from "@/lib/utils";
 
 import { EmptyHome } from "./empty-home";
 import { type ModelOption, ModelSelector } from "./model-selector";
@@ -198,15 +200,17 @@ export function ResearchConsole({
             </div>
           </div>
 
-          <SessionHeader state={state} now={now} costLimitUsd={costLimitUsd} />
-          <StageTimeline state={state} now={now} />
+          <div className={cn(surface, "space-y-3 px-4 py-3")}>
+            <SessionHeader state={state} now={now} costLimitUsd={costLimitUsd} />
+            <StageTimeline state={state} now={now} />
+          </div>
 
           {state.lastMessage && (
             <p className="text-sm text-zinc-600 dark:text-zinc-400">{state.lastMessage}</p>
           )}
 
           {state.error && (
-            <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
+            <p className={cn(notice, "px-3 py-2 text-sm")}>
               {state.error.code}: {state.error.message}
             </p>
           )}
@@ -250,7 +254,7 @@ export function ResearchConsole({
                         </ul>
                       </div>
                     )}
-                    <p className="border-t border-dashed border-zinc-200 pt-3 text-xs text-zinc-400 dark:border-zinc-800">
+                    <p className="border-border border-t pt-3 text-xs text-zinc-400">
                       {state.stage === "writing" ? "正在撰写研究报告…" : "报告生成后显示。"}
                     </p>
                   </div>
@@ -264,7 +268,7 @@ export function ResearchConsole({
               sources={state.sources}
               activeIndex={activeCitation}
               onSelect={setActiveCitation}
-              className="lg:border-l lg:border-zinc-200 lg:pl-6 dark:lg:border-zinc-800"
+              className="lg:self-start"
             />
           </div>
         </div>

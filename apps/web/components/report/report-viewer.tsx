@@ -5,6 +5,8 @@ import type { Claim, Conflict, MetricPoint, ResearchReport, Source } from "@mra/
 import { EpistemicBadge, marksForClaims } from "@/components/report/epistemic-badge";
 import { MetricCharts } from "@/components/report/metric-charts";
 import { ReportMarkdown } from "@/components/report/markdown";
+import { notice, surfaceMuted } from "@/lib/ui";
+import { cn } from "@/lib/utils";
 
 type ReportViewerProps = {
   report: ResearchReport;
@@ -44,7 +46,7 @@ export function ReportViewer({
         </h1>
       </header>
 
-      <section className="max-w-[42rem] rounded-lg bg-zinc-100 px-5 py-4 ring-1 ring-zinc-200/80 dark:bg-zinc-900 dark:ring-zinc-800">
+      <section className={cn(surfaceMuted, "max-w-[42rem] px-5 py-4")}>
         <h2 className="sr-only">摘要</h2>
         <ReportMarkdown
           markdown={report.executive_summary}
@@ -57,7 +59,7 @@ export function ReportViewer({
       {conflicts.length > 0 && (
         <aside
           role="status"
-          className="max-w-[42rem] space-y-2 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-[15px] leading-relaxed text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200"
+          className={cn(notice, "max-w-[42rem] space-y-2 px-4 py-3 text-[15px] leading-relaxed")}
         >
           <h2 className="font-semibold">数值冲突</h2>
           <ul className="space-y-2">
@@ -91,7 +93,7 @@ export function ReportViewer({
             key={section.id}
             className={
               disclaimer || limitations
-                ? "max-w-[42rem] space-y-3 border-t border-dashed border-zinc-200 pt-6 dark:border-zinc-800"
+                ? "border-border max-w-[42rem] space-y-3 border-t pt-6"
                 : "max-w-[42rem] space-y-3"
             }
           >
@@ -123,7 +125,7 @@ export function ReportViewer({
       })}
 
       {!hasDataLimitations && report.data_gaps.length > 0 && (
-        <section className="max-w-[42rem] space-y-3 border-t border-dashed border-zinc-200 pt-6 dark:border-zinc-800">
+        <section className="border-border max-w-[42rem] space-y-3 border-t pt-6">
           <h2 className="text-lg font-semibold tracking-tight">数据限制</h2>
           <ul className="list-disc space-y-1.5 pl-5 text-[15px] leading-relaxed text-zinc-600 dark:text-zinc-400">
             {report.data_gaps.map((gap) => (

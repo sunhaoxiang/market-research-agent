@@ -10,7 +10,8 @@ import type {
   ProviderDebugRow,
 } from "@/lib/debug-stats";
 import { AGENT_LABELS, STAGE_LABELS } from "@/lib/research/stages";
-import { formatCost, formatDuration, formatTokens } from "@/lib/utils";
+import { notice } from "@/lib/ui";
+import { cn, formatCost, formatDuration, formatTokens } from "@/lib/utils";
 
 const STATUS_LABELS: Record<string, string> = {
   pending: "等待",
@@ -140,11 +141,7 @@ export function DebugDashboard({
         title="Provider 缓存与配额"
         hint="进程内计数，重启归零。配额窗口在 Provider SQLite 里，重启不清。"
       >
-        {providersError && (
-          <p className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
-            {providersError}
-          </p>
-        )}
+        {providersError && <p className={cn(notice, "mb-3 px-3 py-2 text-sm")}>{providersError}</p>}
         {providers.length === 0 ? (
           <Empty>Agent 服务不可用时看不到配额。</Empty>
         ) : (
@@ -201,7 +198,7 @@ function RankingTable({
     >
       <table className="w-full min-w-[36rem] text-left text-sm">
         <thead>
-          <tr className="border-b border-zinc-200 text-xs text-zinc-500 dark:border-zinc-800">
+          <tr className="border-border border-b text-xs text-zinc-500">
             {columns.map((column) => (
               <th key={column} className="py-2 pr-3 font-medium">
                 {column}
@@ -211,7 +208,7 @@ function RankingTable({
         </thead>
         <tbody>
           {rows.map((row, index) => (
-            <tr key={index} className="border-b border-zinc-100 dark:border-zinc-900">
+            <tr key={index} className="border-border border-b">
               {row.map((cell, cellIndex) => (
                 <td
                   key={cellIndex}

@@ -12,6 +12,7 @@ import {
   formatSessionDay,
   type RecentSessionPreview,
 } from "@/lib/research/empty-home";
+import { surface } from "@/lib/ui";
 import { cn } from "@/lib/utils";
 
 type EmptyHomeProps = {
@@ -51,10 +52,11 @@ export function EmptyHome({ children, onPickExample, recent }: EmptyHomeProps) {
                 type="button"
                 onClick={() => onPickExample(example.question)}
                 className={cn(
-                  "h-full w-full rounded-lg border border-zinc-200 px-3 py-3 text-left transition",
+                  surface,
+                  "h-full w-full px-3 py-3 text-left transition",
                   "hover:border-accent/40 hover:bg-accent-subtle",
                   "focus-visible:ring-accent focus-visible:ring-2 focus-visible:outline-none",
-                  "dark:border-zinc-800 dark:hover:bg-zinc-900",
+                  "dark:hover:bg-zinc-900",
                 )}
               >
                 <span className="text-accent-text text-[11px] font-medium">{example.label}</span>
@@ -86,7 +88,7 @@ export function EmptyHome({ children, onPickExample, recent }: EmptyHomeProps) {
               全部
             </Link>
           </div>
-          <ul className="mt-3 divide-y divide-zinc-200 dark:divide-zinc-800">
+          <ul className="divide-border mt-3 divide-y">
             {recent.map((session) => (
               <li key={session.id}>
                 <Link

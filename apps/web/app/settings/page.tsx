@@ -6,6 +6,8 @@ import { getDb } from "@/db/client";
 import { getPreferences } from "@/db/queries/settings";
 import { fetchAgentModels } from "@/lib/agent-client";
 import { FALLBACK_LIMITS } from "@/lib/settings";
+import { notice } from "@/lib/ui";
+import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -32,9 +34,7 @@ export default async function SettingsPage() {
     <main id="main" className="mx-auto max-w-6xl px-6 py-6">
       <h1 className="mb-6 text-lg font-semibold tracking-tight">设置</h1>
       {!catalog.ok && (
-        <p className="mb-6 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
-          {catalog.error.message}
-        </p>
+        <p className={cn(notice, "mb-6 px-3 py-2 text-sm")}>{catalog.error.message}</p>
       )}
       <SettingsForm
         models={models}

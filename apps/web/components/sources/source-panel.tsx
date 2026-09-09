@@ -6,6 +6,7 @@ import type { Source, SourceType } from "@mra/shared";
 import { SourceHoverBody } from "@/components/sources/source-preview";
 import { sourceElementId } from "@/lib/report/citations";
 import { countCitedByType, RELIABILITY_MARK } from "@/lib/report/source-groups";
+import { surface } from "@/lib/ui";
 import { cn } from "@/lib/utils";
 
 type SourcePanelProps = {
@@ -45,7 +46,8 @@ export function SourcePanel({ sources, activeIndex, onSelect, className }: Sourc
   return (
     <section
       className={cn(
-        "flex min-h-0 flex-col gap-3",
+        "flex min-h-0 flex-col gap-3 p-3",
+        surface,
         "lg:sticky lg:top-[4.25rem] lg:max-h-[calc(100vh-5.25rem)]",
         className,
       )}
@@ -189,7 +191,10 @@ function SourceRow({
       {!active && (
         <div
           role="tooltip"
-          className="pointer-events-none invisible absolute top-full left-0 z-20 mt-1 w-72 rounded-md border border-zinc-200 bg-white p-2 text-zinc-700 shadow-md group-hover:visible group-focus-within:visible dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200"
+          className={cn(
+            surface,
+            "pointer-events-none invisible absolute top-full left-0 z-20 mt-1 w-72 p-2 text-zinc-700 shadow-md group-hover:visible group-focus-within:visible dark:text-zinc-200",
+          )}
         >
           <SourceHoverBody source={source} />
         </div>

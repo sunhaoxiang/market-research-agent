@@ -8,6 +8,7 @@ import remarkGfm from "remark-gfm";
 
 import { SourceHoverBody } from "@/components/sources/source-preview";
 import { citationHref, linkCitations, parseCitationIndices } from "@/lib/report/citations";
+import { surface } from "@/lib/ui";
 import { cn } from "@/lib/utils";
 
 type ReportMarkdownProps = {
@@ -39,12 +40,12 @@ export function ReportMarkdown({
         "[&_ol]:my-3 [&_ol]:list-decimal [&_ol]:pl-5",
         "[&_li]:my-1",
         "[&>:first-child]:mt-0 [&>:last-child]:mb-0",
-        "[&_blockquote]:border-l-2 [&_blockquote]:border-zinc-300 [&_blockquote]:pl-3 [&_blockquote]:text-zinc-600 dark:[&_blockquote]:border-zinc-600 dark:[&_blockquote]:text-zinc-400",
-        "[&_code]:rounded [&_code]:bg-zinc-100 [&_code]:px-1 [&_code]:text-[0.85em] dark:[&_code]:bg-zinc-800",
-        "[&_pre]:my-3 [&_pre]:overflow-x-auto [&_pre]:rounded-md [&_pre]:bg-zinc-100 [&_pre]:p-3 dark:[&_pre]:bg-zinc-900",
+        "[&_blockquote]:border-border [&_blockquote]:border-l-2 [&_blockquote]:pl-3 [&_blockquote]:text-zinc-600 dark:[&_blockquote]:text-zinc-400",
+        "[&_code]:bg-muted [&_code]:rounded [&_code]:px-1 [&_code]:text-[0.85em]",
+        "[&_pre]:bg-muted [&_pre]:my-3 [&_pre]:overflow-x-auto [&_pre]:rounded-md [&_pre]:p-3",
         "[&_table]:w-full [&_table]:text-sm [&_table]:leading-normal",
-        "[&_th]:border [&_th]:border-zinc-200 [&_th]:bg-zinc-50 [&_th]:px-2.5 [&_th]:py-1.5 [&_th]:text-left [&_th]:font-medium dark:[&_th]:border-zinc-700 dark:[&_th]:bg-zinc-900",
-        "[&_td]:border [&_td]:border-zinc-200 [&_td]:px-2.5 [&_td]:py-1.5 dark:[&_td]:border-zinc-700",
+        "[&_th]:border [&_th]:border-border [&_th]:bg-muted [&_th]:px-2.5 [&_th]:py-1.5 [&_th]:text-left [&_th]:font-medium",
+        "[&_td]:border [&_td]:border-border [&_td]:px-2.5 [&_td]:py-1.5",
         "[&_a]:text-accent-text [&_a]:underline-offset-2",
       )}
     >
@@ -166,7 +167,10 @@ function CitationLink({
       {source && (
         <span
           role="tooltip"
-          className="pointer-events-none invisible absolute bottom-full left-1/2 z-20 mb-1 w-64 -translate-x-1/2 rounded-md border border-zinc-200 bg-white p-2 text-left text-xs text-zinc-700 shadow-md group-hover:visible group-focus-within:visible dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200"
+          className={cn(
+            surface,
+            "pointer-events-none invisible absolute bottom-full left-1/2 z-20 mb-1 w-64 -translate-x-1/2 p-2 text-left text-xs text-zinc-700 shadow-md group-hover:visible group-focus-within:visible dark:text-zinc-200",
+          )}
         >
           <SourceHoverBody source={source} />
         </span>

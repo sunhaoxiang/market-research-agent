@@ -4,6 +4,8 @@ import { useState } from "react";
 
 import { ActivityPanel } from "@/components/research/activity-panel";
 import type { ResearchViewState } from "@/lib/research/state";
+import { surface } from "@/lib/ui";
+import { cn } from "@/lib/utils";
 
 export function ProcessPanel({ state, now }: { state: ResearchViewState; now: number }) {
   const failed = state.taskIds.some((id) => state.tasks[id]?.status === "failed");
@@ -18,7 +20,7 @@ export function ProcessPanel({ state, now }: { state: ResearchViewState; now: nu
   const open = userOpen ?? autoOpen;
 
   return (
-    <div className="rounded-md border border-zinc-200 dark:border-zinc-800">
+    <div className={cn(surface, "overflow-hidden")}>
       <button
         type="button"
         aria-expanded={open}
@@ -29,11 +31,7 @@ export function ProcessPanel({ state, now }: { state: ResearchViewState; now: nu
         <span className="font-medium">研究过程</span>
         <span className="text-xs text-zinc-400">{open ? "收起" : "展开"}</span>
       </button>
-      <div
-        id="research-process"
-        hidden={!open}
-        className="border-t border-zinc-200 px-3 py-3 dark:border-zinc-800"
-      >
+      <div id="research-process" hidden={!open} className="border-border border-t px-3 py-3">
         <ActivityPanel state={state} now={now} hideHeading />
       </div>
     </div>

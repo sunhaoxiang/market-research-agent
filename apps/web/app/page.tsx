@@ -6,6 +6,8 @@ import { listSessions } from "@/db/queries/sessions";
 import { fetchAgentModels } from "@/lib/agent-client";
 import type { RecentSessionPreview } from "@/lib/research/empty-home";
 import { FALLBACK_LIMITS } from "@/lib/settings";
+import { notice } from "@/lib/ui";
+import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -38,9 +40,7 @@ export default async function HomePage({
   return (
     <main id="main" className="mx-auto max-w-6xl px-6 py-6">
       {!catalog.ok && (
-        <p className="mb-6 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
-          {catalog.error.message}
-        </p>
+        <p className={cn(notice, "mb-6 px-3 py-2 text-sm")}>{catalog.error.message}</p>
       )}
 
       <ResearchConsole

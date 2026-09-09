@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+/*
+ * 组件里的 `dark:` 跟 html.dark，不再跟系统媒体查询。
+ * 首屏脚本会在油漆前打上这个类，避免闪浅色。
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-sans:
     ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB",
@@ -14,6 +20,7 @@
  * 只此一个彩色。中性灰负责其余全部层级——多一个品牌色，页面就会开始像拼贴。
  */
 :root {
+  color-scheme: light;
   --background: #ffffff;
   --foreground: #0a0a0a;
   --muted: #f4f4f5;
@@ -30,28 +37,32 @@
   --accent-text: #3730a3;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #fafafa;
-    --muted: #18181b;
-    --muted-foreground: #a1a1aa;
-    --border: #27272a;
+.dark {
+  color-scheme: dark;
+  --background: #0a0a0a;
+  --foreground: #fafafa;
+  --muted: #18181b;
+  --muted-foreground: #a1a1aa;
+  --border: #27272a;
 
-    /* 深色底上要提亮，否则靛蓝会糊进背景 */
-    --accent: #6366f1;
-    --accent-hover: #818cf8;
-    --accent-contrast: #ffffff;
-    --accent-subtle: #1e1b4b;
-    --accent-text: #a5b4fc;
-  }
+  /* 深色底上要提亮，否则靛蓝会糊进背景 */
+  --accent: #6366f1;
+  --accent-hover: #818cf8;
+  --accent-contrast: #ffffff;
+  --accent-subtle: #1e1b4b;
+  --accent-text: #a5b4fc;
 }
 
 /*
  * inline 而非普通 @theme：普通模式会把 var() 在 :root 处解析定值，
- * 将来若改成 .dark 类切换主题（而不是 media query），颜色就不会跟着变。
+ * 主题切到 .dark 时颜色就不会跟着变。
  */
 @theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
   --color-accent: var(--accent);
   --color-accent-hover: var(--accent-hover);
   --color-accent-contrast: var(--accent-contrast);

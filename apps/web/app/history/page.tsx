@@ -95,12 +95,12 @@ export default async function HistoryPage({ searchParams }: { searchParams: Prom
             name="modelId"
             defaultValue={modelId ?? ""}
             placeholder="全部"
-            className="w-56 rounded-md border border-zinc-200 bg-transparent px-3 py-1.5 text-sm focus-visible:ring-accent focus-visible:ring-2 focus-visible:outline-none dark:border-zinc-800"
+            className="focus-visible:ring-accent w-56 rounded-md border border-border bg-transparent px-3 py-1.5 text-sm focus-visible:ring-2 focus-visible:outline-none"
           />
         </label>
         <button
           type="submit"
-          className="rounded-md border border-zinc-200 px-3 py-1.5 hover:bg-zinc-50 focus-visible:ring-accent focus-visible:ring-2 focus-visible:outline-none dark:border-zinc-800 dark:hover:bg-zinc-900"
+          className="border-border hover:bg-muted focus-visible:ring-accent rounded-md border px-3 py-1.5 focus-visible:ring-2 focus-visible:outline-none"
         >
           筛选
         </button>
@@ -109,7 +109,7 @@ export default async function HistoryPage({ searchParams }: { searchParams: Prom
       {rows.length === 0 ? (
         <p className="text-sm text-zinc-500">还没有研究记录。</p>
       ) : (
-        <ul className="divide-y divide-zinc-200 dark:divide-zinc-800">
+        <ul className="divide-border divide-y">
           {rows.map((row) => (
             <li key={row.id}>
               <Link

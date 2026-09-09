@@ -26,5 +26,6 @@ describe("AppHeader", () => {
     expect(screen.getByRole("navigation", { name: "主导航" })).toBeDefined();
     expect(screen.getByRole("link", { name: "历史" }).getAttribute("aria-current")).toBe("page");
     expect(screen.getByRole("link", { name: "研究" }).getAttribute("aria-current")).toBeNull();
+    expect(screen.getByRole("button", { name: /外观：/ })).toBeDefined();
   });
 });

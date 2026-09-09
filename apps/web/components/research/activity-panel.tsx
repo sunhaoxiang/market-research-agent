@@ -80,7 +80,7 @@ function TaskRow({ task, now }: { task: TaskNode; now: number }) {
           )}
 
           {task.toolCalls.length > 0 && (
-            <ul className="mt-1 border-l border-zinc-200 pl-3 dark:border-zinc-800">
+            <ul className="border-border mt-1 border-l pl-3">
               {task.toolCalls.map((call) => (
                 <ToolCallRow key={call.callId} call={call} now={now} />
               ))}
@@ -140,7 +140,7 @@ export function ActivityPanel({
       </ol>
 
       {tasks.length > 0 && (
-        <ol className="space-y-3 border-t border-zinc-200 pt-3 dark:border-zinc-800">
+        <ol className="border-border space-y-3 border-t pt-3">
           {tasks.map((task) => (
             <TaskRow key={task.id} task={task} now={now} />
           ))}
@@ -148,7 +148,7 @@ export function ActivityPanel({
       )}
 
       {state.warnings.length > 0 && (
-        <ul className="space-y-1 border-t border-zinc-200 pt-3 dark:border-zinc-800">
+        <ul className="border-border space-y-1 border-t pt-3">
           {state.warnings.map((warning, index) => (
             <li
               key={`${warning.code}-${index}`}

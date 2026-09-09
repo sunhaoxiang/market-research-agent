@@ -21,6 +21,7 @@ import {
   groupMetricCharts,
   seriesDelta,
 } from "@/lib/research/series";
+import { surface } from "@/lib/ui";
 import { cn } from "@/lib/utils";
 
 export function MetricCharts({ metrics }: { metrics: readonly MetricPoint[] }) {
@@ -47,7 +48,7 @@ function MetricChart({ series, gradientId }: { series: MetricChartSeries; gradie
   const [cross, setCross] = useState<{ x: number; y: number } | null>(null);
 
   return (
-    <figure className="space-y-2" aria-label={label}>
+    <figure className={cn(surface, "space-y-2 p-3")} aria-label={label}>
       <figcaption className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <span className="text-sm font-medium tracking-tight text-zinc-800 dark:text-zinc-100">
           {title}
@@ -171,7 +172,7 @@ function ChartTooltip({
   if (!point) return null;
 
   return (
-    <div className="rounded-md border border-zinc-200 bg-white px-3 py-2 text-xs shadow-md dark:border-zinc-700 dark:bg-zinc-900">
+    <div className={cn(surface, "px-3 py-2 text-xs shadow-md")}>
       <p className="text-zinc-500">{point.asOfLabel}</p>
       <p className="mt-0.5 text-sm font-medium tabular-nums text-zinc-800 dark:text-zinc-100">
         {formatMetricValue(point.value, unit)}
