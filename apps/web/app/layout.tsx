@@ -1,10 +1,15 @@
 import type { Metadata } from "next";
 
+import { AppHeader } from "@/components/research/app-header";
+
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Market Research Agent",
-  description: "AI Financial Research Platform — Crypto & US Stocks",
+  title: {
+    default: "Market Research Agent",
+    template: "%s · Market Research Agent",
+  },
+  description: "带来源、区分事实与推测的加密与美股研究",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -17,6 +22,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         >
           跳到主要内容
         </a>
+        <AppHeader />
         {children}
       </body>
     </html>

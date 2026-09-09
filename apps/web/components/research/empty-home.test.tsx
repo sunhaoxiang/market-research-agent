@@ -13,6 +13,7 @@ describe("EmptyHome", () => {
       </EmptyHome>,
     );
 
+    expect(screen.getByText("Crypto · 美股研究")).toBeDefined();
     expect(screen.getByRole("heading", { name: "带来源、区分事实与推测" })).toBeDefined();
     expect(screen.getByText(HOME_DISCLAIMER)).toBeDefined();
     expect(screen.queryByRole("heading", { name: "最近研究" })).toBeNull();

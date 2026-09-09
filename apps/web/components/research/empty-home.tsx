@@ -22,8 +22,11 @@ type EmptyHomeProps = {
 
 export function EmptyHome({ children, onPickExample, recent }: EmptyHomeProps) {
   return (
-    <div className="mx-auto flex min-h-[calc(100dvh-11rem)] w-full max-w-3xl flex-col justify-center py-6">
+    <div className="mx-auto flex min-h-[calc(100dvh-8rem)] w-full max-w-3xl flex-col justify-center py-6">
       <header className="space-y-2 text-center">
+        <p className="text-[11px] font-medium tracking-[0.16em] text-zinc-500 uppercase">
+          Crypto · 美股研究
+        </p>
         <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
           带来源、区分事实与推测
         </h1>

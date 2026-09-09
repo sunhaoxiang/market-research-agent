@@ -1,4 +1,5 @@
-import { AppHeader } from "@/components/research/app-header";
+import type { Metadata } from "next";
+
 import type { ModelOption } from "@/components/research/model-selector";
 import { SettingsForm } from "@/components/settings/settings-form";
 import { getDb } from "@/db/client";
@@ -7,6 +8,8 @@ import { fetchAgentModels } from "@/lib/agent-client";
 import { FALLBACK_LIMITS } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = { title: "设置" };
 
 export default async function SettingsPage() {
   const catalog = await fetchAgentModels();
@@ -26,8 +29,8 @@ export default async function SettingsPage() {
       : FALLBACK_LIMITS;
 
   return (
-    <main id="main" className="mx-auto max-w-6xl px-6 py-8">
-      <AppHeader current="settings" />
+    <main id="main" className="mx-auto max-w-6xl px-6 py-6">
+      <h1 className="mb-6 text-lg font-semibold tracking-tight">设置</h1>
       {!catalog.ok && (
         <p className="mb-6 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
           {catalog.error.message}

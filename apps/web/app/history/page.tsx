@@ -1,7 +1,6 @@
 import Link from "next/link";
-import type { Route } from "next";
+import type { Metadata, Route } from "next";
 
-import { AppHeader } from "@/components/research/app-header";
 import { Select } from "@/components/ui/field";
 import { getDb } from "@/db/client";
 import { countSessions, countSourcesBySession, listSessions } from "@/db/queries/sessions";
@@ -14,6 +13,8 @@ import {
 import { formatCost, formatDuration } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = { title: "历史" };
 
 const PAGE_SIZE = 20;
 
@@ -62,8 +63,8 @@ export default async function HistoryPage({ searchParams }: { searchParams: Prom
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
-    <main id="main" className="mx-auto max-w-6xl px-6 py-8">
-      <AppHeader current="history" />
+    <main id="main" className="mx-auto max-w-6xl px-6 py-6">
+      <h1 className="mb-6 text-lg font-semibold tracking-tight">历史</h1>
 
       <form method="get" className="mb-6 flex flex-wrap items-end gap-3 text-sm">
         <label className="space-y-1">

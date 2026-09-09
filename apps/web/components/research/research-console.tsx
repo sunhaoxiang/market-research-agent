@@ -178,7 +178,7 @@ export function ResearchConsole({
       ) : (
         <div className="space-y-5" aria-busy={running || restoring}>
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <p className="max-w-3xl text-sm leading-snug text-zinc-600 dark:text-zinc-400">
+            <p className="max-w-3xl text-base leading-snug font-medium tracking-tight text-zinc-900 dark:text-zinc-100">
               {state.question ?? (restoring ? "正在恢复会话…" : question)}
             </p>
             <div className="flex shrink-0 items-center gap-2">

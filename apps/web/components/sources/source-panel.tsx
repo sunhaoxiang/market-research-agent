@@ -46,7 +46,7 @@ export function SourcePanel({ sources, activeIndex, onSelect, className }: Sourc
     <section
       className={cn(
         "flex min-h-0 flex-col gap-3",
-        "lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)]",
+        "lg:sticky lg:top-[4.25rem] lg:max-h-[calc(100vh-5.25rem)]",
         className,
       )}
     >
