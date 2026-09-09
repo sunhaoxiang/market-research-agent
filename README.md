@@ -17,7 +17,6 @@
   <img src="https://img.shields.io/badge/status-MVP-3538cd" alt="MVP">
 </p>
 
-不是又一个 ChatGPT 套壳。编排层是确定性 Python 代码，而不是 LLM 自己决定下一步；数字对不上就并列列出，缺数据就写进 `data_gaps`，而不是编一个看起来完整的答案。
 
 ```text
 用户问题 → 研究计划 → 多 Agent 并行检索 → 事实核查 → 带来源的研究报告
