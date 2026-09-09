@@ -32,7 +32,7 @@ export function SourcePanel({ sources, activeIndex, onSelect, className }: Sourc
 
   return (
     <section className={cn("space-y-3", className)}>
-      <h2 className="text-xs font-medium tracking-wide text-zinc-500 uppercase">
+      <h2 className="text-[11px] font-medium tracking-[0.16em] text-zinc-500 uppercase">
         Sources ({sources.length})
       </h2>
       <ol className="space-y-2">

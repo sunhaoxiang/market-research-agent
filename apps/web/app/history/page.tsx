@@ -62,7 +62,7 @@ export default async function HistoryPage({ searchParams }: { searchParams: Prom
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
-    <main id="main" className="mx-auto max-w-6xl px-6 py-12">
+    <main id="main" className="mx-auto max-w-6xl px-6 py-8">
       <AppHeader current="history" />
 
       <form method="get" className="mb-6 flex flex-wrap items-end gap-3 text-sm">

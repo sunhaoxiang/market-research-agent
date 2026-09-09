@@ -37,7 +37,9 @@ function MetricChart({ series }: { series: MetricChartSeries }) {
 
   return (
     <figure className="space-y-2" aria-label={label}>
-      <figcaption className="text-sm font-semibold">{title}</figcaption>
+      <figcaption className="text-sm font-medium tracking-tight text-zinc-600 dark:text-zinc-400">
+        {title}
+      </figcaption>
       <div className="h-48 w-full">
         <ResponsiveContainer
           width="100%"

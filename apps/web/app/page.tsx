@@ -27,7 +27,7 @@ export default async function HomePage({
   const costLimitUsd = prefs.limits?.maxSessionCostUsd ?? FALLBACK_LIMITS.maxSessionCostUsd;
 
   return (
-    <main id="main" className="mx-auto max-w-6xl px-6 py-12">
+    <main id="main" className="mx-auto max-w-6xl px-6 py-8">
       <AppHeader current="research" />
 
       {!catalog.ok && (

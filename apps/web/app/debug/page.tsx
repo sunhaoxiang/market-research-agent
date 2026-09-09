@@ -11,7 +11,7 @@ export default async function DebugPage() {
   const providers = await fetchProviderDebug();
 
   return (
-    <main id="main" className="mx-auto max-w-6xl px-6 py-12">
+    <main id="main" className="mx-auto max-w-6xl px-6 py-8">
       <AppHeader current="debug" />
       <DebugDashboard
         snapshot={snapshot}

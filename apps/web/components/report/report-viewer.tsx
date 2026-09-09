@@ -36,14 +36,16 @@ export function ReportViewer({
   );
 
   return (
-    <article className="space-y-5">
-      <header className="space-y-2">
-        <h2 className="text-xs font-medium tracking-wide text-zinc-500 uppercase">Report</h2>
-        <h3 className="text-lg font-semibold">{report.title}</h3>
+    <article className="space-y-8">
+      <header className="max-w-[42rem] space-y-2">
+        <p className="text-[11px] font-medium tracking-[0.16em] text-zinc-500 uppercase">报告</p>
+        <h1 className="text-2xl leading-snug font-semibold tracking-tight text-pretty">
+          {report.title}
+        </h1>
       </header>
 
-      <section>
-        <h4 className="sr-only">摘要</h4>
+      <section className="max-w-[42rem] rounded-lg bg-zinc-100 px-5 py-4 ring-1 ring-zinc-200/80 dark:bg-zinc-900 dark:ring-zinc-800">
+        <h2 className="sr-only">摘要</h2>
         <ReportMarkdown
           markdown={report.executive_summary}
           sourcesByIndex={sourcesByIndex}
@@ -55,9 +57,9 @@ export function ReportViewer({
       {conflicts.length > 0 && (
         <aside
           role="status"
-          className="space-y-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200"
+          className="max-w-[42rem] space-y-2 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-[15px] leading-relaxed text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200"
         >
-          <h4 className="font-semibold">数值冲突</h4>
+          <h2 className="font-semibold">数值冲突</h2>
           <ul className="space-y-2">
             {conflicts.map((item) => (
               <li key={item.description}>
@@ -89,30 +91,31 @@ export function ReportViewer({
             key={section.id}
             className={
               disclaimer || limitations
-                ? "space-y-2 border-t border-dashed border-zinc-200 pt-4 dark:border-zinc-800"
-                : "space-y-2"
+                ? "max-w-[42rem] space-y-3 border-t border-dashed border-zinc-200 pt-6 dark:border-zinc-800"
+                : "max-w-[42rem] space-y-3"
             }
           >
             <div className="flex flex-wrap items-baseline gap-2">
-              <h4
+              <h2
                 className={
                   disclaimer
-                    ? "text-xs font-medium tracking-wide text-zinc-500 uppercase"
-                    : "text-sm font-semibold"
+                    ? "text-[11px] font-medium tracking-[0.16em] text-zinc-500 uppercase"
+                    : "text-lg font-semibold tracking-tight"
                 }
               >
                 {section.title}
-              </h4>
+              </h2>
               {marks.map((mark) => (
                 <EpistemicBadge key={mark.type} mark={mark} />
               ))}
             </div>
-            <div className={disclaimer ? "text-xs text-zinc-500 dark:text-zinc-400" : undefined}>
+            <div>
               <ReportMarkdown
                 markdown={section.markdown}
                 sourcesByIndex={sourcesByIndex}
                 activeIndex={activeIndex}
                 onCite={onCite}
+                muted={disclaimer}
               />
             </div>
           </section>
@@ -120,9 +123,9 @@ export function ReportViewer({
       })}
 
       {!hasDataLimitations && report.data_gaps.length > 0 && (
-        <section className="space-y-2 border-t border-dashed border-zinc-200 pt-4 dark:border-zinc-800">
-          <h4 className="text-sm font-semibold">数据限制</h4>
-          <ul className="list-disc space-y-1 pl-5 text-sm text-zinc-600 dark:text-zinc-400">
+        <section className="max-w-[42rem] space-y-3 border-t border-dashed border-zinc-200 pt-6 dark:border-zinc-800">
+          <h2 className="text-lg font-semibold tracking-tight">数据限制</h2>
+          <ul className="list-disc space-y-1.5 pl-5 text-[15px] leading-relaxed text-zinc-600 dark:text-zinc-400">
             {report.data_gaps.map((gap) => (
               <li key={gap}>{gap}</li>
             ))}

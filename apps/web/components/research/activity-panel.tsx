@@ -106,7 +106,9 @@ export function ActivityPanel({
   return (
     <div className="space-y-4">
       {hideHeading ? null : (
-        <h2 className="text-xs font-medium tracking-wide text-zinc-500 uppercase">研究过程</h2>
+        <h2 className="text-[11px] font-medium tracking-[0.16em] text-zinc-500 uppercase">
+          研究过程
+        </h2>
       )}
 
       <ol className="space-y-1">

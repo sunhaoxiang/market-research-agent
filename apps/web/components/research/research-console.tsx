@@ -171,7 +171,9 @@ export function ResearchConsole({
           </div>
 
           <div className="space-y-2">
-            <p className="text-xs font-medium tracking-wide text-zinc-500 uppercase">试试这些</p>
+            <p className="text-[11px] font-medium tracking-[0.16em] text-zinc-500 uppercase">
+              试试这些
+            </p>
             <ul className="space-y-1">
               {EXAMPLES.map((example) => (
                 <li key={example}>
@@ -190,9 +192,9 @@ export function ResearchConsole({
       ) : (
         <div className="space-y-5" aria-busy={running || restoring}>
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <h2 className="max-w-3xl text-lg leading-snug font-semibold">
+            <p className="max-w-3xl text-sm leading-snug text-zinc-600 dark:text-zinc-400">
               {state.question ?? (restoring ? "正在恢复会话…" : question)}
-            </h2>
+            </p>
             <div className="flex shrink-0 items-center gap-2">
               {running && (
                 <Button
@@ -238,12 +240,16 @@ export function ResearchConsole({
               />
             ) : (
               <div className="space-y-3">
-                <h2 className="text-xs font-medium tracking-wide text-zinc-500 uppercase">报告</h2>
+                <h2 className="text-[11px] font-medium tracking-[0.16em] text-zinc-500 uppercase">
+                  报告
+                </h2>
                 <MetricCharts metrics={state.metrics} />
                 {state.plan ? (
-                  <div className="space-y-3">
-                    <p className="text-sm leading-relaxed">{state.plan.interpretation}</p>
-                    <ol className="list-decimal space-y-1 pl-5 text-sm text-zinc-600 dark:text-zinc-400">
+                  <div className="max-w-[42rem] space-y-3">
+                    <p className="text-[15px] leading-[1.75] text-zinc-800 dark:text-zinc-200">
+                      {state.plan.interpretation}
+                    </p>
+                    <ol className="list-decimal space-y-1.5 pl-5 text-[15px] leading-relaxed text-zinc-600 dark:text-zinc-400">
                       {state.plan.tasks.map((task) => (
                         <li key={task.id}>{task.objective}</li>
                       ))}

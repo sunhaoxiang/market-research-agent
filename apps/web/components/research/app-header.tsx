@@ -5,17 +5,20 @@ import { cn } from "@/lib/utils";
 
 export function AppHeader({ current }: { current: "research" | "history" | "settings" | "debug" }) {
   return (
-    <header className="mb-8 flex flex-wrap items-end justify-between gap-4">
-      <div>
-        <h1 className="text-xl font-semibold">
-          <Link href="/" className="hover:underline">
+    <header className="mb-8 flex flex-wrap items-center justify-between gap-4 border-b border-zinc-200 pb-5 dark:border-zinc-800">
+      <Link
+        href="/"
+        aria-label="Market Research Agent — Crypto 与美股研究"
+        className="focus-visible:ring-accent flex items-center gap-3 rounded-md focus-visible:ring-2 focus-visible:outline-none"
+      >
+        <BrandMark />
+        <span className="flex flex-col">
+          <span className="text-[15px] leading-none font-semibold tracking-tight">
             Market Research Agent
-          </Link>
-        </h1>
-        <p className="mt-1 text-sm text-zinc-500">
-          AI Financial Research Platform — Crypto &amp; US Stocks
-        </p>
-      </div>
+          </span>
+          <span className="mt-1.5 text-[11px] leading-none text-zinc-500">Crypto · 美股研究</span>
+        </span>
+      </Link>
       <nav aria-label="主导航" className="flex gap-4 text-sm">
         <NavLink href={"/" as Route} active={current === "research"}>
           研究
@@ -31,6 +34,22 @@ export function AppHeader({ current }: { current: "research" | "history" | "sett
         </NavLink>
       </nav>
     </header>
+  );
+}
+
+function BrandMark() {
+  return (
+    <svg viewBox="0 0 32 32" width="32" height="32" aria-hidden className="text-accent shrink-0">
+      <rect width="32" height="32" rx="8" fill="currentColor" />
+      <polyline
+        points="6.5,21.5 12,15.5 16.5,19 25.5,9.5"
+        fill="none"
+        stroke="var(--accent-contrast)"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
 

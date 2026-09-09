@@ -116,6 +116,37 @@ describe("引用交互", () => {
     expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalled();
   });
 
+  it("连续 [n] 收成一组 pill，点其中某一个仍高亮对应来源", () => {
+    const second: Source = {
+      ...SOURCE,
+      id: "src-2",
+      ref: "s2",
+      url: "https://coingecko.com/hype",
+      url_canonical: "https://coingecko.com/hype",
+      title: "HYPE price",
+      domain: "coingecko.com",
+      citation_index: 2,
+    };
+    render(
+      <Shell
+        report={{
+          ...REPORT,
+          executive_summary: "多源交叉验证。[1][2]",
+          sections: [{ ...REPORT.sections[0]!, markdown: "见上文。", claim_ids: [] }],
+        }}
+        sources={[SOURCE, second]}
+        claims={[]}
+      />,
+    );
+
+    expect(screen.getByRole("group", { name: "来源 1、2" })).toBeDefined();
+    fireEvent.click(screen.getByRole("link", { name: "来源 2：HYPE price" }));
+
+    const source = screen.getByRole("button", { name: "来源 2：HYPE price" });
+    expect(source.getAttribute("aria-current")).toBe("true");
+    expect(source).toBe(document.activeElement);
+  });
+
   it("来源行展示 domain、时间与摘录", () => {
     render(<Shell />);
 
