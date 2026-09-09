@@ -74,7 +74,7 @@ function MetricChart({ series }: { series: MetricChartSeries }) {
             <Line
               type="monotone"
               dataKey="value"
-              stroke="#2563eb"
+              stroke="var(--accent)"
               strokeWidth={2}
               dot={false}
               isAnimationActive={false}

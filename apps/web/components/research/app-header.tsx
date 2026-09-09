@@ -40,10 +40,10 @@ function NavLink({ href, active, children }: { href: Route; active: boolean; chi
       href={href}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "underline-offset-4",
+        "focus-visible:ring-accent rounded-sm underline-offset-4 focus-visible:ring-2 focus-visible:outline-none",
         active
-          ? "font-medium text-zinc-900 focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:outline-none dark:text-zinc-100"
-          : "text-zinc-500 hover:text-zinc-800 hover:underline focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:outline-none dark:hover:text-zinc-200",
+          ? "text-accent-text font-medium"
+          : "text-zinc-500 hover:text-zinc-800 hover:underline dark:hover:text-zinc-200",
       )}
     >
       {children}

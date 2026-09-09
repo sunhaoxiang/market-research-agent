@@ -81,12 +81,12 @@ function SourceRow({
         onClick={() => onSelect(index)}
         className={cn(
           "w-full rounded-md px-2 py-1.5 text-left text-xs transition",
-          "hover:bg-zinc-100 focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:outline-none dark:hover:bg-zinc-800",
+          "focus-visible:ring-accent hover:bg-zinc-100 focus-visible:ring-2 focus-visible:outline-none dark:hover:bg-zinc-800",
           active && "bg-amber-50 ring-1 ring-amber-400 dark:bg-amber-950/40",
         )}
       >
         <span className="flex items-baseline gap-2">
-          <span className="font-mono font-medium text-blue-700 dark:text-blue-400">[{index}]</span>
+          <span className="text-accent-text font-mono font-medium">[{index}]</span>
           <span className="min-w-0 truncate font-medium text-zinc-800 dark:text-zinc-100">
             {label}
           </span>

@@ -6,7 +6,7 @@ import { cn, formatCost, formatDuration, formatTokens } from "@/lib/utils";
 
 const STATUS_DOT: Record<ResearchViewState["status"], string> = {
   idle: "bg-zinc-300 dark:bg-zinc-600",
-  running: "motion-safe:animate-pulse bg-blue-500",
+  running: "motion-safe:animate-pulse bg-accent",
   completed: "bg-emerald-500",
   failed: "bg-amber-500",
   cancelled: "bg-zinc-400",

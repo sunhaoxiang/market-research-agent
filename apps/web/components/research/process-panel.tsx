@@ -24,7 +24,7 @@ export function ProcessPanel({ state, now }: { state: ResearchViewState; now: nu
         aria-expanded={open}
         aria-controls="research-process"
         onClick={() => setUserOpen(!open)}
-        className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-zinc-50 focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:outline-none dark:hover:bg-zinc-900"
+        className="focus-visible:ring-accent flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-zinc-50 focus-visible:ring-2 focus-visible:outline-none dark:hover:bg-zinc-900"
       >
         <span className="font-medium">研究过程</span>
         <span className="text-xs text-zinc-400">{open ? "收起" : "展开"}</span>

@@ -7,12 +7,27 @@
   --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 }
 
+/*
+ * 品牌主色是靛蓝而不是默认蓝：报告正文里 `[n]` 角标密集，用亮蓝会和正文抢注意力，
+ * 而深一档的靛蓝在小字号下仍能和纯文本区分开。
+ *
+ * 只此一个彩色。中性灰负责其余全部层级——多一个品牌色，页面就会开始像拼贴。
+ */
 :root {
   --background: #ffffff;
   --foreground: #0a0a0a;
   --muted: #f4f4f5;
   --muted-foreground: #71717a;
   --border: #e4e4e7;
+
+  --accent: #3538cd;
+  --accent-hover: #2b2ea8;
+  /* 主色块上的文字。不用 --background：主色在深色模式下仍是深底白字 */
+  --accent-contrast: #ffffff;
+  /* hover / 选中态的浅色底 */
+  --accent-subtle: #eef2ff;
+  /* 正文里的链接与角标。要在白底上过 4.5:1，比 --accent 本身更保守 */
+  --accent-text: #3730a3;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -22,7 +37,26 @@
     --muted: #18181b;
     --muted-foreground: #a1a1aa;
     --border: #27272a;
+
+    /* 深色底上要提亮，否则靛蓝会糊进背景 */
+    --accent: #6366f1;
+    --accent-hover: #818cf8;
+    --accent-contrast: #ffffff;
+    --accent-subtle: #1e1b4b;
+    --accent-text: #a5b4fc;
   }
+}
+
+/*
+ * inline 而非普通 @theme：普通模式会把 var() 在 :root 处解析定值，
+ * 将来若改成 .dark 类切换主题（而不是 media query），颜色就不会跟着变。
+ */
+@theme inline {
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-contrast: var(--accent-contrast);
+  --color-accent-subtle: var(--accent-subtle);
+  --color-accent-text: var(--accent-text);
 }
 
 body {

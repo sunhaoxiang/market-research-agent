@@ -51,7 +51,7 @@ export function DebugDashboard({
               <li key={row.id}>
                 <Link
                   href={`/?session=${encodeURIComponent(row.id)}` as Route}
-                  className="block rounded-md focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:outline-none"
+                  className="block rounded-md focus-visible:ring-accent focus-visible:ring-2 focus-visible:outline-none"
                 >
                   <p className="text-sm font-medium">{row.question}</p>
                   <p className="mt-1 text-xs text-zinc-500">
@@ -194,7 +194,7 @@ function RankingTable({
 }) {
   return (
     <div
-      className="overflow-x-auto rounded-md focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:outline-none"
+      className="overflow-x-auto rounded-md focus-visible:ring-accent focus-visible:ring-2 focus-visible:outline-none"
       tabIndex={0}
       role="region"
       aria-label={caption}

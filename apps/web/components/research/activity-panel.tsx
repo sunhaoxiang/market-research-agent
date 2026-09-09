@@ -68,7 +68,7 @@ function TaskRow({ task, now }: { task: TaskNode; now: number }) {
           </p>
 
           {expanded && task.progress && (
-            <p className="mt-0.5 text-xs text-blue-600 dark:text-blue-400">{task.progress}</p>
+            <p className="text-accent-text mt-0.5 text-xs">{task.progress}</p>
           )}
           {task.status === "failed" && task.error && (
             <p className="mt-0.5 text-xs text-amber-600 dark:text-amber-500">

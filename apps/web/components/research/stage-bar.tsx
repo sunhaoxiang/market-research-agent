@@ -7,9 +7,10 @@ import type { Stage } from "@mra/shared";
 import { STAGE_LABELS } from "@/lib/research/stages";
 import { cn, formatDuration } from "@/lib/utils";
 
+/** researching 用主色而非另一个蓝：它和「进行中」的状态点常常同屏，两种蓝会像是配错了。 */
 export const STAGE_TONE: Record<Stage, string> = {
   planning: "bg-zinc-400 dark:bg-zinc-500",
-  researching: "bg-blue-500",
+  researching: "bg-accent",
   checking: "bg-violet-500",
   writing: "bg-emerald-500",
 };

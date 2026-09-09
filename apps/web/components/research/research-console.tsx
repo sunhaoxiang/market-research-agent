@@ -178,7 +178,7 @@ export function ResearchConsole({
                   <button
                     type="button"
                     onClick={() => setQuestion(example)}
-                    className="text-left text-sm text-zinc-500 underline-offset-2 hover:text-zinc-900 hover:underline focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:outline-none dark:hover:text-zinc-100"
+                    className="focus-visible:ring-accent rounded-sm text-left text-sm text-zinc-500 underline-offset-2 hover:text-zinc-900 hover:underline focus-visible:ring-2 focus-visible:outline-none dark:hover:text-zinc-100"
                   >
                     {example}
                   </button>

@@ -38,7 +38,7 @@ export function ReportMarkdown({
         "[&_table]:my-2 [&_table]:w-full [&_table]:text-xs",
         "[&_th]:border [&_th]:border-zinc-200 [&_th]:px-2 [&_th]:py-1 dark:[&_th]:border-zinc-700",
         "[&_td]:border [&_td]:border-zinc-200 [&_td]:px-2 [&_td]:py-1 dark:[&_td]:border-zinc-700",
-        "[&_a]:text-blue-700 [&_a]:underline-offset-2 hover:[&_a]:underline dark:[&_a]:text-blue-400",
+        "[&_a]:text-accent-text [&_a]:underline-offset-2 hover:[&_a]:underline",
       )}
     >
       <Markdown
@@ -101,7 +101,7 @@ function CitationLink({
         }}
         className={cn(
           "mx-0.5 inline-flex translate-y-px rounded px-0.5 text-xs font-medium no-underline",
-          "text-blue-700 hover:bg-blue-50 focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:outline-none dark:text-blue-400 dark:hover:bg-blue-950",
+          "text-accent-text hover:bg-accent-subtle focus-visible:ring-accent focus-visible:ring-2 focus-visible:outline-none",
           active &&
             "bg-amber-200 text-amber-950 ring-1 ring-amber-400 dark:bg-amber-900 dark:text-amber-100",
         )}
