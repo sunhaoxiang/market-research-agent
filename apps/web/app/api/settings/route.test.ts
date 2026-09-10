@@ -28,8 +28,8 @@ beforeEach(() => {
     ok: true,
     data: {
       models: [],
-      role_defaults: { planner: "deepseek:deepseek-v4-pro" },
-      default_model_id: "deepseek:deepseek-v4-pro",
+      role_defaults: { planner: "deepseek:deepseek-flash" },
+      default_model_id: "deepseek:deepseek-flash",
       limits: {
         max_tasks_per_plan: 6,
         max_parallel_tasks: 2,
@@ -50,7 +50,7 @@ describe("GET/PATCH /api/settings", () => {
       defaults: { defaultModelId: string };
     };
     expect(body.preferences.defaultModelId).toBeNull();
-    expect(body.defaults.defaultModelId).toBe("deepseek:deepseek-v4-pro");
+    expect(body.defaults.defaultModelId).toBe("deepseek:deepseek-flash");
   });
 
   it("PATCH 之后能读回来", async () => {

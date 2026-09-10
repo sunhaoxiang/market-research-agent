@@ -121,7 +121,7 @@ class Settings(BaseSettings):
     agent_cache_db: Path = REPO_ROOT / "data" / "provider-cache.db"
 
     # ── 模型（见 §9.5 / §9.7）。开发期用国内模型，上线切 OpenAI 只改环境变量
-    default_model_id: str = "deepseek:deepseek-v4-pro"
+    default_model_id: str = "deepseek:deepseek-flash"
     model_role_planner: OptionalText = None
     model_role_balanced: OptionalText = None
     model_role_fast: OptionalText = None

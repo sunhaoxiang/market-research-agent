@@ -43,7 +43,7 @@ def _verified_note(provider: ProviderId) -> str:
     if provider is ProviderId.DEEPSEEK:
         return (
             "json_mode 完整研究已在 Phase 2–4 真跑通过。"
-            "deepseek-v4-flash 覆盖 FAST 角色，不作为 planner。"
+            "deepseek-flash（V4.1 Flash）现为四角色默认，含 planner。"
         )
     return "完整研究冒烟已通过。"
 

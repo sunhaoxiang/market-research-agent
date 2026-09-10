@@ -43,7 +43,7 @@ function catalogDefaults(
 ): SettingsPayload["defaults"] {
   if (!catalog.ok) {
     return {
-      defaultModelId: "deepseek:deepseek-v4-pro",
+      defaultModelId: "deepseek:deepseek-flash",
       roleModels: {},
       limits: FALLBACK_LIMITS,
     };

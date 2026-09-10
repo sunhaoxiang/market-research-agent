@@ -3,7 +3,7 @@
 刻意不做成 pytest：真实计费、结果不确定，不能进 CI。
 
     uv run python scripts/probe_planner.py                       # 对比全部候选
-    uv run python scripts/probe_planner.py deepseek:deepseek-v4-flash
+    uv run python scripts/probe_planner.py deepseek:deepseek-flash
 
 验收标准（DEVELOPMENT_PLAN §7.3 / ROADMAP P1-9）：三个样例问题都能产出
 **无需修复即通过语义校验**的计划。`validate_plan` 报出的 issue 越多说明 prompt
@@ -26,7 +26,7 @@ from agent_service.observability.cost import cost_usd, to_token_usage
 from agent_service.orchestrator.plan_validation import ValidatedPlan
 from agent_service.orchestrator.planner import create_plan
 
-CANDIDATES = ["deepseek:deepseek-v4-flash", "deepseek:deepseek-v4-pro"]
+CANDIDATES = ["deepseek:deepseek-flash", "deepseek:deepseek-v4-flash", "deepseek:deepseek-v4-pro"]
 """默认对比项。
 
 原本的猜想是「v4-pro 单次 17-60 秒太慢，换 flash」，实测否证了它：

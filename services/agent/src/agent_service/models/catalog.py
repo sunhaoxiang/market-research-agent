@@ -41,12 +41,26 @@ def _cny(amount: float) -> float:
     return round(amount / CNY_PER_USD, 4)
 
 
+def _half_price(prices: TokenPrices) -> TokenPrices:
+    """闲时价 = 高峰的一半。用除法而不是再 round(_cny)，避免 0.1408 vs 0.14085。"""
+    cached = None if prices.cached_input is None else prices.cached_input / 2
+    return TokenPrices(input=prices.input / 2, output=prices.output / 2, cached_input=cached)
+
+
 DEEPSEEK_PEAK = PeakSchedule(
     timezone="Asia/Shanghai",
     weekdays_only=True,
     hour_windows=[(9, 12), (14, 18)],
 )
 """DeepSeek 高峰时段：北京时间工作日 09-12、14-18，其余（含周末全天）价格减半。"""
+
+_FLASH_PEAK = TokenPrices(input=_cny(2), output=_cny(8), cached_input=_cny(0.04))
+_FLASH_PRICING = Pricing(
+    peak=_FLASH_PEAK,
+    off_peak=_half_price(_FLASH_PEAK),
+    schedule=DEEPSEEK_PEAK,
+)
+"""V4.1 Flash / 已路由的 Flash 系列：官方 2026-09-10 调价（¥/MTok，闲时半价）。"""
 
 
 class ModelEntry(Schema):
@@ -68,12 +82,42 @@ class ModelEntry(Schema):
 
 
 _VERIFIED = date(2026, 9, 7)
+_VERIFIED_FLASH = date(2026, 9, 10)
 
 
 CATALOG: tuple[ModelEntry, ...] = (
     # ─────────────────────────────────────────────────────────────────────────
     # DeepSeek —— 开发期主力
     # ─────────────────────────────────────────────────────────────────────────
+    ModelEntry(
+        id="deepseek:deepseek-flash",
+        provider=ProviderId.DEEPSEEK,
+        upstream_model="deepseek-flash",
+        adapter=AdapterKind.OPENAI_CHAT,
+        display_name="DeepSeek V4.1 Flash",
+        verified_at=_VERIFIED_FLASH,
+        verified=True,
+        notes=(
+            "2026-09-10 上线的默认模型。官方 API 名 `deepseek-flash`；"
+            "性能、费用、速度宣称全面超过 V4 Pro，"
+            "四角色（PLANNER / BALANCED / FAST / WRITING）均指向它。"
+            "原生多模态、1M 上下文；结构化输出仍按 json_mode"
+            "（与其它 DeepSeek 条目相同）。"
+            "json_mode 路径已在 V4 Pro / V4 Flash 上冒烟通过；"
+            "本条目沿用同一适配器，未单独重跑完整研究。"
+        ),
+        capabilities=ModelCapabilities(
+            tool_calling=True,
+            parallel_tool_calls=True,
+            structured_output=StructuredOutputMode.JSON_MODE,
+            streaming=True,
+            reasoning=True,
+            vision=True,
+            context_window=1_000_000,
+            max_output_tokens=384_000,
+            pricing=_FLASH_PRICING,
+        ),
+    ),
     ModelEntry(
         id="deepseek:deepseek-v4-pro",
         provider=ProviderId.DEEPSEEK,
@@ -83,14 +127,13 @@ CATALOG: tuple[ModelEntry, ...] = (
         verified_at=_VERIFIED,
         verified=True,
         notes=(
-            "开发期 PLANNER / BALANCED / WRITING 的默认模型。"
+            "兼容条目，不再作为角色默认。"
             "json_mode 已实测确认：发送 response_format=json_schema 会被 400 拒绝，"
             'message 为 "This response_format type is unavailable now"，只支持 json_object。'
-            "planner 场景实测单次 17-60s，输出 1.1k-4k token，延迟与输出量正相关；"
-            "三个样例问题 3/3 产出无需修复的合法计划，故保留为 PLANNER 默认。"
             "偶发返回 200 + 空 content（见 EmptyOutputError），已按可重试处理。"
-            "P5-9（2026-09-08）：完整研究冒烟通过（Phase 2–4 真跑，json_mode）；"
-            "本机仅有 DeepSeek key，未对其它 provider 重跑。"
+            "P5-9（2026-09-08）：完整研究冒烟通过（Phase 2–4 真跑，json_mode）。"
+            "官方：北京时间 2026-09-14 12:00 起，"
+            "deepseek-v4-pro 将路由到 V4.1 Flash 并按 Flash 单价计费。"
         ),
         capabilities=ModelCapabilities(
             tool_calling=True,
@@ -114,15 +157,12 @@ CATALOG: tuple[ModelEntry, ...] = (
         upstream_model="deepseek-v4-flash",
         adapter=AdapterKind.OPENAI_CHAT,
         display_name="DeepSeek V4 Flash",
-        verified_at=_VERIFIED,
+        verified_at=_VERIFIED_FLASH,
         verified=True,
         notes=(
-            "开发期 FAST 的默认模型：意图分类与 Web Research。"
-            "**不适合做 planner**（P1-9 实测）：它同样是推理模型，规划这类任务上"
-            "输出 4.3k-4.7k token（v4-pro 只要 2.1k-2.7k），因此中位延迟 42s"
-            "反而略高于 v4-pro 的 38s，价格优势也被输出量吃掉大半；"
-            "同一问题连跑 5 次有 1 次返回空 content，延迟方差 14-71s。"
-            "P5-9：同一真跑会话的 FAST 角色已覆盖；不作为 planner。"
+            "兼容条目。官方已下线独立服务，deepseek-v4-flash 暂时路由到 V4.1 Flash，"
+            "按 Flash 系列 2026-09-10 单价计费。新调用请用 `deepseek:deepseek-flash`。"
+            "P5-9：同一真跑会话的 FAST 角色已覆盖。"
         ),
         capabilities=ModelCapabilities(
             tool_calling=True,
@@ -130,14 +170,10 @@ CATALOG: tuple[ModelEntry, ...] = (
             structured_output=StructuredOutputMode.JSON_MODE,
             streaming=True,
             reasoning=True,
-            vision=False,
+            vision=True,
             context_window=1_000_000,
             max_output_tokens=384_000,
-            pricing=Pricing(
-                peak=TokenPrices(input=0.44, output=1.32, cached_input=0.014),
-                off_peak=TokenPrices(input=0.22, output=0.66, cached_input=0.007),
-                schedule=DEEPSEEK_PEAK,
-            ),
+            pricing=_FLASH_PRICING,
         ),
     ),
     # ─────────────────────────────────────────────────────────────────────────
@@ -348,10 +384,10 @@ CATALOG: tuple[ModelEntry, ...] = (
 
 
 ROLE_DEFAULTS: dict[ModelRole, str] = {
-    ModelRole.PLANNER: "deepseek:deepseek-v4-pro",
-    ModelRole.BALANCED: "deepseek:deepseek-v4-pro",
-    ModelRole.FAST: "deepseek:deepseek-v4-flash",
-    ModelRole.WRITING: "deepseek:deepseek-v4-pro",
+    ModelRole.PLANNER: "deepseek:deepseek-flash",
+    ModelRole.BALANCED: "deepseek:deepseek-flash",
+    ModelRole.FAST: "deepseek:deepseek-flash",
+    ModelRole.WRITING: "deepseek:deepseek-flash",
 }
 """角色 → 模型的兜底映射（§9.5）。环境变量 `MODEL_ROLE_*` 优先于此。"""
 

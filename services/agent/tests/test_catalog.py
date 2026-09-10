@@ -49,6 +49,7 @@ def test_dev_defaults_are_deepseek() -> None:
     """开发期默认必须是国内模型；改回 OpenAI 时这个断言会提醒同步更新 .env.example。"""
     for model_id in ROLE_DEFAULTS.values():
         assert model_id.startswith("deepseek:")
+    assert set(ROLE_DEFAULTS.values()) == {"deepseek:deepseek-flash"}
 
 
 def test_unknown_model_error_lists_alternatives() -> None:
@@ -59,7 +60,7 @@ def test_unknown_model_error_lists_alternatives() -> None:
 
 def test_list_entries_filters_by_provider() -> None:
     deepseek = list_entries(ProviderId.DEEPSEEK)
-    assert len(deepseek) == 2
+    assert len(deepseek) == 3
     assert all(entry.provider is ProviderId.DEEPSEEK for entry in deepseek)
     assert list_entries() == CATALOG
 
@@ -114,7 +115,11 @@ def test_peak_schedule_respects_timezone() -> None:
 
 
 def test_off_peak_is_half_of_peak() -> None:
-    for model_id in ("deepseek:deepseek-v4-pro", "deepseek:deepseek-v4-flash"):
+    for model_id in (
+        "deepseek:deepseek-flash",
+        "deepseek:deepseek-v4-pro",
+        "deepseek:deepseek-v4-flash",
+    ):
         pricing = get_entry(model_id).capabilities.pricing
         assert pricing is not None
         assert pricing.off_peak is not None
@@ -208,7 +213,11 @@ def test_only_kimi_and_openai_claim_native_schema() -> None:
 def test_only_deepseek_is_smoke_verified() -> None:
     """P5-9：本机只有 DeepSeek key，完整研究冒烟只标这两条。"""
     verified = {entry.id for entry in CATALOG if entry.verified}
-    assert verified == {"deepseek:deepseek-v4-pro", "deepseek:deepseek-v4-flash"}
+    assert verified == {
+        "deepseek:deepseek-flash",
+        "deepseek:deepseek-v4-pro",
+        "deepseek:deepseek-v4-flash",
+    }
 
 
 def test_peak_schedule_hour_windows_are_well_formed() -> None:

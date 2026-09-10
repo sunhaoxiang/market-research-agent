@@ -627,5 +627,5 @@ def test_role_and_limit_overrides_from_options(
         ).text
     )
     assert seen["fast"] == "deepseek:deepseek-v4-flash"
-    assert seen["planner"] == "deepseek:deepseek-v4-pro"
+    assert seen["planner"] == "deepseek:deepseek-flash"
     assert seen["max_tasks"] == 3

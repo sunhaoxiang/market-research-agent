@@ -32,7 +32,11 @@ def clear_provider_keys(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_only_deepseek_entries_are_smoke_verified() -> None:
     verified = {entry.id for entry in CATALOG if entry.verified}
-    assert verified == {"deepseek:deepseek-v4-pro", "deepseek:deepseek-v4-flash"}
+    assert verified == {
+        "deepseek:deepseek-flash",
+        "deepseek:deepseek-v4-pro",
+        "deepseek:deepseek-v4-flash",
+    }
 
 
 def test_price_verified_is_not_smoke_verified() -> None:
@@ -82,6 +86,7 @@ def test_only_deepseek_key_marks_others_skipped() -> None:
     deepseek = reports[ProviderId.DEEPSEEK]
     assert deepseek.status is SmokeStatus.VERIFIED
     assert deepseek.verified_model_ids == [
+        "deepseek:deepseek-flash",
         "deepseek:deepseek-v4-pro",
         "deepseek:deepseek-v4-flash",
     ]

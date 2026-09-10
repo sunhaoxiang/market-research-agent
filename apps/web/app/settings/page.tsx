@@ -40,7 +40,7 @@ export default async function SettingsPage() {
         models={models}
         initial={preferences}
         defaults={{
-          defaultModelId: catalog.ok ? catalog.data.default_model_id : "deepseek:deepseek-v4-pro",
+          defaultModelId: catalog.ok ? catalog.data.default_model_id : "deepseek:deepseek-flash",
           roleModels: catalog.ok ? catalog.data.role_defaults : {},
           limits,
         }}

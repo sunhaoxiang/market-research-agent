@@ -60,7 +60,11 @@ def test_only_configured_provider_is_available(clean_env: pytest.MonkeyPatch) ->
     registry = _registry(clean_env, DEEPSEEK_API_KEY="sk-test")
 
     available = {entry.id for entry in registry.available_entries()}
-    assert available == {"deepseek:deepseek-v4-pro", "deepseek:deepseek-v4-flash"}
+    assert available == {
+        "deepseek:deepseek-flash",
+        "deepseek:deepseek-v4-pro",
+        "deepseek:deepseek-v4-flash",
+    }
 
     reasons = registry.unavailable_reasons()
     assert "deepseek:deepseek-v4-pro" not in reasons
@@ -163,8 +167,8 @@ def test_different_providers_get_different_clients(clean_env: pytest.MonkeyPatch
 def test_roles_fall_back_to_catalog_defaults(clean_env: pytest.MonkeyPatch) -> None:
     registry = _registry(clean_env, DEEPSEEK_API_KEY="sk-test")
 
-    assert registry.model_id_for_role(ModelRole.PLANNER) == "deepseek:deepseek-v4-pro"
-    assert registry.model_id_for_role(ModelRole.FAST) == "deepseek:deepseek-v4-flash"
+    assert registry.model_id_for_role(ModelRole.PLANNER) == "deepseek:deepseek-flash"
+    assert registry.model_id_for_role(ModelRole.FAST) == "deepseek:deepseek-flash"
 
 
 def test_env_override_wins_over_catalog_default(clean_env: pytest.MonkeyPatch) -> None:

@@ -99,7 +99,7 @@ def test_role_defaults_reflect_env_overrides(monkeypatch: pytest.MonkeyPatch) ->
     body = TestClient(create_app()).get("/v1/models").json()
 
     assert body["role_defaults"]["fast"] == "zhipu:glm-5.3-flash"
-    assert body["role_defaults"]["balanced"] == "deepseek:deepseek-v4-pro"
+    assert body["role_defaults"]["balanced"] == "deepseek:deepseek-flash"
     assert body["limits"]["max_tasks_per_plan"] >= 1
     assert body["limits"]["max_parallel_tasks"] >= 1
     get_settings.cache_clear()
