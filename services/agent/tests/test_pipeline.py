@@ -20,6 +20,7 @@ from pydantic import SecretStr
 
 from agent_service.agents.report_writer import ReportWriterAgent, build_report_writer
 from agent_service.agents.research_manager import PlannerAgent, build_research_manager
+from agent_service.models.catalog import ROLE_DEFAULTS
 from agent_service.models.registry import ModelRegistry
 from agent_service.observability.event_bus import EventBus
 from agent_service.orchestrator.executor import TaskContext
@@ -30,6 +31,7 @@ from agent_service.schemas.common import (
     AgentName,
     ConfidenceLevel,
     EpistemicType,
+    ModelRole,
     QuestionType,
     SourceType,
     Stage,
@@ -572,7 +574,7 @@ async def test_planner_run_records_prompt_and_model() -> None:
         if isinstance(e, AgentRunMetricsEvent) and e.payload.agent is AgentName.RESEARCH_MANAGER
     ]
     assert metrics.payload.agent is AgentName.RESEARCH_MANAGER
-    assert metrics.payload.model_id == "deepseek:deepseek-v4-pro"
+    assert metrics.payload.model_id == ROLE_DEFAULTS[ModelRole.PLANNER]
     # 规划不属于计划里的任何任务，所以没有 task_id
     assert metrics.payload.task_id is None
     assert metrics.payload.prompt is not None
