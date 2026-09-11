@@ -29,10 +29,10 @@ jobs:
         run: uv sync --locked
 
       - name: Ruff lint
-        run: uv run ruff check --output-format=github .
+        run: uv run ruff check --output-format=github . ../../evals
 
       - name: Ruff format
-        run: uv run ruff format --check .
+        run: uv run ruff format --check . ../../evals
 
       - name: Type check
         run: uv run basedpyright

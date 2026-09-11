@@ -44,6 +44,9 @@ target-version = "py313"
 line-length = 100
 src = ["src", "tests"]
 
+[tool.ruff.lint.isort]
+known-first-party = ["agent_service", "evals"]
+
 [tool.ruff.lint]
 select = [
     "E",      # pycodestyle errors
@@ -86,7 +89,8 @@ ban-relative-imports = "parents"
 [tool.basedpyright]
 pythonVersion = "3.13"
 typeCheckingMode = "standard"
-include = ["src", "tests"]
+include = ["src", "tests", "../../evals"]
+extraPaths = ["src", "../.."]
 reportMissingTypeStubs = false
 reportUnknownMemberType = false
 reportUnknownVariableType = false
@@ -99,6 +103,7 @@ reportExplicitAny = false
 # ─────────────────────────────────────────────────────────────────────────────
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["src", "../.."]
 asyncio_mode = "auto"
 addopts = "-ra --strict-markers"
 markers = [

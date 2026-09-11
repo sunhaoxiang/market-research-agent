@@ -1,0 +1,3 @@
+{"id":"smoke-echo-empty","suite":"smoke","question":"","expected":{"echo":""},"tags":["offline","harness"]}
+{"id":"smoke-echo-ascii","suite":"smoke","question":"ping","expected":{"echo":"ping"},"tags":["offline","harness"]}
+{"id":"smoke-echo-zh","suite":"smoke","question":"分析 NVDA 最近一季财报","expected":{"echo":"分析 NVDA 最近一季财报"},"tags":["offline","harness"]}

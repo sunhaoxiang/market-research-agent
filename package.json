@@ -22,10 +22,11 @@
     "db:generate": "pnpm --filter @mra/web db:generate",
     "db:migrate": "pnpm --filter @mra/web db:migrate",
     "db:studio": "pnpm --filter @mra/web db:studio",
-    "py:lint": "cd services/agent && uv run ruff check .",
-    "py:format": "cd services/agent && uv run ruff format .",
+    "py:lint": "cd services/agent && uv run ruff check . ../../evals",
+    "py:format": "cd services/agent && uv run ruff format . ../../evals",
     "py:typecheck": "cd services/agent && uv run basedpyright",
     "py:test": "cd services/agent && uv run pytest -m 'not live'",
+    "eval": "./scripts/eval.sh",
     "check": "pnpm gen:types && pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm py:lint && pnpm py:format --check && pnpm py:typecheck && pnpm py:test",
     "prepare": "husky"
   },
