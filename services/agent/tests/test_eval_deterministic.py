@@ -277,3 +277,34 @@ def test_seed_tool_selection_dataset_matches_filename() -> None:
         assert wanted, case.id
         assert recorded, case.id
         assert wanted <= recorded
+
+
+def _assert_report_ground_truth(stem: str) -> None:
+    cases = load_jsonl(DATASETS_DIR / f"{stem}.jsonl")
+    assert len(cases) >= 15
+    assert all(case.suite == stem for case in cases)
+    for case in cases:
+        metrics = case.expected.get("metrics") or []
+        sections = case.expected.get("report_sections") or []
+        observation = (case.fixtures or {}).get("observation") or {}
+        assert isinstance(metrics, list) and metrics, case.id
+        assert isinstance(sections, list) and sections, case.id
+        for item in metrics:
+            assert isinstance(item, dict) and "name" in item and "value" in item, case.id
+        assert observation.get("claims"), case.id
+        assert observation.get("sources"), case.id
+        assert observation.get("sections"), case.id
+        assert observation.get("executive_summary"), case.id
+        assert observation.get("metrics"), case.id
+
+
+def test_seed_crypto_project_has_ground_truth() -> None:
+    _assert_report_ground_truth("crypto_project")
+
+
+def test_seed_stock_analysis_has_ground_truth() -> None:
+    _assert_report_ground_truth("stock_analysis")
+
+
+def test_seed_financial_report_has_ground_truth() -> None:
+    _assert_report_ground_truth("financial_report")
