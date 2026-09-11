@@ -43,6 +43,7 @@ class MetricName(StrEnum):
     NUMERIC_ACCURACY = "numeric_accuracy"
     LATENCY_P50_S = "latency_p50_s"
     COST_PER_RUN = "cost_per_run"
+    INJECTION_DETECTION_RATE = "injection_detection_rate"
 
 
 class EvalCase(EvalModel):

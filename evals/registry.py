@@ -8,7 +8,7 @@ from typing import Protocol
 from evals.graders.deterministic import DeterministicGrader
 from evals.graders.llm_judge import JudgeProducer, LlmJudgeGrader
 from evals.graders.smoke import SmokeGrader, SmokeProducer
-from evals.producers import FixtureProducer, IntentRoutingProducer
+from evals.producers import FixtureProducer, IntentRoutingProducer, PromptInjectionProducer
 from evals.schemas import EvalCase, GradeResult, Observation
 
 
@@ -42,4 +42,8 @@ SUITE_HARNESS: dict[str, SuiteHarness] = {
     "financial_report": SuiteHarness(producer=_FIXTURE, grader=_DETERMINISTIC),
     "fact_check": SuiteHarness(producer=_JUDGE_PRODUCER, grader=_LLM_JUDGE),
     "epistemic_labeling": SuiteHarness(producer=_JUDGE_PRODUCER, grader=_LLM_JUDGE),
+    "prompt_injection": SuiteHarness(
+        producer=PromptInjectionProducer(),
+        grader=_DETERMINISTIC,
+    ),
 }
