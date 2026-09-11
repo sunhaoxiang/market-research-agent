@@ -153,7 +153,7 @@ def test_cli_smoke_writes_report(tmp_path: Path) -> None:
 
 
 def test_cli_unknown_suite() -> None:
-    assert main(["--suite", "intent_routing"]) == 2
+    assert main(["--suite", "not_a_suite"]) == 2
 
 
 def test_cli_list(capsys: pytest.CaptureFixture[str]) -> None:

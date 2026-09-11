@@ -6,7 +6,7 @@
 > **每完成一个任务就更新此表的状态**；每完成一个阶段，跑 `[DP §26]` 的收尾清单并写阶段小结。
 
 - 最后更新：2026-09-11
-- 当前阶段：**P7 进行中**（P7-1 完成）。P6 全部完成（含 Playwright E2E）。
+- 当前阶段：**P7 进行中**（P7-2 完成）。P6 全部完成（含 Playwright E2E）。
 
 ### 已确认的前置决策（2026-09-07）
 
@@ -44,7 +44,7 @@
 | P5    | Multi-Agent 完整编排            | 9      | ✅   | Fact Checker / 并行 / 报告结构   |
 | P5.5  | **MVP 验收**                    | 1      | ✅   | 见 `[DP §21.1]`；限制见 P5.5 记录 |
 | P6    | 高级 UX + 历史 + 可观察性       | 11     | ✅   | 主区居中 + 阶段瀑布 + 无障碍 + 历史 / 设置 / 调试 / 续订 / 取消 / 成本告警 + Playwright |
-| P7    | Evaluation 系统                 | 8      | 🟡   | P7-1 骨架已通；数据集 / grader 待填         |
+| P7    | Evaluation 系统                 | 8      | 🟡   | P7-1/P7-2 已通；数据集与 LLM judge 待填 |
 | P8    | 扩展能力                        | 8      | ⬜   | 按需触发，非线性                 |
 
 ---
@@ -389,7 +389,7 @@ Phase 2 真实验收后补的刷新恢复，把历史会话的数据面先做了
 | ID   | 任务                                                                                            | 依赖      | 状态 | 验收                       |
 | ---- | ----------------------------------------------------------------------------------------------- | --------- | ---- | -------------------------- |
 | P7-1 | `evals/` 骨架 + `runner.py` + 结果归档格式                                                      | P5.5      | ✅   | 可跑并输出 JSON + Markdown |
-| P7-2 | `deterministic.py` grader：路由 / tool 选择 / 引用覆盖率 / 引用有效性 / 报告完整性 / 数值准确性 | P7-1      | ⬜   | 指标可复现                 |
+| P7-2 | `deterministic.py` grader：路由 / tool 选择 / 引用覆盖率 / 引用有效性 / 报告完整性 / 数值准确性 | P7-1      | ✅   | 指标可复现                 |
 | P7-3 | `llm_judge.py` grader：幻觉率 / 认知类型正确率                                                  | P7-1      | ⬜   | 与人工抽检一致率 >80%      |
 | P7-4 | 数据集：`intent_routing` + `tool_selection`                                                     | P7-2      | ⬜   | 各 ≥30 条                  |
 | P7-5 | 数据集：`crypto_project` + `stock_analysis` + `financial_report`                                | P7-2      | ⬜   | 各 ≥15 条，带真值          |
@@ -398,6 +398,8 @@ Phase 2 真实验收后补的刷新恢复，把历史会话的数据面先做了
 | P7-8 | 跨模型 eval 对比报告（回答"哪个模型效果最好"）                                                  | P7-1~P7-7 | ⬜   | 生成对比表并归档           |
 
 `./scripts/eval.sh --suite smoke`（或 `pnpm eval -- --suite smoke`）把报告写到 `evals/results/local/<run>/report.{json,md}`。本地结果 gitignore；要归档时把目录挪出 `local/` 再提交。P7-2 起往 `evals/registry.py` 注册 suite，不要改归档 schema。
+
+确定性 grader 覆盖路由 / tool / 引用 / 报告 / 数值；`intent_routing` 走规则分类，其余 suite 暂用 `fixtures.observation` 保证同一输入分数不变。完整数据集是 P7-4 / P7-5。
 
 ---
 

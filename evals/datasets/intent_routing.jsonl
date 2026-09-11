@@ -1,0 +1,6 @@
+{"id":"intent-nvda-what","suite":"intent_routing","question":"NVDA 是做什么的","expected":{"question_type":"stock","entities":["NVDA"],"agents":["stock_research"]},"tags":["rules"]}
+{"id":"intent-nvda-earnings","suite":"intent_routing","question":"分析 NVDA 最近一季财报","expected":{"question_type":"stock","entities":["NVDA"],"agents":["stock_research"]},"tags":["rules"]}
+{"id":"intent-hype-catalyst","suite":"intent_routing","question":"HYPE 最近有什么重要进展？","expected":{"question_type":"crypto","entities":["HYPE"],"agents":["crypto_research"]},"tags":["rules"]}
+{"id":"intent-compare-chips","suite":"intent_routing","question":"比较 NVDA、AMD、AVGO","expected":{"question_type":"compare","entities":["NVDA","AMD","AVGO"],"agents":["stock_research"]},"tags":["rules"]}
+{"id":"intent-fed","suite":"intent_routing","question":"美联储会不会降息","expected":{"question_type":"macro","entities":[],"agents":["web_research"]},"tags":["rules"]}
+{"id":"intent-hello","suite":"intent_routing","question":"你好","expected":{"question_type":"generic","entities":[],"agents":["web_research"]},"tags":["rules"]}

@@ -5,7 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol
 
+from evals.graders.deterministic import DeterministicGrader
 from evals.graders.smoke import SmokeGrader, SmokeProducer
+from evals.producers import FixtureProducer, IntentRoutingProducer
 from evals.schemas import EvalCase, GradeResult, Observation
 
 
@@ -25,6 +27,14 @@ class SuiteHarness:
     grader: Grader
 
 
+_DETERMINISTIC = DeterministicGrader()
+_FIXTURE = FixtureProducer()
+
 SUITE_HARNESS: dict[str, SuiteHarness] = {
     "smoke": SuiteHarness(producer=SmokeProducer(), grader=SmokeGrader()),
+    "intent_routing": SuiteHarness(producer=IntentRoutingProducer(), grader=_DETERMINISTIC),
+    "tool_selection": SuiteHarness(producer=_FIXTURE, grader=_DETERMINISTIC),
+    "crypto_project": SuiteHarness(producer=_FIXTURE, grader=_DETERMINISTIC),
+    "stock_analysis": SuiteHarness(producer=_FIXTURE, grader=_DETERMINISTIC),
+    "financial_report": SuiteHarness(producer=_FIXTURE, grader=_DETERMINISTIC),
 }
