@@ -1,8 +1,8 @@
 """确定性 grader（P7-2 / [DP §19.2]）。
 
 对同一组 `expected` + `observation` 重复打分，分数必须相同。不打网络、
-不调 LLM。引用有效性只看 fixture 里的 URL / 状态码 / excerpt 是否能在
-`page_text` 里定位——live 抓取留给 P7-7。
+不调 LLM。引用有效性只看 fixture catalog / 录制 page_text 里 excerpt
+能否定位——不打实时网页。
 
 payload 约定（observation 与 fixtures.observation 同形）：
 

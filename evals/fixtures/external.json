@@ -1,0 +1,307 @@
+{
+  "as_of": "2026-09-11T00:00:00Z",
+  "pages": {
+    "https://defillama.com/protocol/hyperliquid": {
+      "http_status": 200,
+      "text": "Hyperliquid TVL $1.8b across perps. Hyperliquid TVL 约 18 亿美元."
+    },
+    "https://defillama.com/chain/ethereum": {
+      "http_status": 200,
+      "text": "Ethereum TVL $58.4b. 以太坊链上 TVL 约 584 亿美元."
+    },
+    "https://defillama.com/chain/solana": {
+      "http_status": 200,
+      "text": "Solana TVL $8.65b. Solana TVL 约 86.5 亿美元 across DeFi. 24h DEX volume $2.15b."
+    },
+    "https://defillama.com/chain/sui": {
+      "http_status": 200,
+      "text": "Sui TVL $1.94b at the recorded window. Sui TVL 约 19.4 亿美元."
+    },
+    "https://defillama.com/chain/arbitrum": {
+      "http_status": 200,
+      "text": "Arbitrum TVL $2.48b across bridged assets. Arbitrum TVL 约 24.8 亿美元."
+    },
+    "https://www.coingecko.com/en/coins/bitcoin": {
+      "http_status": 200,
+      "text": "Bitcoin $97,250 as of the recorded snapshot. BTC 现价约 97250 美元. market cap $1.92T."
+    },
+    "https://www.coingecko.com/en/coins/ethereum": {
+      "http_status": 200,
+      "text": "Ethereum $3,480 as of the recorded snapshot. market cap $418b."
+    },
+    "https://www.coingecko.com/en/coins/chainlink": {
+      "http_status": 200,
+      "text": "Chainlink $18.4 as of the recorded snapshot."
+    },
+    "https://www.coingecko.com/en/coins/hyperliquid": {
+      "http_status": 200,
+      "text": "HYPE circulating supply 333 million tokens."
+    },
+    "https://financialmodelingprep.com/nvda": {
+      "http_status": 200,
+      "text": "NVDA PE TTM 45.2 versus peers. NVDA TTM 市盈率约 45.2 倍. market cap $3.35T."
+    },
+    "https://www.sec.gov/nvda-10q": {
+      "http_status": 200,
+      "text": "Condensed income statement Revenue $44,096 million. Gross profit $32,860 million. Diluted EPS $0.89. revenue up 69% year over year. 最近一季营收 440.96 亿美元."
+    }
+  },
+  "coins": {
+    "bitcoin": {
+      "symbol": "btc",
+      "name": "Bitcoin",
+      "price": 97250.0,
+      "market_cap": 1920000000000.0
+    },
+    "ethereum": {
+      "symbol": "eth",
+      "name": "Ethereum",
+      "price": 3480.0,
+      "market_cap": 418000000000.0
+    },
+    "chainlink": {
+      "symbol": "link",
+      "name": "Chainlink",
+      "price": 18.4,
+      "market_cap": 11700000000.0
+    },
+    "hyperliquid": {
+      "symbol": "hype",
+      "name": "Hyperliquid",
+      "price": 32.0,
+      "market_cap": 10656000000.0,
+      "circulating_supply": 333000000.0
+    }
+  },
+  "protocols": {
+    "hyperliquid": {
+      "name": "Hyperliquid",
+      "symbol": "HYPE",
+      "category": "Derivatives",
+      "tvl_usd": 1800000000.0,
+      "fees_30d": 93333333.33333333,
+      "volume_24h": 2150000000.0,
+      "volume_30d": 92400000000.0
+    }
+  },
+  "chains": {
+    "Ethereum": { "tvl_usd": 58400000000.0 },
+    "Solana": { "tvl_usd": 8650000000.0 },
+    "Sui": { "tvl_usd": 1940000000.0 },
+    "Arbitrum": { "tvl_usd": 2480000000.0 }
+  },
+  "stocks": {
+    "NVDA": {
+      "cik": "0001045810",
+      "title": "NVIDIA CORP",
+      "pe": 45.2,
+      "market_cap": 3350000000000.0,
+      "price": 120.5,
+      "income_quarterly": [
+        {
+          "period_end": "2025-04-27",
+          "fiscal_year": 2026,
+          "fiscal_period": "Q1",
+          "revenue": 44096000000.0,
+          "gross_profit": 32860000000.0,
+          "operating_income": 21600000000.0,
+          "eps_diluted": 0.89
+        }
+      ],
+      "income_annual": [
+        {
+          "period_end": "2025-01-26",
+          "fiscal_year": 2025,
+          "fiscal_period": "FY",
+          "revenue": 130497000000.0,
+          "gross_profit": 97360000000.0,
+          "operating_income": 81450000000.0
+        },
+        {
+          "period_end": "2024-01-28",
+          "fiscal_year": 2024,
+          "fiscal_period": "FY",
+          "revenue": 77217159763.31361,
+          "gross_profit": 44301000000.0,
+          "operating_income": 32972000000.0
+        }
+      ]
+    },
+    "AMD": {
+      "cik": "0000002488",
+      "title": "ADVANCED MICRO DEVICES INC",
+      "pe": 112.4,
+      "price": 160.0,
+      "income_quarterly": [
+        {
+          "period_end": "2025-03-29",
+          "fiscal_year": 2025,
+          "fiscal_period": "Q1",
+          "revenue": 7438000000.0
+        }
+      ]
+    },
+    "AAPL": {
+      "cik": "0000320193",
+      "title": "Apple Inc.",
+      "pe": 32.8,
+      "price": 220.0,
+      "income_quarterly": [
+        {
+          "period_end": "2025-03-29",
+          "fiscal_year": 2025,
+          "fiscal_period": "Q2",
+          "revenue": 94036000000.0
+        }
+      ]
+    },
+    "MSFT": {
+      "cik": "0000789019",
+      "title": "MICROSOFT CORP",
+      "pe": 36.1,
+      "price": 420.0,
+      "income_quarterly": [
+        {
+          "period_end": "2025-03-31",
+          "fiscal_year": 2025,
+          "fiscal_period": "Q3",
+          "revenue": 70000000000.0,
+          "operating_income": 32000000000.0
+        }
+      ]
+    },
+    "TSLA": {
+      "cik": "0001318605",
+      "title": "Tesla, Inc.",
+      "pe": 180.0,
+      "price": 250.0,
+      "income_quarterly": [
+        {
+          "period_end": "2025-03-31",
+          "fiscal_year": 2025,
+          "fiscal_period": "Q1",
+          "revenue": 22496000000.0
+        }
+      ],
+      "income_annual": [
+        {
+          "period_end": "2024-12-31",
+          "fiscal_year": 2024,
+          "fiscal_period": "FY",
+          "revenue": 97690000000.0,
+          "gross_profit": 17388820000.0,
+          "operating_income": 7070000000.0
+        }
+      ]
+    },
+    "GOOG": {
+      "cik": "0001652044",
+      "title": "Alphabet Inc.",
+      "pe": 24.6,
+      "price": 175.0,
+      "income_quarterly": [
+        {
+          "period_end": "2025-03-31",
+          "fiscal_year": 2025,
+          "fiscal_period": "Q1",
+          "revenue": 90234000000.0
+        }
+      ]
+    },
+    "META": {
+      "cik": "0001326801",
+      "title": "Meta Platforms, Inc.",
+      "pe": 27.3,
+      "price": 580.0,
+      "income_quarterly": [
+        {
+          "period_end": "2025-03-31",
+          "fiscal_year": 2025,
+          "fiscal_period": "Q1",
+          "revenue": 42310000000.0
+        }
+      ]
+    },
+    "AMZN": {
+      "cik": "0001018724",
+      "title": "AMAZON COM INC",
+      "pe": 38.0,
+      "price": 190.0,
+      "income_annual": [
+        {
+          "period_end": "2024-12-31",
+          "fiscal_year": 2024,
+          "fiscal_period": "FY",
+          "revenue": 637959000000.0,
+          "gross_profit": 311000000000.0,
+          "operating_income": 70813449000.0
+        }
+      ]
+    },
+    "AVGO": {
+      "cik": "0001730168",
+      "title": "Broadcom Inc.",
+      "pe": 88.7,
+      "price": 175.0,
+      "income_quarterly": [
+        {
+          "period_end": "2025-02-02",
+          "fiscal_year": 2025,
+          "fiscal_period": "Q1",
+          "revenue": 15990000000.0
+        }
+      ]
+    },
+    "TSM": {
+      "cik": "0001046179",
+      "title": "Taiwan Semiconductor Manufacturing Co Ltd",
+      "pe": 28.9,
+      "price": 185.0
+    },
+    "PLTR": {
+      "cik": "0001321655",
+      "title": "Palantir Technologies Inc.",
+      "pe": 400.0,
+      "ps": 64.2,
+      "price": 85.0,
+      "income_quarterly": [
+        {
+          "period_end": "2025-03-31",
+          "fiscal_year": 2025,
+          "fiscal_period": "Q1",
+          "revenue": 883900000.0
+        }
+      ]
+    },
+    "BABA": {
+      "cik": "0001577552",
+      "title": "Alibaba Group Holding Ltd",
+      "pe": 16.4,
+      "price": 90.0
+    },
+    "INTC": {
+      "cik": "0000050863",
+      "title": "INTEL CORP",
+      "pe": 22.0,
+      "price": 22.0,
+      "income_quarterly": [
+        {
+          "period_end": "2025-03-29",
+          "fiscal_year": 2025,
+          "fiscal_period": "Q1",
+          "revenue": 12859000000.0
+        }
+      ],
+      "income_annual": [
+        {
+          "period_end": "2024-12-28",
+          "fiscal_year": 2024,
+          "fiscal_period": "FY",
+          "revenue": 53101000000.0,
+          "gross_profit": 18479148000.0,
+          "operating_income": -11600000000.0
+        }
+      ]
+    }
+  }
+}

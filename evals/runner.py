@@ -276,7 +276,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--mode",
         choices=("fixture", "live"),
         default="fixture",
-        help="fixture=录制数据；live=打真实 API（P7-7 起）",
+        help="fixture=录制数据与冻结的外部 API；live=只把 LLM judge 切到 FAST 模型",
     )
     parser.add_argument("--list", action="store_true", help="列出数据集与是否已注册 harness")
     parser.add_argument(

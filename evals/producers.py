@@ -10,6 +10,7 @@ from agent_service.tools.web.untrusted import (
     detect_injection,
     wrap_untrusted,
 )
+from evals.external import attach_pages, replay_calls
 from evals.schemas import EvalCase, Observation
 
 
@@ -60,13 +61,39 @@ class IntentRoutingProducer:
 
 
 class FixtureProducer:
-    """P7-2/P7-5：把录制的 observation 原样送进 grader，保证分数可复现。"""
+    """把录制的 observation 原样送进 grader。"""
 
     async def produce(self, case: EvalCase) -> Observation:
         fixtures = case.fixtures or {}
         payload = fixtures.get("observation")
         if not isinstance(payload, dict):
             return Observation(error="缺少 fixtures.observation")
+        return Observation(payload=payload)
+
+
+class ExternalReplayProducer:
+    """P7-7：录制报告骨架 + 冻结外部数据上的 tool 重放。"""
+
+    async def produce(self, case: EvalCase) -> Observation:
+        fixtures = case.fixtures or {}
+        recorded = fixtures.get("observation")
+        if not isinstance(recorded, dict):
+            return Observation(error="缺少 fixtures.observation")
+        payload = attach_pages(recorded)
+        raw_calls = fixtures.get("calls")
+        calls: list[dict[str, object]] = []
+        if isinstance(raw_calls, list):
+            calls = [item for item in raw_calls if isinstance(item, dict)]
+        if not calls:
+            payload["fixture_source"] = "recorded"
+            return Observation(payload=payload)
+        try:
+            metrics, names = await replay_calls(calls)
+        except Exception as exc:
+            return Observation(payload=payload, error=f"fixture 重放失败：{exc}")
+        payload["metrics"] = metrics
+        payload["tools"] = names
+        payload["fixture_source"] = "replay"
         return Observation(payload=payload)
 
 

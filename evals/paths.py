@@ -9,5 +9,6 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 EVALS_DIR = REPO_ROOT / "evals"
 DATASETS_DIR = EVALS_DIR / "datasets"
+FIXTURES_DIR = EVALS_DIR / "fixtures"
 RESULTS_DIR = EVALS_DIR / "results"
 LOCAL_RESULTS_DIR = RESULTS_DIR / "local"
