@@ -132,3 +132,38 @@ class EvalRunReport(EvalModel):
     suites: list[SuiteResult]
     metrics: list[MetricScore]
     summary: RunSummary
+
+
+class CompareRun(EvalModel):
+    """对比表的一列：一次 eval run。"""
+
+    run_id: str
+    label: str
+    model_ids: dict[str, str] = Field(default_factory=dict)
+    git: GitSnapshot
+    mode: Literal["fixture", "live"]
+    pass_rate: float | None
+    quality_score: float
+    rank: int
+
+
+class CompareMetric(EvalModel):
+    name: str
+    polarity: Literal["higher", "lower"]
+    values: dict[str, float | None]
+    winner_run_ids: list[str]
+
+
+class EvalCompareReport(EvalModel):
+    """跨 run / 跨模型对比。独立文档，不改 EvalRunReport.schema_version。"""
+
+    schema_version: Literal["1"] = "1"
+    kind: Literal["compare"] = "compare"
+    compare_id: str
+    created_at: datetime
+    git: GitSnapshot
+    run_ids: list[str]
+    runs: list[CompareRun]
+    metrics: list[CompareMetric]
+    winner_run_ids: list[str]
+    summary: str

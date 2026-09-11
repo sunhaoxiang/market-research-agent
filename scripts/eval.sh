@@ -5,6 +5,7 @@
 # 用法：
 #   ./scripts/eval.sh --suite smoke
 #   ./scripts/eval.sh --list
+#   ./scripts/eval.sh --compare run_a,run_b
 #   pnpm eval -- --suite smoke
 set -euo pipefail
 

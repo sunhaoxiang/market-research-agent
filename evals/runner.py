@@ -3,6 +3,7 @@
 用法：
     ./scripts/eval.sh --suite smoke
     ./scripts/eval.sh --list
+    ./scripts/eval.sh --compare run_a,run_b
 """
 
 from __future__ import annotations
@@ -18,7 +19,10 @@ from pathlib import Path
 from shutil import which
 from typing import Literal
 
+from agent_service.models.registry import ModelRegistry
+from agent_service.schemas.common import ModelRole
 from evals.archive import allocate_run_dir, make_run_id, summarize_counts, write_report
+from evals.compare import MIN_COMPARE_RUNS, CompareError, resolve_run_path, run_compare
 from evals.datasets_io import DatasetError, list_dataset_files, load_jsonl
 from evals.graders.llm_judge import install_default_live_judge, set_live_judge
 from evals.paths import DATASETS_DIR, LOCAL_RESULTS_DIR, REPO_ROOT
@@ -43,11 +47,18 @@ class EvalConfig:
     suites: tuple[str, ...] | None
     mode: Literal["fixture", "live"] = "fixture"
     label: str | None = None
+    model_ids: dict[str, str] | None = None
     repo_root: Path = REPO_ROOT
 
 
 class EvalError(Exception):
     """CLI 可预期的失败（未知 suite、没有可跑的用例）。"""
+
+
+def snapshot_model_ids() -> dict[str, str]:
+    """当前角色 → model_id，不打 LLM。"""
+    registry = ModelRegistry()
+    return {role.value: registry.model_id_for_role(role) for role in ModelRole}
 
 
 def git_snapshot(repo: Path) -> GitSnapshot:
@@ -221,6 +232,7 @@ async def _run_eval(config: EvalConfig) -> tuple[EvalRunReport, Path]:
         git=git_snapshot(config.repo_root),
         mode=config.mode,
         label=label,
+        model_ids=config.model_ids if config.model_ids is not None else snapshot_model_ids(),
         suites_requested=suites,
         suites=suite_results,
         metrics=aggregate_metrics(all_cases),
@@ -280,6 +292,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--list", action="store_true", help="列出数据集与是否已注册 harness")
     parser.add_argument(
+        "--compare",
+        default=None,
+        help="逗号分隔的 report.json 或 run 目录，生成跨模型对比表并归档",
+    )
+    parser.add_argument(
         "--datasets",
         type=Path,
         default=DATASETS_DIR,
@@ -288,12 +305,39 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _main_compare(args: argparse.Namespace) -> int:
+    raw = [part.strip() for part in str(args.compare).split(",") if part.strip()]
+    if len(raw) < MIN_COMPARE_RUNS:
+        print("✖ --compare 至少需要两份报告")
+        return 2
+    try:
+        paths = [resolve_run_path(item) for item in raw]
+        report, run_dir = run_compare(
+            paths,
+            out_dir=args.out or LOCAL_RESULTS_DIR,
+            label=args.label,
+            git=git_snapshot(REPO_ROOT),
+        )
+    except CompareError as exc:
+        print(f"✖ {exc}")
+        return 2
+    by_id = {item.run_id: item.label for item in report.runs}
+    winners = ", ".join(by_id[run_id] for run_id in report.winner_run_ids)
+    print(f"✓ 对比完成  {report.summary}")
+    print(f"  最优  {winners}")
+    print(f"  JSON  {run_dir / 'comparison.json'}")
+    print(f"  MD    {run_dir / 'comparison.md'}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     datasets_dir: Path = args.datasets
     if args.list:
         return _print_list(datasets_dir)
+    if args.compare:
+        return _main_compare(args)
 
     config = EvalConfig(
         datasets_dir=datasets_dir,

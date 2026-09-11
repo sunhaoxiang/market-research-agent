@@ -6,7 +6,7 @@
 > **每完成一个任务就更新此表的状态**；每完成一个阶段，跑 `[DP §26]` 的收尾清单并写阶段小结。
 
 - 最后更新：2026-09-11
-- 当前阶段：**P7 进行中**（P7-7 完成）。P6 全部完成（含 Playwright E2E）。
+- 当前阶段：**P7 完成**。下一阶段 P8 按需。P6 全部完成（含 Playwright E2E）。
 
 ### 已确认的前置决策（2026-09-07）
 
@@ -44,7 +44,7 @@
 | P5    | Multi-Agent 完整编排            | 9      | ✅   | Fact Checker / 并行 / 报告结构   |
 | P5.5  | **MVP 验收**                    | 1      | ✅   | 见 `[DP §21.1]`；限制见 P5.5 记录 |
 | P6    | 高级 UX + 历史 + 可观察性       | 11     | ✅   | 主区居中 + 阶段瀑布 + 无障碍 + 历史 / 设置 / 调试 / 续订 / 取消 / 成本告警 + Playwright |
-| P7    | Evaluation 系统                 | 8      | 🟡   | P7-7 完成；跨模型对比待做                 |
+| P7    | Evaluation 系统                 | 8      | ✅   | 8/8；对比表见 `evals/results/p7-8-fixture-compare/` |
 | P8    | 扩展能力                        | 8      | ⬜   | 按需触发，非线性                 |
 
 ---
@@ -395,13 +395,15 @@ Phase 2 真实验收后补的刷新恢复，把历史会话的数据面先做了
 | P7-5 | 数据集：`crypto_project` + `stock_analysis` + `financial_report`                                | P7-2      | ✅   | 各 ≥15 条，带真值          |
 | P7-6 | 数据集：`fact_check`（注入错误声明）+ `epistemic_labeling` + prompt injection 用例              | P7-3      | ✅   | 各 ≥20 条                  |
 | P7-7 | Fixture 化外部数据（eval 结果可跨时间比较）                                                     | P7-5      | ✅   | 同一数据集重复跑分数稳定   |
-| P7-8 | 跨模型 eval 对比报告（回答"哪个模型效果最好"）                                                  | P7-1~P7-7 | ⬜   | 生成对比表并归档           |
+| P7-8 | 跨模型 eval 对比报告（回答"哪个模型效果最好"）                                                  | P7-1~P7-7 | ✅   | 生成对比表并归档           |
 
 `./scripts/eval.sh --suite smoke`（或 `pnpm eval -- --suite smoke`）把报告写到 `evals/results/local/<run>/report.{json,md}`。本地结果 gitignore；要归档时把目录挪出 `local/` 再提交。P7-2 起往 `evals/registry.py` 注册 suite，不要改归档 schema。
 
+`./scripts/eval.sh --compare run_a,run_b` 读两份及以上 `report.json`，按 `metrics[].name` 对齐，写出 `comparison.{json,md}`。综合分加权：幻觉率与引用覆盖率最高，延迟/成本最低。样本归档在 `evals/results/p7-8-fixture-compare/`。
+
 确定性 grader 覆盖路由 / tool / 引用 / 报告 / 数值；`intent_routing` 走规则分类。P7-4 已把 `intent_routing` / `tool_selection` 扩到各 ≥30；P7-5 已把 `crypto_project` / `stock_analysis` / `financial_report` 扩到各 ≥15 并带数值真值。P7-7 把行情 / TVL / 财报冻在 `evals/fixtures/external.json`，报告类 suite 对冻结数据重放 tool，不打实时 API。
 
-LLM judge（P7-3）打幻觉率与认知类型。默认启发式 / 录制 verdicts，与金标一致率必须 >80%；`./scripts/eval.sh --mode live` 才打 FAST 模型。P7-6 已把 `fact_check` / `epistemic_labeling` / `prompt_injection` 扩到各 ≥20；注入套件跑 `detect_injection`，不把网页指令当系统 prompt。
+LLM judge（P7-3）打幻觉率与认知类型。默认启发式 / 录制 verdicts，与金标一致率必须 >80%；`./scripts/eval.sh --mode live` 才打 FAST 模型。P7-6 已把 `fact_check` / `epistemic_labeling` / `prompt_injection` 扩到各 ≥20；注入套件跑 `detect_injection`，不把网页指令当系统 prompt。P7-8 用已归档 run 对比模型，不改 `EvalRunReport.schema_version`。
 
 ---
 
@@ -1081,6 +1083,12 @@ P5-8 用 ScriptedModel 覆盖正常 / 工具失败 / 超时 / 冲突 / 引用缺
 P6-11 Playwright 打桩 Python（`e2e/stub-agent.mjs`），Next 起在 :3100、桩在 :18000，`reuseExistingServer: false`，避免打到本机 `pnpm dev`。不并进 `pnpm test` / web job——CI 另开 e2e job 装 Chromium。
 
 **偏离计划**：没有为阶段单独打 tag（只在 MVP 打了 `v0.1.0-mvp`）。`[DP §26]` 第 7 条「真实问题」在 P2–P5.5 已真跑；本阶段 E2E 按计划不调 LLM。第 11 条 eval 仍是 P7。
+
+### Phase 7 — Evaluation 系统 ✅（2026-09-11）
+
+任务表 8/8。`./scripts/eval.sh` 跑注册 suite，JSON + Markdown 进 `evals/results/local/`。确定性 grader 打路由 / tool / 引用 / 报告 / 数值 / 注入；LLM judge 默认启发式，`--mode live` 才打 FAST。外部行情与财报冻在 `evals/fixtures/external.json`，报告类 suite 重放 tool 不打实时 API。`--compare` 对齐多次 run 的 `metrics[].name`，核心权重是幻觉率与引用覆盖率；样本对比归档在 `evals/results/p7-8-fixture-compare/`（`deepseek-flash` 综合更好）。
+
+**偏离计划**：没有为阶段打 tag。对比表示范用冻结分数，不是多模型 live 全量真跑；换模型后对同一 suite 再跑才能分出真实优劣。D10 prompt 版本管理未做。
 
 ---
 
