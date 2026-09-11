@@ -6,6 +6,8 @@ from pathlib import Path
 
 import pytest
 
+from agent_service.orchestrator.intent import classify_by_rules
+from agent_service.tools.registry import HANDLERS
 from evals.datasets_io import load_jsonl
 from evals.graders.deterministic import (
     DeterministicGrader,
@@ -17,7 +19,7 @@ from evals.graders.deterministic import (
     grade_tools,
 )
 from evals.paths import DATASETS_DIR
-from evals.producers import IntentRoutingProducer
+from evals.producers import IntentRoutingProducer, specialist_agents
 from evals.runner import EvalConfig, run_eval
 from evals.schemas import CaseStatus, EvalCase, Observation
 
@@ -248,5 +250,30 @@ async def test_seed_suites_all_pass(tmp_path: Path) -> None:
 
 def test_seed_intent_dataset_matches_filename() -> None:
     cases = load_jsonl(DATASETS_DIR / "intent_routing.jsonl")
-    assert len(cases) >= 6
+    assert len(cases) >= 30
     assert all(case.suite == "intent_routing" for case in cases)
+    types = {str(case.expected.get("question_type")) for case in cases}
+    assert types >= {"stock", "crypto", "compare", "macro", "generic"}
+    for case in cases:
+        if case.fixtures:
+            continue
+        intent = classify_by_rules(case.question)
+        assert intent is not None, case.id
+        assert intent.question_type.value == case.expected["question_type"]
+        assert [entity.symbol for entity in intent.entities] == case.expected["entities"]
+        assert specialist_agents(intent) == case.expected["agents"]
+
+
+def test_seed_tool_selection_dataset_matches_filename() -> None:
+    cases = load_jsonl(DATASETS_DIR / "tool_selection.jsonl")
+    assert len(cases) >= 30
+    assert all(case.suite == "tool_selection" for case in cases)
+    for case in cases:
+        wanted = set(case.expected.get("tools") or [])
+        optional = set(case.expected.get("optional_tools") or [])
+        recorded = set(((case.fixtures or {}).get("observation") or {}).get("tools") or [])
+        unknown = (wanted | optional | recorded) - HANDLERS.keys()
+        assert not unknown, (case.id, unknown)
+        assert wanted, case.id
+        assert recorded, case.id
+        assert wanted <= recorded

@@ -1,6 +1,45 @@
-{"id":"intent-nvda-what","suite":"intent_routing","question":"NVDA 是做什么的","expected":{"question_type":"stock","entities":["NVDA"],"agents":["stock_research"]},"tags":["rules"]}
-{"id":"intent-nvda-earnings","suite":"intent_routing","question":"分析 NVDA 最近一季财报","expected":{"question_type":"stock","entities":["NVDA"],"agents":["stock_research"]},"tags":["rules"]}
-{"id":"intent-hype-catalyst","suite":"intent_routing","question":"HYPE 最近有什么重要进展？","expected":{"question_type":"crypto","entities":["HYPE"],"agents":["crypto_research"]},"tags":["rules"]}
-{"id":"intent-compare-chips","suite":"intent_routing","question":"比较 NVDA、AMD、AVGO","expected":{"question_type":"compare","entities":["NVDA","AMD","AVGO"],"agents":["stock_research"]},"tags":["rules"]}
-{"id":"intent-fed","suite":"intent_routing","question":"美联储会不会降息","expected":{"question_type":"macro","entities":[],"agents":["web_research"]},"tags":["rules"]}
-{"id":"intent-hello","suite":"intent_routing","question":"你好","expected":{"question_type":"generic","entities":[],"agents":["web_research"]},"tags":["rules"]}
+{"id": "intent-nvda-what", "suite": "intent_routing", "question": "NVDA 是做什么的", "expected": {"question_type": "stock", "entities": ["NVDA"], "agents": ["stock_research"]}, "tags": ["rules"]}
+{"id": "intent-nvda-earnings", "suite": "intent_routing", "question": "分析 NVDA 最近一季财报", "expected": {"question_type": "stock", "entities": ["NVDA"], "agents": ["stock_research"]}, "tags": ["rules"]}
+{"id": "intent-nvda-valuation", "suite": "intent_routing", "question": "NVDA 估值贵不贵", "expected": {"question_type": "stock", "entities": ["NVDA"], "agents": ["stock_research"]}, "tags": ["rules"]}
+{"id": "intent-nvidia-cn", "suite": "intent_routing", "question": "英伟达最新一季财报的关键信号是什么？", "expected": {"question_type": "stock", "entities": ["NVDA"], "agents": ["stock_research"]}, "tags": ["rules"]}
+{"id": "intent-aapl-price", "suite": "intent_routing", "question": "AAPL 现在股价多少", "expected": {"question_type": "stock", "entities": ["AAPL"], "agents": ["stock_research"]}, "tags": ["rules"]}
+{"id": "intent-msft-buyback", "suite": "intent_routing", "question": "微软最近有没有回购", "expected": {"question_type": "stock", "entities": ["MSFT"], "agents": ["stock_research"]}, "tags": ["rules"]}
+{"id": "intent-tsla-valuation", "suite": "intent_routing", "question": "TSLA 的估值合理吗", "expected": {"question_type": "stock", "entities": ["TSLA"], "agents": ["stock_research"]}, "tags": ["rules"]}
+{"id": "intent-tesla-cn", "suite": "intent_routing", "question": "特斯拉是做什么的", "expected": {"question_type": "stock", "entities": ["TSLA"], "agents": ["stock_research"]}, "tags": ["rules"]}
+{"id": "intent-amd-gross", "suite": "intent_routing", "question": "AMD 最近一季毛利率如何", "expected": {"question_type": "stock", "entities": ["AMD"], "agents": ["stock_research"]}, "tags": ["rules"]}
+{"id": "intent-tsm-cn", "suite": "intent_routing", "question": "台积电最新一季情况怎么样", "expected": {"question_type": "stock", "entities": ["TSM"], "agents": ["stock_research"]}, "tags": ["rules"]}
+{"id": "intent-meta-ads", "suite": "intent_routing", "question": "META 广告收入怎么样", "expected": {"question_type": "stock", "entities": ["META"], "agents": ["stock_research"]}, "tags": ["rules"]}
+{"id": "intent-amzn-aws", "suite": "intent_routing", "question": "AMZN 云业务占比高不高", "expected": {"question_type": "stock", "entities": ["AMZN"], "agents": ["stock_research"]}, "tags": ["rules"]}
+{"id": "intent-goog-valuation", "suite": "intent_routing", "question": "GOOG 估值贵不贵", "expected": {"question_type": "stock", "entities": ["GOOG"], "agents": ["stock_research"]}, "tags": ["rules"]}
+{"id": "intent-aapl-cn", "suite": "intent_routing", "question": "苹果公司最新财报看什么", "expected": {"question_type": "stock", "entities": ["AAPL"], "agents": ["stock_research"]}, "tags": ["rules"]}
+{"id": "intent-pltr-what", "suite": "intent_routing", "question": "PLTR 是做什么的", "expected": {"question_type": "stock", "entities": ["PLTR"], "agents": ["stock_research"]}, "tags": ["rules"]}
+{"id": "intent-baba-buy", "suite": "intent_routing", "question": "BABA 现在还能买吗", "expected": {"question_type": "stock", "entities": ["BABA"], "agents": ["stock_research"]}, "tags": ["rules"]}
+{"id": "intent-avgo-what", "suite": "intent_routing", "question": "AVGO 是做什么的", "expected": {"question_type": "stock", "entities": ["AVGO"], "agents": ["stock_research"]}, "tags": ["rules"]}
+{"id": "intent-intc-foundry", "suite": "intent_routing", "question": "INTC 晶圆代工业务进展如何", "expected": {"question_type": "stock", "entities": ["INTC"], "agents": ["stock_research"]}, "tags": ["rules"]}
+{"id": "intent-hype-catalyst", "suite": "intent_routing", "question": "HYPE 最近有什么重要进展？", "expected": {"question_type": "crypto", "entities": ["HYPE"], "agents": ["crypto_research"]}, "tags": ["rules"]}
+{"id": "intent-hype-intro", "suite": "intent_routing", "question": "介绍一下 HYPE", "expected": {"question_type": "crypto", "entities": ["HYPE"], "agents": ["crypto_research"]}, "tags": ["rules"]}
+{"id": "intent-hype-tvl", "suite": "intent_routing", "question": "查询 HYPE 的 TVL、交易量和资金变化", "expected": {"question_type": "crypto", "entities": ["HYPE"], "agents": ["crypto_research"]}, "tags": ["rules"]}
+{"id": "intent-hyperliquid", "suite": "intent_routing", "question": "Hyperliquid 怎么样？", "expected": {"question_type": "crypto", "entities": ["HYPE"], "agents": ["crypto_research"]}, "tags": ["rules"]}
+{"id": "intent-btc-price", "suite": "intent_routing", "question": "BTC 现在什么价格", "expected": {"question_type": "crypto", "entities": ["BTC"], "agents": ["crypto_research"]}, "tags": ["rules"]}
+{"id": "intent-btc-cn", "suite": "intent_routing", "question": "比特币最近为什么涨", "expected": {"question_type": "crypto", "entities": ["BTC"], "agents": ["crypto_research"]}, "tags": ["rules"]}
+{"id": "intent-eth-upgrade", "suite": "intent_routing", "question": "以太坊接下来有什么升级", "expected": {"question_type": "crypto", "entities": ["ETH"], "agents": ["crypto_research"]}, "tags": ["rules"]}
+{"id": "intent-sol-eco", "suite": "intent_routing", "question": "Solana 生态最近怎么样", "expected": {"question_type": "crypto", "entities": ["SOL"], "agents": ["crypto_research"]}, "tags": ["rules"]}
+{"id": "intent-sui-tvl", "suite": "intent_routing", "question": "SUI 的 TVL 最近怎么走", "expected": {"question_type": "crypto", "entities": ["SUI"], "agents": ["crypto_research"]}, "tags": ["rules"]}
+{"id": "intent-link-what", "suite": "intent_routing", "question": "LINK 是做什么的", "expected": {"question_type": "crypto", "entities": ["LINK"], "agents": ["crypto_research"]}, "tags": ["rules"]}
+{"id": "intent-compare-chips3", "suite": "intent_routing", "question": "比较 NVDA、AMD、AVGO", "expected": {"question_type": "compare", "entities": ["NVDA", "AMD", "AVGO"], "agents": ["stock_research"]}, "tags": ["rules"]}
+{"id": "intent-compare-sol-sui", "suite": "intent_routing", "question": "比较 Solana 和 Sui", "expected": {"question_type": "compare", "entities": ["SOL", "SUI"], "agents": ["crypto_research"]}, "tags": ["rules"]}
+{"id": "intent-compare-nvda-amd", "suite": "intent_routing", "question": "比较 NVDA 和 AMD", "expected": {"question_type": "compare", "entities": ["NVDA", "AMD"], "agents": ["stock_research"]}, "tags": ["rules"]}
+{"id": "intent-compare-vs", "suite": "intent_routing", "question": "NVDA vs AMD", "expected": {"question_type": "compare", "entities": ["NVDA", "AMD"], "agents": ["stock_research"]}, "tags": ["rules"]}
+{"id": "intent-compare-btc-eth", "suite": "intent_routing", "question": "对比 BTC 和 ETH", "expected": {"question_type": "compare", "entities": ["BTC", "ETH"], "agents": ["crypto_research"]}, "tags": ["rules"]}
+{"id": "intent-compare-mixed", "suite": "intent_routing", "question": "比较 NVDA 和 BTC", "expected": {"question_type": "compare", "entities": ["NVDA", "BTC"], "agents": ["stock_research", "crypto_research"]}, "tags": ["rules"]}
+{"id": "intent-compare-aapl-msft", "suite": "intent_routing", "question": "比较 AAPL 和 MSFT", "expected": {"question_type": "compare", "entities": ["AAPL", "MSFT"], "agents": ["stock_research"]}, "tags": ["rules"]}
+{"id": "intent-fed-cut", "suite": "intent_routing", "question": "美联储会不会降息", "expected": {"question_type": "macro", "entities": [], "agents": ["web_research"]}, "tags": ["rules"]}
+{"id": "intent-cpi", "suite": "intent_routing", "question": "最新 CPI 怎么看", "expected": {"question_type": "macro", "entities": [], "agents": ["web_research"]}, "tags": ["rules"]}
+{"id": "intent-nfp", "suite": "intent_routing", "question": "非农数据好不好", "expected": {"question_type": "macro", "entities": [], "agents": ["web_research"]}, "tags": ["rules"]}
+{"id": "intent-vix", "suite": "intent_routing", "question": "VIX 为什么升", "expected": {"question_type": "macro", "entities": [], "agents": ["web_research"]}, "tags": ["rules"]}
+{"id": "intent-fomc", "suite": "intent_routing", "question": "FOMC 会加息吗", "expected": {"question_type": "macro", "entities": [], "agents": ["web_research"]}, "tags": ["rules"]}
+{"id": "intent-hello", "suite": "intent_routing", "question": "你好", "expected": {"question_type": "generic", "entities": [], "agents": ["web_research"]}, "tags": ["rules"]}
+{"id": "intent-pe-explain", "suite": "intent_routing", "question": "帮我解释一下市盈率", "expected": {"question_type": "generic", "entities": [], "agents": ["web_research"]}, "tags": ["rules"]}
+{"id": "intent-what-is-tvl", "suite": "intent_routing", "question": "什么是 TVL", "expected": {"question_type": "generic", "entities": [], "agents": ["web_research"]}, "tags": ["rules"]}
+{"id": "intent-thanks", "suite": "intent_routing", "question": "谢谢", "expected": {"question_type": "generic", "entities": [], "agents": ["web_research"]}, "tags": ["rules"]}
+{"id": "intent-hype-english", "suite": "intent_routing", "question": "What's the hype about?", "expected": {"question_type": "generic", "entities": [], "agents": ["web_research"]}, "tags": ["rules"]}
