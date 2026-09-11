@@ -20,6 +20,7 @@ from typing import Literal
 
 from evals.archive import allocate_run_dir, make_run_id, summarize_counts, write_report
 from evals.datasets_io import DatasetError, list_dataset_files, load_jsonl
+from evals.graders.llm_judge import install_default_live_judge, set_live_judge
 from evals.paths import DATASETS_DIR, LOCAL_RESULTS_DIR, REPO_ROOT
 from evals.registry import SUITE_HARNESS
 from evals.schemas import (
@@ -168,6 +169,19 @@ async def _grade_case(case: EvalCase, harness_name: str) -> CaseResult:
 
 
 async def run_eval(config: EvalConfig) -> tuple[EvalRunReport, Path]:
+    set_live_judge(None)
+    if config.mode == "live":
+        try:
+            install_default_live_judge()
+        except RuntimeError as exc:
+            raise EvalError(str(exc)) from exc
+    try:
+        return await _run_eval(config)
+    finally:
+        set_live_judge(None)
+
+
+async def _run_eval(config: EvalConfig) -> tuple[EvalRunReport, Path]:
     started_at = _now()
     suites = resolve_suites(config)
     if not suites:

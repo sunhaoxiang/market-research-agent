@@ -37,6 +37,7 @@ class MetricName(StrEnum):
     CITATION_VALIDITY = "citation_validity"
     HALLUCINATION_RATE = "hallucination_rate"
     EPISTEMIC_ACCURACY = "epistemic_accuracy"
+    JUDGE_AGREEMENT = "judge_agreement"
     CONFLICT_DETECTION_RATE = "conflict_detection_rate"
     REPORT_COMPLETENESS = "report_completeness"
     NUMERIC_ACCURACY = "numeric_accuracy"

@@ -1,1 +1,1 @@
-"""Grader 包。P7-2 注册确定性打分；LLM judge 见 P7-3。"""
+"""Grader 包。P7-3 起含确定性与 LLM judge。"""
